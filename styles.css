@@ -317,3 +317,46 @@ body.inEditor .layout{padding-top:12px}
   .sticky{width:150px}
   .sticky textarea{height:80px}
 }
+
+/* --- Top-5 gaps fix: two slim rows, per-tool dropdowns, status bar, board + annotate FAB --- */
+.toolbar{flex-direction:column;align-items:stretch;gap:0;padding:4px 6px 0;border-radius:14px;position:sticky;top:6px}
+.tbRow{display:flex;align-items:center;gap:2px;width:100%;min-height:42px;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tbRow::-webkit-scrollbar{display:none}
+.tbRowTools .tool{width:38px;height:38px;min-height:38px;flex:0 0 auto;border-radius:10px}
+.tbRowTools .tool svg{width:20px;height:20px}
+.tbRowTools .tool.active{background:var(--accent);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
+.tbDivider{width:1px;height:26px;background:var(--line);margin:0 4px;flex:0 0 auto}
+.tbBoardBtn{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 10%, var(--surface));color:var(--accent);border-radius:999px;padding:0 12px;min-height:36px;font-weight:700;font-size:13px}
+.tbBoardBtn[aria-pressed="true"]{background:var(--accent);color:#fff}
+.tbRowOpts{border-top:1px solid var(--line);min-height:42px;gap:6px;padding:2px 0}
+.tbRowOpts .sizeGroup{background:var(--paper2);border:1px solid var(--line);border-radius:999px;padding:2px 8px 2px 10px;gap:6px}
+.tbRowOpts #brushSize{width:86px!important;flex:0 1 86px}
+.tbRowOpts .swatch{width:24px;height:24px;min-height:24px;flex:0 0 auto}
+.tbRowOpts input[type=color].colorPick{width:28px;height:28px;min-height:28px;flex:0 0 auto}
+.tbMenuBtn{flex:0 0 auto;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:0 10px;min-height:34px;font-weight:700;font-size:12.5px;white-space:nowrap}
+.tbMenuBtn[aria-expanded="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.statusBar{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;border-top:1px solid var(--line);padding:5px 4px 6px;font-size:11.5px;color:var(--muted);font-weight:600;white-space:nowrap}
+.statusBar::-webkit-scrollbar{display:none}
+.statusBar b{color:var(--ink);font-weight:700}
+.toolPop{position:absolute;left:6px;right:6px;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 32px rgba(0,0,0,.18);padding:10px 12px;display:none;z-index:60;max-height:46vh;overflow:auto}
+@media(min-width:640px){.toolPop{left:auto;right:6px;width:360px}}
+.toolPop.open{display:block}
+.toolPop h5{margin:0 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.toolPop .popRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line)}
+.toolPop .popRow:first-of-type{border-top:0}
+.toolPop label{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
+.toolPop select{max-width:100%}
+.toolOptSection{display:none}
+.toolOptSection.show{display:block}
+#mainToolbar{position:sticky}
+.editorTop{padding:5px 6px;border-radius:12px}
+.annotateFab{position:fixed;right:14px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:55;background:var(--accent);color:#fff;border:0;border-radius:999px;padding:0 18px;min-height:48px;font-weight:700;font-size:14px;box-shadow:0 10px 24px rgba(0,0,0,.28);display:inline-flex;align-items:center;gap:8px}
+.annotateFab.hidden{display:none!important}
+.board{top:8px;left:8px;right:8px;width:auto;max-width:none}
+@media(max-width:860px){
+  #mainToolbar{flex-wrap:nowrap!important;overflow:visible;padding:4px 6px 0;top:6px}
+  #brushSizeGroup{order:0!important;flex:0 1 auto!important;background:var(--paper2)!important;padding:2px 8px!important}
+  #brushSizeGroup input[type=range]{flex:0 1 86px!important;width:86px!important}
+  .editorWrap{margin-top:8px}
+}
+
