@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light dark"/>
 <link rel="icon" href="data:,"/>
 <title>Inkwell — Notes & Reading</title>
-<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Noto+Sans+Bengali:wght@400;600&family=Noto+Sans+Arabic:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
@@ -145,8 +145,8 @@
       <span class="tool-label">Eraser</span>
       <select id="eraserModeSel" class="shapeSel" onchange="S.eraserMode=this.value" title="Eraser behaviour"><option value="split">Standard — cuts strokes</option><option value="stroke">Delete whole stroke</option><option value="whiteout">Whiteout</option></select>
       </span>
-      <span class="tool-label">Size</span>
-      <input type="range" min="1" max="16" value="4" id="brushSize" style="width:100px"/>
+      <span class="sizeGroup"><span class="tool-label">Size</span>
+      <input type="range" min="1" max="16" value="4" id="brushSize" style="width:100px"/></span>
       <span class="moreWrap" id="moreWrapC">
       <span class="tool-label">Template</span>
       <select id="templateSel" onchange="setTemplate(this.value)" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600">
@@ -298,7 +298,7 @@
           <div id="readerBody"><p>Open a book from the library — or import a PDF or EPUB — and it will open here in reading mode first.</p></div>
           <div id="dictBox" class="resultBox hidden"></div>
           <div id="ocrBox" class="resultBox hidden">
-            <b>OCR — recognise print on this page</b>
+            <div class="cardHead"><b>OCR — recognise print on this page</b><button class="btn small cardClose" type="button" onclick="closeReaderCards()" aria-label="Close OCR panel">✕ Close</button></div>
             <p class="kbd" style="line-height:1.6">Runs on-device with Tesseract.js. Language data downloads on first use for the language you pick. Best on clear print; handwriting is not what this is for.</p>
             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0">
               <select id="ocrLang" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600">
@@ -386,8 +386,8 @@
     <select id="texTemplate" onchange="applyTexTemplate(this.value)"><option value="">Blank</option><option value="frac">Fraction</option><option value="sqrt">Square root</option><option value="int">Integral</option><option value="sum">Summation</option><option value="matrix">2×2 matrix</option><option value="pyth">Pythagoras</option></select>
     <label class="kbd">TeX</label>
     <textarea id="texInput" rows="3" style="width:100%;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--bg);color:var(--ink);font-family:ui-monospace,monospace;font-size:14px" placeholder="e.g. \frac{-b \pm \sqrt{b^2-4ac}}{2a}"></textarea>
-    <label class="kbd">Size</label>
-    <input type="range" id="texSize" min="14" max="54" value="26"/>
+    <div class="sizeRow"><label class="kbd" for="texSize" style="flex:0 0 auto">Size</label>
+    <input type="range" id="texSize" min="14" max="54" value="26"/></div>
     <div id="texPreview" style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:8px;overflow:auto;background:#fff;color:#111"></div>
     <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1;justify-content:center" onclick="closeModal('texModal')">Cancel</button><button class="btn primary" style="flex:1;justify-content:center" onclick="insertTex()">Place on page</button></div>
   </div>

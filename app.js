@@ -66,6 +66,8 @@ function showView(v){
   $('mainLayout').classList.toggle('shelf',v==='library');
   document.body.classList.toggle('inEditor',v==='editor'); document.body.classList.toggle('inReader',v==='reader');
   let sr=$('searchResults'); if(sr) sr.classList.add('hidden');
+  let lh=$('libHint'); if(lh) lh.style.visibility='';
+  syncHashForView(v);
   if(v==='library') renderLibrary();
   if(v==='editor' && !curNb()){ // guarantee an editable notebook exists
     let nb=S.items.find(i=>i.kind==='notebook');
@@ -91,8 +93,10 @@ function renderLibrary(){
   $('statBooks').textContent=S.items.filter(i=>i.kind!=='notebook').length;
   $('statPages').textContent=S.items.reduce((a,n)=>a+itemPages(n),0);
   $('statAnnos').textContent=S.items.reduce((a,n)=>a+((n.annotations||[]).length),0);
-  let userItems=S.items.filter(i=>!i.sample);
-  $('emptyState').classList.toggle('hidden', userItems.length>0);
+  /* P11: the shelf is only "empty" when nothing is on it at all — the
+     built-in sample book counts, so the banner no longer claims a fresh,
+     empty shelf while the sample book sits right below it. */
+  $('emptyState').classList.toggle('hidden', S.items.length>0);
   $('libHint').textContent=q? items.length+' on the shelf — search also looks inside notes, books and annotations.' : '';
   $('libraryGrid').innerHTML=items.map(n=>{
     let cov=coverFor(n);
@@ -163,7 +167,7 @@ function onSearchInput(){
   let q=($('globalSearch').value||'').trim().toLowerCase();
   let box=$('searchResults');
   if(S.view==='library') renderLibrary();
-  if(q.length<2){ box.classList.add('hidden'); S.searchResults=[]; return; }
+  if(q.length<2){ box.classList.add('hidden'); S.searchResults=[]; $('libHint').style.visibility=''; return; }
   let res=[];
   S.items.forEach(it=>{
     if(it.title.toLowerCase().includes(q)) res.push({label:it.title, sub:(it.kind==='notebook'?'Notebook':'Book')+' — title match', act:()=> it.kind==='notebook'? openNotebook(it.id): openBook(it.id)});
@@ -188,9 +192,12 @@ function onSearchInput(){
   S.searchResults=res.slice(0,14);
   box.innerHTML= S.searchResults.length? S.searchResults.map((r,i)=>'<div class="srItem" onclick="runSearchResult('+i+')"><b>'+esc(r.label)+'</b><span>'+r.sub+'</span></div>').join('') : '<div class="srItem"><span>No matches inside your notes and books.</span></div>';
   box.classList.remove('hidden');
+  /* P13: while the results dropdown is open, blank the status line under
+     it so the two never overlap/read through each other. */
+  $('libHint').style.visibility='hidden';
 }
-function runSearchResult(i){ let r=S.searchResults[i]; $('searchResults').classList.add('hidden'); if(r&&r.act) r.act(); }
-document.addEventListener('click',e=>{ if(!e.target.closest('.searchWrap')) $('searchResults').classList.add('hidden'); });
+function runSearchResult(i){ let r=S.searchResults[i]; $('searchResults').classList.add('hidden'); $('libHint').style.visibility=''; if(r&&r.act) r.act(); }
+document.addEventListener('click',e=>{ if(!e.target.closest('.searchWrap')){ $('searchResults').classList.add('hidden'); let lh=$('libHint'); if(lh) lh.style.visibility=''; } });
 
 /* ============ notebooks: create / open ============ */
 function openNewNotebook(){$('newModal').classList.add('open'); setTimeout(()=>$('newTitle').focus(),50)}
@@ -1171,7 +1178,7 @@ function renderPages(){
     +'<div class="ptRow"><span class="kbd">Page '+(i+1)+(p.board&&p.board.strokes.length?' • board':'')+(p.bgPdf?' • PDF p.'+p.bgPdf.page:'')+'</span><span>'
     +'<button class="miniBtn" title="Move up" onclick="pageAction('+i+',\'up\',event)">↑</button> '
     +'<button class="miniBtn" title="Move down" onclick="pageAction('+i+',\'down\',event)">↓</button> '
-    +'<button class="miniBtn" title="Duplicate" onclick="pageAction('+i+',\'dup\',event)">⧉</button> '
+    +'<button class="miniBtn" title="Duplicate" aria-label="Duplicate page" onclick="pageAction('+i+',\'dup\',event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button> '
     +'<button class="miniBtn" title="Delete page" onclick="pageAction('+i+',\'del\',event)">×</button></span></div></div>';
   }).join('');
   $('statEditorPages').textContent=nb.pages.length;
@@ -1371,7 +1378,7 @@ function renderTexLayer(){
     let d=document.createElement('div'); d.className='texEl';
     d.style.left=(t.x/CW*100)+'%'; d.style.top=(t.y/PH*100)+'%';
     texRenderInto(d, t.tex, Math.max(10,(t.size||26)*scale), t.color);
-    let del=document.createElement('button'); del.className='miniBtn'; del.textContent='×'; del.title='Remove equation'; del.style.cssText='position:absolute;top:-10px;right:-10px;z-index:3;background:#fff';
+    let del=document.createElement('button'); del.className='miniBtn'; del.textContent='×'; del.title='Remove equation'; del.style.cssText='position:absolute;top:-10px;left:-12px;z-index:3;background:#fff'; /* P9: was top-right, sitting on the superscript — now top-left, clear of the maths */
     del.onclick=e=>{ e.stopPropagation(); p.texs=p.texs.filter(x=>x!==t); bumpV(p); renderTexLayer(); renderPages(); };
     d.appendChild(del);
     d.addEventListener('pointerdown',e=>{
@@ -1391,7 +1398,7 @@ function openTexModal(){
   setTimeout(()=>$('texInput').focus(),50);
 }
 function applyTexTemplate(k){ if(k && TEX_TEMPLATES[k]){ $('texInput').value=TEX_TEMPLATES[k]; updateTexPreview(); } }
-function updateTexPreview(){ texRenderInto($('texPreview'), $('texInput').value||'x^2', +$('texSize').value, S.color); }
+function updateTexPreview(){ let v=$('texInput').value.trim(); let pv=$('texPreview'); if(!v){ /* P8: an empty box previews nothing — no phantom x² that Place then rejects */ pv.textContent='Your equation will preview here as you type.'; pv.style.cssText='border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:8px;overflow:auto;background:var(--paper2);color:var(--muted);font-size:13px'; return; } pv.style.cssText='border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:8px;overflow:auto;background:#fff;color:#111'; texRenderInto(pv, v, +$('texSize').value, S.color); }
 function insertTex(){
   let p=curPageObj(); if(!p) return;
   let tex=$('texInput').value.trim(); if(!tex){ toast('Write some TeX first'); return; }
@@ -1685,6 +1692,7 @@ function showEpubChrome(){ $('pdfView').classList.add('hidden'); $('readerArticl
 function showPdfChrome(){ $('pdfView').classList.remove('hidden'); $('readerArticle').classList.add('hidden'); $('ttsBar').classList.remove('hidden'); $('parallelBox').classList.add('hidden'); }
 function closePdf(){ let b=curBook(); if(b) b.mode='scroll'; showView('library'); }
 function setReaderMode(m){
+  closeReaderCards();
   $('modeScrollBtn').classList.toggle('active',m==='scroll'); $('modePageBtn').classList.toggle('active',m==='page');
   let b=curBook(); if(b){ b.mode=m; if(b.kind==='pdf') renderPdfBook(); else renderEpubBook(); }
   toast(m==='scroll'?'Scroll view':'Page view — one at a time, use Prev / Next');
@@ -1701,14 +1709,49 @@ function updateResume(){
 /* --- EPUB rendering --- */
 function renderEpubBook(){
   let b=curBook(); if(!b||b.kind!=='epub') return;
+  /* the lookup card may have been parked inside the body next to a
+     selection — rescue it (and the OCR panel) before innerHTML is rebuilt */
+  ['dictBox','ocrBox'].forEach(id=>{ let el=$(id); if(el && el.closest('#readerBody')) $('readerArticle').appendChild(el); });
   $('readerBadge').textContent=(b.sample?'Sample book':'EPUB')+' • '+b.chapters.length+' chapters';
   $('readerTitle').textContent=b.title;
   let body=$('readerBody');
   if(b.mode==='page'){ let c=b.chapters[b.ch]; body.innerHTML='<h3 style="font-family:Newsreader,serif;font-size:24px;margin:14px 0 6px">'+esc(c.title)+'</h3>'+c.html; }
   else { body.innerHTML=b.chapters.map((c,i)=>'<div data-ch="'+i+'"><h3 style="font-family:Newsreader,serif;font-size:24px;margin:22px 0 6px">'+esc(c.title)+'</h3>'+c.html+'</div>').join(''); }
+  reapplyAnnotations();
   updateResume();
 }
-function jumpToChapter(i){ let b=curBook(); if(!b||b.kind!=='epub') return; b.ch=Math.max(0,Math.min(b.chapters.length-1,i));
+/* P2: highlights used to live only as DOM <mark> wrappers, so any
+   re-render (Scroll → Page switch, chapter jump) rebuilt the body from
+   the raw chapter HTML and the marks vanished even though the annotation
+   list kept them. Re-wrap the stored annotation texts after every render. */
+function wrapTextOnce(container,needle,kind){
+  if(!container||!needle) return false;
+  let walker=document.createTreeWalker(container,NodeFilter.SHOW_TEXT,{acceptNode:n=>{
+    if(!n.nodeValue||n.nodeValue.indexOf(needle)<0) return NodeFilter.FILTER_REJECT;
+    if(n.parentElement && n.parentElement.closest('mark,[data-hl]')) return NodeFilter.FILTER_REJECT;
+    return NodeFilter.FILTER_ACCEPT;
+  }});
+  let node=walker.nextNode(); if(!node) return false;
+  let idx=node.nodeValue.indexOf(needle);
+  let range=document.createRange(); range.setStart(node,idx); range.setEnd(node,idx+needle.length);
+  let wrapEl;
+  if(kind==='underline'){ wrapEl=document.createElement('span'); wrapEl.style.cssText='text-decoration:underline;text-decoration-color:#2456c8;text-decoration-thickness:2px'; }
+  else if(kind==='strike'){ wrapEl=document.createElement('span'); wrapEl.style.cssText='text-decoration:line-through;text-decoration-color:#b23a2e;text-decoration-thickness:2px'; }
+  else wrapEl=document.createElement('mark');
+  wrapEl.setAttribute('data-hl','1');
+  try{ range.surroundContents(wrapEl); return true; }catch(e){ return false; }
+}
+function reapplyAnnotations(){
+  let b=curBook(); if(!b||b.kind!=='epub') return;
+  (b.annotations||[]).forEach(a=>{
+    let m=/Chapter\s+(\d+)/.exec(a.where||''); let ci=m? (+m[1]-1) : b.ch;
+    let container= b.mode==='page'? (ci===b.ch? $('readerBody') : null) : document.querySelector('[data-ch="'+ci+'"]');
+    if(container) wrapTextOnce(container,a.text,a.kind||'highlight');
+  });
+}
+/* P3: lookup / OCR cards — closable, and never left behind on a new page */
+function closeReaderCards(){ let d=$('dictBox'); if(d) d.classList.add('hidden'); let o=$('ocrBox'); if(o) o.classList.add('hidden'); }
+function jumpToChapter(i){ let b=curBook(); if(!b||b.kind!=='epub') return; closeReaderCards(); b.ch=Math.max(0,Math.min(b.chapters.length-1,i));
   if(b.mode==='page') renderEpubBook(); else { let el=document.querySelector('[data-ch="'+b.ch+'"]'); if(el) el.scrollIntoView({behavior:'smooth'}); updateResume(); }
   renderReaderSide(); }
 
@@ -1791,7 +1834,7 @@ async function renderPdfBook(){
   host.querySelectorAll('.pdfPage').forEach(el=>pdfObserver.observe(el));
 }
 function jumpToPdfPage(n){
-  let b=curBook(); if(!b||b.kind!=='pdf') return;
+  let b=curBook(); if(!b||b.kind!=='pdf') return; closeReaderCards();
   b.page=Math.max(1,Math.min(b.numPages,n));
   if(b.mode==='page'){ renderPdfBook(); window.scrollTo({top:0}); }
   else { let el=document.querySelector('.pdfPage[data-page="'+b.page+'"]'); if(el) el.scrollIntoView({behavior:'smooth'}); updateResume(); }
@@ -1887,8 +1930,13 @@ async function lookupSelection(){
   let w=(window.getSelection().toString().trim().split(/\s+/)[0]||'').replace(/[^A-Za-z'-]/g,'');
   let box=$('dictBox');
   if(!w){ toast('Select a word in the text first'); return; }
-  box.classList.remove('hidden'); box.innerHTML='<b>'+esc(w)+'</b><p class="kbd">Looking it up…</p>'; box.scrollIntoView({behavior:'smooth',block:'nearest'});
-  let html='<b style="font-size:18px">'+esc(w)+'</b>';
+  /* P3: park the card right after the paragraph the word sits in, so it
+     lands on-screen next to the selection instead of at the end of the
+     whole book (where it sat in Scroll mode), and give it a close button. */
+  try{ let sel=window.getSelection(); if(sel.rangeCount){ let node=sel.getRangeAt(0).commonAncestorContainer; let el=node.nodeType===1? node : node.parentElement; let block=el && el.closest? (el.closest('p,li,div')||el) : null; if(block && block.parentNode) block.parentNode.insertBefore(box, block.nextSibling); } }catch(e){}
+  let closeBtn='<div class="cardHead"><span></span><button class="btn small cardClose" type="button" onclick="closeReaderCards()" aria-label="Close lookup">✕ Close</button></div>';
+  box.classList.remove('hidden'); box.innerHTML=closeBtn+'<b>'+esc(w)+'</b><p class="kbd">Looking it up…</p>'; box.scrollIntoView({behavior:'smooth',block:'nearest'});
+  let html=closeBtn+'<b style="font-size:18px">'+esc(w)+'</b>';
   try{
     let r=await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(w.toLowerCase()));
     if(r.ok){ let data=await r.json(); let e0=data[0];
@@ -1906,7 +1954,7 @@ async function lookupSelection(){
 
 /* --- OCR: Tesseract.js on-device --- */
 let lastOcrText='';
-function openOcrPanel(){ $('ocrBox').classList.remove('hidden'); $('ocrBox').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+function openOcrPanel(){ let box=$('ocrBox'); /* P3: move the panel to the top of the article so it opens on-screen, not past the end of the book */ let art=$('readerArticle'); if(art && box.parentNode!==art) art.appendChild(box); if(art) art.insertBefore(box, $('readerBody')); box.classList.remove('hidden'); box.scrollIntoView({behavior:'smooth',block:'nearest'}); }
 async function ocrSourceCanvas(){
   let b=curBook();
   if(S.view==='reader' && b && b.kind==='epub'){ toast('This book already has real text — OCR is for scanned PDF pages and images'); return null; }
@@ -2028,6 +2076,7 @@ async function translateParallel(){
       done.push(t);
     }
     out.textContent=done.join(' ');
+    out.setAttribute('lang',lang); /* with the Noto Sans Bengali/Arabic webfonts loaded in <head>, the translation renders real glyphs on devices with no Bengali font installed */
     let b=curBook(); if(b) $('parallelNotes').value=(b.parallelNotes&&b.parallelNotes[parallelKey()])||'';
   }catch(e){ out.textContent='Translation needs a connection and the free service has a daily limit — try again in a moment.'; }
 }
@@ -2065,7 +2114,28 @@ function openTimer(){
 /* ============ session stats ticker ============ */
 setInterval(()=>{ if(S.view==='editor') S.stats.writeSec++; if(S.view==='reader') S.stats.readSec++; if(S.stats.writeSec%15===0||S.stats.readSec%15===0) updateStatsPanel(); },1000);
 
+/* ============ hash routing (P14, safe part) ============
+   Routes: #/ (library), #/note/:id (notebook editor), #/book/:id (reader).
+   Back/Forward now move between shelf, notebook and book. This stays a
+   classic script on purpose: dozens of inline onclick/onchange/oninput
+   handlers call these functions as globals, so converting to ES modules
+   would break every one of them. No test suite is added in this pass. */
+function syncHashForView(v){
+  let h= v==='editor' && S.curNbId? '#/note/'+S.curNbId : v==='reader' && S.curBookId? '#/book/'+S.curBookId : '#/';
+  if(window.location.hash!==h){ try{ history.pushState(null,'',h); }catch(e){ /* sandboxed frames may refuse pushState — the view still works, only the hash stays stale */ } }
+}
+function applyRoute(){
+  let h=window.location.hash||'#/';
+  let mNote=/^#\/note\/(.+)$/.exec(h), mBook=/^#\/book\/(.+)$/.exec(h);
+  if(mNote){ let id=decodeURIComponent(mNote[1]); if(S.view==='editor' && S.curNbId===id) return; let nb=S.items.find(i=>i.id===id && i.kind==='notebook'); if(nb){ openNotebook(id); return; } }
+  if(mBook){ let id=decodeURIComponent(mBook[1]); if(S.view==='reader' && S.curBookId===id) return; let b=S.items.find(i=>i.id===id && i.kind!=='notebook'); if(b){ openBook(id); return; } }
+  if(S.view!=='library') showView('library');
+}
+window.addEventListener('hashchange',applyRoute);
+window.addEventListener('popstate',applyRoute);
+
 /* ============ init ============ */
 S.items.push(sampleBook());
 renderLibrary();
-showView('library');
+if(/^#\/(note|book)\//.test(window.location.hash||'')){ applyRoute(); if(S.view==='library' && !S.curNbId && !S.curBookId) showView('library'); }
+else showView('library');

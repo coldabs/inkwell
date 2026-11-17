@@ -107,7 +107,11 @@ a{color:var(--accent)}
 .splitPane p{font-family:Newsreader,serif;line-height:1.7;font-size:15px}
 .reader{max-width:760px;margin:0 auto;background:var(--paper);border:1px solid var(--line);border-radius:22px;padding:28px 28px 36px;box-shadow:var(--shadow)}
 .reader.sepia{--paper:#fbf3d9;--ink:#3b2f1a;color:#3b2f1a}
-.reader.dark{--paper:#171917;--ink:#e8e6df;color:#e8e6df}
+.reader.dark{--paper:#171917;--ink:#e8e6df;--paper2:#232823;--bg:#232823;--card:#1e211e;--line:#3d443c;--muted:#a8ada0;color:#e8e6df}
+.reader.dark .badge{background:#232823;color:#e8e6df;border-color:#3d443c}
+.reader.dark .resultBox{background:#232823;color:#e8e6df;border-color:#3d443c}
+.reader.dark .resultBox .kbd{color:#a8ada0}
+.reader.dark mark{background:#ffe98a;color:#111}
 .reader h2{font-family:Newsreader,serif;font-size:32px;line-height:1.05;margin:6px 0 8px}
 .reader h1,.reader h3,.reader h4{font-family:Newsreader,serif}
 .reader p,.reader li{font-family:Newsreader,serif;font-size:var(--reader-fs);line-height:1.75}
@@ -217,6 +221,32 @@ input[type=color].colorPick{width:34px;height:34px;min-height:34px;border:1px so
 .popMenu .btn:hover,.popMenu label.btn:hover{background:var(--paper2)}
 details.helpBox{margin-top:12px;border-top:1px solid var(--line);padding-top:4px}
 details.helpBox summary{cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 0;min-height:40px;display:flex;align-items:center}
+
+/* --- audit fix pass (P1–P14) --- */
+/* P4: only one sticky bar per view — the editor header and the reader's
+   "More" row scroll away instead of sticking over the sidebar/page. */
+.editorTop{position:static}
+#readerMore{position:static;margin-top:8px}
+/* P5: translations get real Bengali/Arabic glyph coverage, not tofu boxes */
+#parallelTrans{font-family:"Noto Sans Bengali","Noto Sans Arabic","Noto Sans",Newsreader,serif}
+/* P6: a label and its slider travel as one unbreakable group */
+.sizeGroup{display:inline-flex;align-items:center;gap:2px;flex:0 0 auto;white-space:nowrap}
+.sizeRow{display:flex;align-items:center;gap:10px;margin-top:8px}
+.sizeRow input[type=range]{flex:1;width:auto!important}
+/* P7: page label never wraps; duplicate button carries a real SVG icon */
+.pageThumb .ptRow{flex-wrap:wrap}
+.pageThumb .ptRow .kbd{white-space:nowrap}
+.miniBtn svg{width:13px;height:13px;display:block}
+.ptBtns{display:inline-flex;gap:4px;flex-wrap:nowrap}
+/* P10: in split view stickies shrink to fit the halved page instead of
+   being clipped by the page shell */
+.stageWrap.split .sticky{width:132px}
+.stageWrap.split .sticky textarea{height:70px;font-size:12px;padding:6px}
+/* P12: the Sample book pill is a real action, not a disabled-looking chip */
+.chip.dashed{border:1.5px solid var(--accent);background:color-mix(in srgb,var(--accent) 9%, var(--surface));color:var(--accent);font-weight:600}
+/* P3: lookup / OCR cards get a visible close control */
+.cardHead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.cardClose{flex:0 0 auto}
 
 /* --- minimal pass: one clear action per screen; in the editor the page comes first --- */
 #noteTitle{font-size:22px!important}
