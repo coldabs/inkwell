@@ -759,6 +759,12 @@ function drawStroke(ctx,st){
     else if(st.shape==='arrow'){ ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); let ang=Math.atan2(b.y-a.y,b.x-a.x), hl=18+st.size*2; ctx.beginPath(); ctx.moveTo(b.x,b.y); ctx.lineTo(b.x-hl*Math.cos(ang-0.42), b.y-hl*Math.sin(ang-0.42)); ctx.moveTo(b.x,b.y); ctx.lineTo(b.x-hl*Math.cos(ang+0.42), b.y-hl*Math.sin(ang+0.42)); ctx.stroke(); }
     ctx.restore(); return;
   }
+  if(st.tool==='poly'){
+    ctx.save(); ctx.strokeStyle=st.color; ctx.lineWidth=Math.max(1.5,st.size*1.4); ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
+    if(st.fill){ ctx.closePath(); ctx.fillStyle=st.color; ctx.globalAlpha=0.28; ctx.fill(); ctx.globalAlpha=1; }
+    ctx.stroke(); ctx.restore(); return;
+  }
   if(st.tool==='highlighter'){
     ctx.save(); ctx.globalCompositeOperation='multiply'; ctx.globalAlpha=0.42; ctx.strokeStyle=st.color; ctx.lineWidth=st.size*4.5;
     ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y); ctx.stroke(); ctx.restore(); return;
@@ -803,7 +809,7 @@ function composePage(p, template, out){
   return c;
 }
 
-/* ============ Xournal-style shapes, selection, on-page text & images, zoom ============ */
+/* ============ Shapes, selection, on-page text & images, zoom ============ */
 let selDrag=null, moveDrag=null;
 function strokeBBox(st){ let xs=st.points.map(p=>p.x), ys=st.points.map(p=>p.y); return {x1:Math.min.apply(null,xs),y1:Math.min.apply(null,ys),x2:Math.max.apply(null,xs),y2:Math.max.apply(null,ys)}; }
 function selectionBBox(){ if(!S.selection.length) return null; let bs=S.selection.map(strokeBBox); return {x1:Math.min.apply(null,bs.map(b=>b.x1)),y1:Math.min.apply(null,bs.map(b=>b.y1)),x2:Math.max.apply(null,bs.map(b=>b.x2)),y2:Math.max.apply(null,bs.map(b=>b.y2))}; }
@@ -822,16 +828,248 @@ function finishSelection(){ let p=curPageObj(); if(!p||!S.selRect) return; let r
   let all=p.ink.concat(p.hi); S.selection=all.filter(st=>{ let b=strokeBBox(st); return b.x2>=r.x1 && b.x1<=r.x2 && b.y2>=r.y1 && b.y1<=r.y2; });
   drawSelectionOverlay(); if(S.selection.length) toast(S.selection.length+' stroke(s) selected — drag inside the box to move'); else toast('Nothing in that box — drag around some ink');
 }
-function recogniseStroke(st){
-  let pts=st.points; if(pts.length<6) return st;
-  let a=pts[0], b=pts[pts.length-1];
-  let closed=Math.hypot(b.x-a.x,b.y-a.y)<36;
+/* ============ Shape recogniser (inertia-based polygonal recognition) ============
+   Each stroke is split into straight segments by recursive polygonal
+   approximation: a candidate segment is scored by the determinant of its
+   inertia tensor (an ideal straight segment scores 0), grown while the
+   score stays low, and the break points are then optimised. Segments are
+   queued across consecutive strokes, so a triangle or rectangle drawn
+   side-by-side in several strokes still combines into one shape. A lone
+   segment becomes a snapped line; a non-polygonal stroke is tested as a
+   circle by its inertia radius and radial deviation score. */
+const RECO_MAX_SIDES=4;                    /* MAX_POLYGON_SIDES */
+const RECO_SEGMENT_MAX_DET=0.045;          /* SEGMENT_MAX_DET: max score for a polygon segment (ideal line = 0) */
+const RECO_LINE_MAX_DET=0.015;             /* LINE_MAX_DET: max score for a single line, stricter than for polygons */
+const RECO_LINE_POINT_DIST2=15;            /* LINE_POINT_DIST2_THRESHOLD */
+const RECO_CIRCLE_MIN_DET=0.95;            /* CIRCLE_MIN_DET (ideal circle = 1) */
+const RECO_CIRCLE_MAX_SCORE=0.10;          /* CIRCLE_MAX_SCORE (ideal circle = 0) */
+const RECO_SLANT_TOL=5*Math.PI/180;        /* SLANT_TOLERANCE: ignore slanting by +/- 5 degrees */
+const RECO_TRI_TOL=0.3;                    /* TRIANGLE_LINEAR_TOLERANCE */
+const RECO_RECT_ANGLE_TOL=15*Math.PI/180;  /* RECTANGLE_ANGLE_TOLERANCE */
+const RECO_RECT_TOL=0.20;                  /* RECTANGLE_LINEAR_TOLERANCE */
+const RECO_MIN_SIZE=10;                    /* smallest stroke (bounds diagonal) worth recognising */
+
+function inertiaNew(){ return {mass:0,sx:0,sy:0,sxx:0,sxy:0,syy:0}; }
+function inertiaCopy(s){ return {mass:s.mass,sx:s.sx,sy:s.sy,sxx:s.sxx,sxy:s.sxy,syy:s.syy}; }
+function inertiaIncrease(s,p1,p2,coef){ let dm=coef*Math.hypot(p2.x-p1.x,p2.y-p1.y); s.mass+=dm; s.sx+=dm*p1.x; s.sy+=dm*p1.y; s.sxx+=dm*p1.x*p1.x; s.syy+=dm*p1.y*p1.y; s.sxy+=dm*p1.x*p1.y; }
+function inertiaCalc(s,pts,i1,i2){ s.mass=s.sx=s.sy=s.sxx=s.sxy=s.syy=0; for(let i=i1;i<i2;i++) inertiaIncrease(s,pts[i],pts[i+1],1); }
+function inertiaXX(s){ return s.mass<=0?0:(s.sxx-s.sx*s.sx/s.mass)/s.mass; }
+function inertiaXY(s){ return s.mass<=0?0:(s.sxy-s.sx*s.sy/s.mass)/s.mass; }
+function inertiaYY(s){ return s.mass<=0?0:(s.syy-s.sy*s.sy/s.mass)/s.mass; }
+function inertiaRad(s){ let v=inertiaXX(s)+inertiaYY(s); return v<=0?0:Math.sqrt(v); }
+function inertiaDet(s){ let a=inertiaXX(s), b=inertiaYY(s), c=inertiaXY(s); if(s.mass<=0||a+b<=0) return 0; return 4*(a*b-c*c)/(a+b)/(a+b); }
+function inertiaCX(s){ return s.sx/s.mass; }
+function inertiaCY(s){ return s.sy/s.mass; }
+
+function recoSegmentGeometry(pts,start,end,s){
+  let seg={startpt:start,endpt:end,xcenter:inertiaCX(s),ycenter:inertiaCY(s),angle:0,radius:0,x1:0,y1:0,x2:0,y2:0,reversed:false,srcStroke:null};
+  let a=inertiaXX(s), b=inertiaXY(s), c=inertiaYY(s);
+  /* max angle for inertia quadratic form solves: tan(2t) = 2b/(a-c) */
+  seg.angle=Math.atan2(2*b,a-c)/2;
+  seg.radius=Math.sqrt(3*(a+c));
+  let lmin=0, lmax=0, ca=Math.cos(seg.angle), sa=Math.sin(seg.angle);
+  for(let i=start;i<=end;i++){ let l=(pts[i].x-seg.xcenter)*ca+(pts[i].y-seg.ycenter)*sa; if(l<lmin) lmin=l; if(l>lmax) lmax=l; }
+  seg.x1=seg.xcenter+lmin*ca; seg.y1=seg.ycenter+lmin*sa;
+  seg.x2=seg.xcenter+lmax*ca; seg.y2=seg.ycenter+lmax*sa;
+  return seg;
+}
+function recoEdgeIsect(r1,r2){
+  let t=(r2.xcenter-r1.xcenter)*Math.sin(r2.angle)-(r2.ycenter-r1.ycenter)*Math.cos(r2.angle);
+  t/=Math.sin(r2.angle-r1.angle);
+  return {x:r1.xcenter+t*Math.cos(r1.angle), y:r1.ycenter+t*Math.sin(r1.angle)};
+}
+function recoDist2(p,q){ let dx=p.x-q.x, dy=p.y-q.y; return dx*dx+dy*dy; }
+
+/* Check if a stroke range is a polygonal line with at most nsides sides.
+   [start, finish] (inclusive) is the range in pts; brk/ss are filled at offset off. */
+function recoFindPolygonal(pts,start,finish,nsides,brk,ss,off){
+  let s=inertiaNew(), i1=0, i2=0, n1=0, n2=0;
+  if(finish===start) return 0;
+  if(nsides<=0) return 0;
+  if(finish-start<5) nsides=1; /* too small for a polygon */
+  /* look for a linear piece that's big enough */
+  let k=0;
+  for(;k<nsides;k++){
+    i1=start+Math.floor(k*(finish-start)/nsides);
+    i2=start+Math.floor((k+1)*(finish-start)/nsides);
+    inertiaCalc(s,pts,i1,i2);
+    if(inertiaDet(s)<RECO_SEGMENT_MAX_DET) break;
+  }
+  if(k===nsides) return 0; /* failed */
+  /* grow the linear piece we found */
+  while(true){
+    let det1, det2, s1=null, s2=null;
+    if(i1>start){ s1=inertiaCopy(s); inertiaIncrease(s1,pts[i1-1],pts[i1],1); det1=inertiaDet(s1); } else det1=1.0;
+    if(i2<finish){ s2=inertiaCopy(s); inertiaIncrease(s2,pts[i2],pts[i2+1],1); det2=inertiaDet(s2); } else det2=1.0;
+    if(det1<det2 && det1<RECO_SEGMENT_MAX_DET){ i1--; s=s1; }
+    else if(det2<det1 && det2<RECO_SEGMENT_MAX_DET){ i2++; s=s2; }
+    else break;
+  }
+  if(i1>start){
+    n1=recoFindPolygonal(pts,start,i1,(i2===finish)?(nsides-1):(nsides-2),brk,ss,off);
+    if(n1===0) return 0; /* it doesn't work */
+  }
+  brk[off+n1]=i1; brk[off+n1+1]=i2; ss[off+n1]=s;
+  if(i2<finish){
+    n2=recoFindPolygonal(pts,i2,finish,nsides-n1-1,brk,ss,off+n1+1);
+    if(n2===0) return 0;
+  }
+  return n1+n2+1;
+}
+/* Improve on the polygon found by recoFindPolygonal() */
+function recoOptimizePolygonal(pts,nsides,brk,ss){
+  for(let i=1;i<nsides;i++){
+    /* optimize break between sides i and i+1 */
+    let a0=inertiaDet(ss[i-1]), b0=inertiaDet(ss[i]);
+    let cost=a0*a0+b0*b0;
+    let s1=inertiaCopy(ss[i-1]), s2=inertiaCopy(ss[i]);
+    let improved=false;
+    while(brk[i]>brk[i-1]+1){
+      /* try moving the break to the left */
+      inertiaIncrease(s1,pts[brk[i]-1],pts[brk[i]-2],-1);
+      inertiaIncrease(s2,pts[brk[i]-1],pts[brk[i]-2],1);
+      let a=inertiaDet(s1), b=inertiaDet(s2), nc=a*a+b*b;
+      if(nc>=cost) break;
+      improved=true; cost=nc; brk[i]--; ss[i-1]=inertiaCopy(s1); ss[i]=inertiaCopy(s2);
+    }
+    if(improved) continue;
+    s1=inertiaCopy(ss[i-1]); s2=inertiaCopy(ss[i]);
+    while(brk[i]<brk[i+1]-1){
+      /* try moving the break to the right */
+      inertiaIncrease(s1,pts[brk[i]],pts[brk[i]+1],1);
+      inertiaIncrease(s2,pts[brk[i]],pts[brk[i]+1],-1);
+      let a=inertiaDet(s1), b=inertiaDet(s2), nc=a*a+b*b;
+      if(nc>=cost) break;
+      cost=nc; brk[i]++; ss[i-1]=inertiaCopy(s1); ss[i]=inertiaCopy(s2);
+    }
+  }
+}
+
+let recoQueue=[], recoQueuePage=null;
+function recoTryTriangle(){
+  if(recoQueue.length<3) return null;
+  let rs=recoQueue.slice(recoQueue.length-3);
+  if(rs[0].startpt!==0) return null;
+  /* orient segments so neighbours point towards each other (all clockwise or all counter-clockwise) */
+  for(let i=0;i<=2;i++){
+    let r1=rs[i], r2=rs[(i+1)%3];
+    let minPRPS=Math.min(recoDist2({x:r1.x1,y:r1.y1},{x:r2.x1,y:r2.y1}), recoDist2({x:r1.x1,y:r1.y1},{x:r2.x2,y:r2.y2}));
+    let minQRQS=Math.min(recoDist2({x:r1.x2,y:r1.y2},{x:r2.x1,y:r2.y1}), recoDist2({x:r1.x2,y:r1.y2},{x:r2.x2,y:r2.y2}));
+    r1.reversed = minPRPS<minQRQS;
+  }
+  for(let i=0;i<=2;i++){
+    let r1=rs[i], r2=rs[(i+1)%3];
+    let x1=r1.reversed?r1.x1:r1.x2, y1=r1.reversed?r1.y1:r1.y2;
+    let x2=r2.reversed?r2.x2:r2.x1, y2=r2.reversed?r2.y2:r2.y1;
+    if(Math.hypot(x1-x2,y1-y2) > RECO_TRI_TOL*(r1.radius+r2.radius)) return null;
+  }
+  let pts=[]; for(let i=0;i<=2;i++) pts.push(recoEdgeIsect(rs[i],rs[(i+1)%3]));
+  pts.push({x:pts[0].x,y:pts[0].y});
+  return {pts:pts,count:3};
+}
+function recoTryRectangle(){
+  if(recoQueue.length<4) return null;
+  let rs=recoQueue.slice(recoQueue.length-4);
+  if(rs[0].startpt!==0) return null;
+  /* check edges make angles ~= Pi/2 and vertices roughly match */
+  let avgAngle=0;
+  for(let i=0;i<=3;i++){
+    let r1=rs[i], r2=rs[(i+1)%4];
+    if(Math.abs(Math.abs(r1.angle-r2.angle)-Math.PI/2) > RECO_RECT_ANGLE_TOL) return null;
+    avgAngle+=r1.angle;
+    if(r2.angle>r1.angle) avgAngle+=(i+1)*Math.PI/2; else avgAngle-=(i+1)*Math.PI/2;
+    /* test if r1 points away from r2 rather than towards it */
+    r1.reversed = ((r1.x2-r1.x1)*(r2.xcenter-r1.xcenter)+(r1.y2-r1.y1)*(r2.ycenter-r1.ycenter))<0;
+  }
+  for(let i=0;i<=3;i++){
+    let r1=rs[i], r2=rs[(i+1)%4];
+    let d=Math.hypot((r1.reversed?r1.x1:r1.x2)-(r2.reversed?r2.x2:r2.x1), (r1.reversed?r1.y1:r1.y2)-(r2.reversed?r2.y2:r2.y1));
+    if(d > RECO_RECT_TOL*(r1.radius+r2.radius)) return null;
+  }
+  /* make a rectangle of the correct size and slope */
+  avgAngle/=4;
+  if(Math.abs(avgAngle)<RECO_SLANT_TOL) avgAngle=0;
+  if(Math.abs(avgAngle)>Math.PI/2-RECO_SLANT_TOL) avgAngle=Math.PI/2;
+  for(let i=0;i<=3;i++) rs[i].angle=avgAngle+i*Math.PI/2;
+  let pts=[]; for(let i=0;i<=3;i++) pts.push(recoEdgeIsect(rs[i],rs[(i+1)%4]));
+  pts.push({x:pts[0].x,y:pts[0].y});
+  return {pts:pts,count:4};
+}
+function recoScoreCircle(pts,s){
+  let r0=inertiaRad(s), divisor=s.mass*r0;
+  if(divisor===0) return 0;
+  let sum=0, x0=inertiaCX(s), y0=inertiaCY(s);
+  for(let i=0;i+1<pts.length;i++){
+    let dm=Math.hypot(pts[i+1].x-pts[i].x, pts[i+1].y-pts[i].y);
+    let deltar=Math.hypot(pts[i].x-x0,pts[i].y-y0)-r0;
+    sum+=dm*Math.abs(deltar);
+  }
+  return sum/divisor;
+}
+function recoTryCircle(st){
+  let s=inertiaNew(); inertiaCalc(s,st.points,0,st.points.length-1);
+  if(inertiaDet(s)>RECO_CIRCLE_MIN_DET && recoScoreCircle(st.points,s)<RECO_CIRCLE_MAX_SCORE){
+    /* the recognised shape is a circle of radius inertia.rad() about the inertia centre */
+    let cx=inertiaCX(s), cy=inertiaCY(s), r=inertiaRad(s);
+    return {tool:'shape',shape:'ellipse',color:st.color,size:st.size,fill:!!($('fillTgl')&&$('fillTgl').checked),points:[{x:cx-r,y:cy-r},{x:cx+r,y:cy+r}]};
+  }
+  return null;
+}
+function recoFinishShape(res,st){
+  let used=recoQueue.splice(recoQueue.length-res.count, res.count);
+  let consumed=[], seen=[];
+  used.forEach(seg=>{ if(seg.srcStroke && seg.srcStroke!==st && seen.indexOf(seg.srcStroke)<0){ seen.push(seg.srcStroke); consumed.push(seg.srcStroke); } });
+  let stroke={tool:'poly',points:res.pts,color:st.color,size:st.size,fill:!!($('fillTgl')&&$('fillTgl').checked)};
+  return {stroke:stroke, consumed:consumed};
+}
+/* Main recognition entry: returns {stroke, consumed[]} or null to keep the stroke as drawn. */
+function recognizeStroke(st,pageObj){
+  if(recoQueuePage!==pageObj){ recoQueue=[]; recoQueuePage=pageObj; }
+  let pts=st.points;
+  if(pts.length<3) return null;
   let bb=strokeBBox(st);
-  if(closed && (bb.x2-bb.x1)>30 && (bb.y2-bb.y1)>24){ return {tool:'shape',shape:'ellipse',color:st.color,size:st.size,fill:!!($('fillTgl')&&$('fillTgl').checked),points:[{x:bb.x1,y:bb.y1},{x:bb.x2,y:bb.y2}]}; }
-  let dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1; let maxD=0;
-  pts.forEach(pt=>{ let d=Math.abs((pt.x-a.x)*dy-(pt.y-a.y)*dx)/len; if(d>maxD) maxD=d; });
-  if(!closed && len>40 && maxD<14){ return {tool:'shape',shape:'line',color:st.color,size:st.size,points:[{x:a.x,y:a.y},{x:b.x,y:b.y}]}; }
-  return st;
+  if(Math.hypot(bb.x2-bb.x1,bb.y2-bb.y1)<RECO_MIN_SIZE) return null;
+  let brk=[0,0,0,0,0], ss=[null,null,null,null];
+  /* first see if it's a polygon */
+  let n=recoFindPolygonal(pts,0,pts.length-1,RECO_MAX_SIDES,brk,ss,0);
+  if(n>0){
+    recoOptimizePolygonal(pts,n,brk,ss);
+    /* update recognizer segment queue (most recent at end) */
+    while(n+recoQueue.length>RECO_MAX_SIDES){
+      /* remove oldest polygonal stroke */
+      let i=1; while(i<recoQueue.length && recoQueue[i].startpt!==0) i++;
+      recoQueue.splice(0,i);
+      if(!recoQueue.length) break;
+    }
+    for(let i=0;i<n;i++){ let seg=recoSegmentGeometry(pts,brk[i],brk[i+1],ss[i]); seg.srcStroke=st; recoQueue.push(seg); }
+    let tri=recoTryTriangle(); if(tri) return recoFinishShape(tri,st);
+    let rect=recoTryRectangle(); if(rect) return recoFinishShape(rect,st);
+    if(n===1 && inertiaDet(ss[0])<RECO_LINE_MAX_DET){
+      /* current stroke is a line */
+      let rs=recoQueue[recoQueue.length-1];
+      let aligned=true;
+      if(Math.abs(rs.angle)<RECO_SLANT_TOL){ rs.angle=0; rs.y1=rs.y2=rs.ycenter; }         /* nearly horizontal */
+      else if(Math.abs(rs.angle)>Math.PI/2-RECO_SLANT_TOL){ rs.angle=rs.angle>0?Math.PI/2:-Math.PI/2; rs.x1=rs.x2=rs.xcenter; } /* nearly vertical */
+      else aligned=false;
+      let out;
+      if(aligned) out=[{x:rs.x1,y:rs.y1},{x:rs.x2,y:rs.y2}];
+      else{
+        let P={x:rs.x1,y:rs.y1}, Q={x:rs.x2,y:rs.y2}, last=pts[pts.length-1];
+        let dx=Q.x-P.x, dy=Q.y-P.y;
+        let num=dy*last.x-dx*last.y+Q.x*P.y-Q.y*P.x;
+        let dist2=(num*num)/(dy*dy+dx*dx);
+        if(dist2<RECO_LINE_POINT_DIST2) out=[P,Q];
+        else out=[{x:pts[0].x,y:pts[0].y},{x:last.x,y:last.y}];
+      }
+      let stroke={tool:'poly',points:out,color:st.color,size:st.size};
+      rs.srcStroke=stroke; /* the queued segment now belongs to the snapped line that lands on the page */
+      return {stroke:stroke, consumed:[]};
+    }
+  }
+  /* not a polygon: maybe a circle? */
+  let circ=recoTryCircle(st);
+  if(circ) return {stroke:circ, consumed:[]};
+  return null;
 }
 function renderCanvasTexts(){
   let p=curPageObj(); let host=$('pageTextLayer'); if(!host) return; host.innerHTML=''; if(!p) return;
@@ -960,7 +1198,10 @@ function endStroke(){
   if(curStroke && p){
     let layer=curStroke._layer||'ink';
     let finalStroke=curStroke;
-    if(finalStroke.tool!=='shape' && $('recognizerTgl') && $('recognizerTgl').checked && (finalStroke.tool==='pen'||finalStroke.tool==='calligraphy')) finalStroke=recogniseStroke(finalStroke);
+    if(finalStroke.tool!=='shape' && $('recognizerTgl') && $('recognizerTgl').checked && (finalStroke.tool==='pen'||finalStroke.tool==='calligraphy')){
+      let rec=recognizeStroke(finalStroke,p);
+      if(rec){ finalStroke=rec.stroke; (rec.consumed||[]).forEach(cs=>{ let ix=p.ink.indexOf(cs); if(ix>=0) p.ink.splice(ix,1); }); }
+    }
     delete finalStroke._layer;
     p[layer].push(finalStroke); S.stats.strokes++; redrawLayer(layer); bumpV(p);
   }
@@ -969,13 +1210,209 @@ function endStroke(){
 }
 inkC.addEventListener('pointerup',endStroke);
 inkC.addEventListener('pointercancel',endStroke);
-function distToStroke(pt,st){ let best=1e9; for(let i=0;i<st.points.length;i++){ let q=st.points[i]; let d=Math.hypot(pt.x-q.x,pt.y-q.y); if(d<best)best=d; } return best; }
+/* ============ Eraser: padded-box stroke splitting ============
+   The eraser is a square. Around it sits a second, larger square padded
+   by 0.4 x the stroke's width (the round-cap padding coefficient). A
+   stretch of stroke is erased only where it crosses the padded square
+   AND the stroke actually reaches the inner square somewhere along the
+   way — so ink is cut exactly at the padded boundary, but a near miss
+   erases nothing. The surviving stretches are rebuilt as new strokes
+   from the path parameters between the crossings; a closed stroke whose
+   two ends survive is rejoined into one circular section. */
+const ERASE_PAD_COEFF=0.4;        /* PADDING_COEFFICIENT_CAP for round caps */
+const ERASE_CLOSED_DIST=0.3;      /* CLOSED_STROKE_DISTANCE */
+function eraseRect(cx,cy,half){ return {x:cx-half,y:cy-half,w:2*half,h:2*half}; }
+function ptInRect(x,y,r){ return x>=r.x && x<=r.x+r.w && y>=r.y && y<=r.y+r.h; }
+/* Interval of the infinite line p->q inside rect as [tmin,tmax], or null */
+function lineRectInterval(p,q,rect){
+  function strip(a1,a2,amin,aw){ let norm=1/(a2-a1); let t1=(amin-a1)*norm; let t2=t1+aw*norm; return [Math.min(t1,t2),Math.max(t1,t2)]; }
+  if(p.x===q.x){
+    if(p.y===q.y) return null; /* single dot */
+    if(rect.x<p.x && p.x<rect.x+rect.w) return strip(p.y,q.y,rect.y,rect.h); /* vertical segment */
+    return null;
+  }
+  if(p.y===q.y){
+    if(rect.y<p.y && p.y<rect.y+rect.h) return strip(p.x,q.x,rect.x,rect.w); /* horizontal segment */
+    return null;
+  }
+  let v=strip(p.y,q.y,rect.y,rect.h), h=strip(p.x,q.x,rect.x,rect.w);
+  let lo=Math.max(v[0],h[0]), hi=Math.min(v[1],h[1]);
+  return lo<=hi ? [lo,hi] : null;
+}
+/* Same, but only the parameters between 0 and 1 (points between p and q) */
+function segRectParams(p,q,rect){
+  let iv=lineRectInterval(p,q,rect); if(!iv) return [];
+  let out=[];
+  if(iv[0]>0.0 && iv[0]<=1.0) out.push(iv[0]);
+  if(iv[1]>0.0 && iv[1]<=1.0) out.push(iv[1]);
+  return out;
+}
+function pointAtParam(pts,par){
+  let p=pts[par.index], q=pts[par.index+1];
+  let pr=(p.p!=null?p.p:0.5);
+  if(!q) return {x:p.x,y:p.y,p:pr};
+  return {x:p.x+(q.x-p.x)*par.t, y:p.y+(q.y-p.y)*par.t, p:pr}; /* pressure is that of the segment's first point */
+}
+/* Parameters where the stroke crosses in/out of the padded box (flat, even count, sorted) */
+function strokePaddedBoxParams(pts,box){
+  let n=pts.length;
+  if(n<2){
+    if(n===1 && ptInRect(pts[0].x,pts[0].y,eraseRect(box.cx,box.cy,box.half))) return [{index:0,t:0},{index:0,t:0}];
+    return [];
+  }
+  let inner=eraseRect(box.cx,box.cy,box.half), outer=eraseRect(box.cx,box.cy,box.halfPad);
+  let firstIndex=0, lastIndex=n-2;
+  let flags;
+  (function initFlags(){
+    let fk=pts[firstIndex], ht=pts[firstIndex+1];
+    if(ptInRect(fk.x,fk.y,inner)){ flags={insideOuter:true,wentInner:true,endedOnBoundary:false}; return; }
+    if(ptInRect(fk.x,fk.y,outer)){
+      let iv=lineRectInterval(fk,ht,inner);
+      /* if the half tangent goes towards the inner box, say we've been inside it */
+      flags={insideOuter:true,wentInner:!!(iv && iv[1]<=0.0),endedOnBoundary:false}; return;
+    }
+    flags={insideOuter:false,wentInner:false,endedOnBoundary:false};
+  })();
+  let result=[];
+  if(flags.insideOuter) result.push({index:firstIndex,t:0}); /* we start inside the padded box: fake intersection */
+  for(let index=firstIndex; index<=lastIndex; index++){
+    let fk=pts[index], sk=pts[index+1];
+    let outerHits=segRectParams(fk,sk,outer);
+    if(outerHits.length || ptInRect(fk.x,fk.y,outer) || ptInRect(sk.x,sk.y,outer)){
+      /* some part of the segment lies inside the padded box */
+      let innerHits=segRectParams(fk,sk,inner), ii=0;
+      function skipInnerBelow(v){ let skipped=false; while(ii<innerHits.length && innerHits[ii]<v){ skipped=true; ii++; } return skipped; }
+      if(flags.endedOnBoundary){
+        flags.endedOnBoundary=false;
+        let px=sk.x, py=sk.y;
+        if(outerHits.length){ let t=0.5*outerHits[0]; px=fk.x+(sk.x-fk.x)*t; py=fk.y+(sk.y-fk.y)*t; }
+        if(ptInRect(px,py,outer) !== (result.length%2!==0)){
+          /* the stroke bounced back on the box border and never got in or out */
+          if(result.length) result.pop();
+        }
+      }
+      for(let oi=0; oi<outerHits.length; oi++){
+        let t=outerHits[oi];
+        if(skipInnerBelow(t)) flags.wentInner=true;
+        if(!flags.insideOuter || flags.wentInner){
+          result.push({index:index,t:t});
+          if(t===1.0) flags.endedOnBoundary=true;
+        } else {
+          if(result.length) result.pop();
+        }
+        flags.wentInner=false;
+        flags.insideOuter=!flags.insideOuter;
+      }
+      if(ii<innerHits.length) flags.wentInner=true;
+    }
+  }
+  let inconsistent=false;
+  if(result.length%2!==0){
+    /* not necessarily inconsistent: the stroke may end inside the outer box */
+    let lastPt=pts[n-1], prevPt=pts[n-2];
+    if(ptInRect(lastPt.x,lastPt.y,outer)){
+      let toward=flags.wentInner;
+      if(!toward){ let iv=lineRectInterval(lastPt,prevPt,inner); toward=!!(iv && iv[1]<0.0); }
+      if(toward) result.push({index:lastIndex,t:1.0});
+      else result.pop();
+    } else inconsistent=true;
+  }
+  if(!inconsistent){
+    /* sanity check: a point midway through each erased stretch must lie inside the outer box */
+    for(let i=0;i+1<result.length;i+=2){
+      let a=result[i], b=result[i+1], mid;
+      if(a.index===b.index) mid=pointAtParam(pts,{index:a.index,t:(a.t+b.t)/2});
+      else mid=pts[Math.floor((a.index+b.index+1)/2)];
+      if(!ptInRect(mid.x,mid.y,outer)){ inconsistent=true; break; }
+    }
+  }
+  return inconsistent ? [] : result;
+}
+function cloneStrokeWithPoints(st,newPts){
+  let out=[]; newPts.forEach((pt,i)=>{ if(i===0 || pt.x!==newPts[i-1].x || pt.y!==newPts[i-1].y) out.push(pt); });
+  if(out.length<2) return null;
+  let c={}; for(let k in st) if(k!=='points') c[k]=st[k];
+  c.points=out; return c;
+}
+function cloneSectionStroke(st,lo,hi){
+  let pts=st.points, np=[pointAtParam(pts,lo)];
+  for(let i=lo.index+1;i<=hi.index;i++) np.push({x:pts[i].x,y:pts[i].y,p:(pts[i].p!=null?pts[i].p:0.5)});
+  np.push(pointAtParam(pts,hi));
+  return cloneStrokeWithPoints(st,np);
+}
+function cloneCircularSectionStroke(st,startPar,endPar){
+  let pts=st.points, n=pts.length, np=[pointAtParam(pts,startPar)];
+  for(let i=startPar.index+1;i<=n-2;i++) np.push({x:pts[i].x,y:pts[i].y,p:(pts[i].p!=null?pts[i].p:0.5)});
+  for(let i=0;i<=endPar.index;i++) np.push({x:pts[i].x,y:pts[i].y,p:(pts[i].p!=null?pts[i].p:0.5)});
+  np.push(pointAtParam(pts,endPar));
+  return cloneStrokeWithPoints(st,np);
+}
+/* Split one stroke around the eraser box: null = untouched, [] = fully erased, else the surviving strokes */
+function eraseStrokeSplit(st,box){
+  let pts=st.points, n=pts.length;
+  if(n===1) return ptInRect(pts[0].x,pts[0].y,eraseRect(box.cx,box.cy,box.half)) ? [] : null;
+  if(n<2) return null;
+  let params=strokePaddedBoxParams(pts,box);
+  if(!params.length) return null;
+  /* remaining sections = complement of the erased stretches over the whole path */
+  function cmpPar(a,b){ return (a.index+a.t)-(b.index+b.t); }
+  let end={index:n-2,t:1.0}, sections=[], cur={index:0,t:0};
+  for(let i=0;i+1<params.length;i+=2){
+    if(cmpPar(params[i],cur)>0) sections.push({min:cur,max:params[i]});
+    cur=params[i+1];
+  }
+  if(cmpPar(end,cur)>0) sections.push({min:cur,max:end});
+  let closed = n>=3 && Math.hypot(pts[0].x-pts[n-1].x,pts[0].y-pts[n-1].y)<ERASE_CLOSED_DIST;
+  let merge = closed && sections.length>=2 &&
+    sections[0].min.index===0 && sections[0].min.t===0 &&
+    sections[sections.length-1].max.index===n-2 && sections[sections.length-1].max.t===1.0;
+  let out=[], from=0, to=sections.length;
+  if(merge){
+    /* clone the first and last sections as a single circular stroke */
+    let m=cloneCircularSectionStroke(st,sections[sections.length-1].min,sections[0].max);
+    if(m) out.push(m);
+    from=1; to=sections.length-1;
+  }
+  for(let i=from;i<to;i++){ let c=cloneSectionStroke(st,sections[i].min,sections[i].max); if(c) out.push(c); }
+  return out;
+}
+function strokeWidthOf(st){
+  if(st.tool==='highlighter') return st.size*4.5;
+  if(st.tool==='shape'||st.tool==='poly') return Math.max(1.5,st.size*1.4);
+  if(st.tool==='calligraphy') return st.size*1.7;
+  return st.size*1.8;
+}
+/* Parametric shape strokes are outlines too once the eraser touches them */
+function shapeToPolylines(st){
+  let a=st.points[0], b=st.points[st.points.length-1]; if(!a||!b) return [];
+  function mk(np){ let c={}; for(let k in st) if(k!=='points'&&k!=='shape'&&k!=='fill') c[k]=st[k]; c.tool='poly'; c.points=np; return c; }
+  if(st.shape==='line') return [mk([{x:a.x,y:a.y},{x:b.x,y:b.y}])];
+  if(st.shape==='rect'){ let x1=Math.min(a.x,b.x), y1=Math.min(a.y,b.y), x2=Math.max(a.x,b.x), y2=Math.max(a.y,b.y); return [mk([{x:x1,y:y1},{x:x2,y:y1},{x:x2,y:y2},{x:x1,y:y2},{x:x1,y:y1}])]; }
+  if(st.shape==='ellipse'){ let cx=(a.x+b.x)/2, cy=(a.y+b.y)/2, rx=Math.abs(b.x-a.x)/2, ry=Math.abs(b.y-a.y)/2, np=[]; for(let i=0;i<=64;i++){ let t=i/64*Math.PI*2; np.push({x:cx+rx*Math.cos(t),y:cy+ry*Math.sin(t)}); } return [mk(np)]; }
+  if(st.shape==='arrow'){ let ang=Math.atan2(b.y-a.y,b.x-a.x), hl=18+st.size*2; let h1={x:b.x-hl*Math.cos(ang-0.42),y:b.y-hl*Math.sin(ang-0.42)}, h2={x:b.x-hl*Math.cos(ang+0.42),y:b.y-hl*Math.sin(ang+0.42)}; return [mk([{x:a.x,y:a.y},{x:b.x,y:b.y}]), mk([h1,{x:b.x,y:b.y},h2])]; }
+  return [];
+}
 function eraseAt(pt){
   let p=curPageObj(); if(!p) return;
-  let before=p.ink.length+p.hi.length;
-  p.ink=p.ink.filter(st=>distToStroke(pt,st)>16+st.size);
-  p.hi=p.hi.filter(st=>distToStroke(pt,st)>16+st.size);
-  if(p.ink.length+p.hi.length!==before){ eraseChanged=true; bumpV(p); redrawLayer('ink'); redrawLayer('hi'); }
+  let half=8+(+$('brushSize').value); /* halfEraserSize: half the side of the eraser square */
+  let changed=false;
+  ['ink','hi'].forEach(layer=>{
+    let out=[], layerChanged=false;
+    p[layer].forEach(st=>{
+      let list = st.tool==='shape' ? shapeToPolylines(st) : [st];
+      let anyHit=false, pieces=[];
+      list.forEach(t=>{
+        let box={cx:pt.x, cy:pt.y, half:half, halfPad:half+ERASE_PAD_COEFF*strokeWidthOf(t)};
+        let res=eraseStrokeSplit(t,box);
+        if(res===null) pieces.push(t);
+        else { anyHit=true; res.forEach(r=>pieces.push(r)); }
+      });
+      if(!anyHit) out.push(st);
+      else { layerChanged=true; pieces.forEach(pc=>out.push(pc)); }
+    });
+    if(layerChanged){ p[layer]=out; changed=true; }
+  });
+  if(changed){ eraseChanged=true; bumpV(p); redrawLayer('ink'); redrawLayer('hi'); }
 }
 function setTool(t,el){
   if(S.tool===t && el && el.classList.contains('active')){ S.tool='hand'; document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('active',b.dataset.tool==='hand')); toast('Tool put down — hand mode'); return; }
