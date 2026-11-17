@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="color-scheme" content="light dark"/>
+<link rel="icon" href="data:,"/>
+<title>Inkwell — Notes & Reading</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"/>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main class="layout" id="mainLayout">
+  <!-- LIBRARY — same shelf as the app: search, filter chips, book covers, bottom action bar -->
+  <section id="view-library">
+    <div class="searchRow">
+      <div class="searchWrap">
+        <div class="search"><input id="globalSearch" placeholder="Search notes…" aria-label="Search notebooks and notes" oninput="onSearchInput()" autocomplete="off"/></div>
+        <div id="searchResults" class="searchResults hidden"></div>
+      </div>
+      <button class="searchBtn" type="button" aria-label="Search" onclick="document.getElementById('globalSearch').focus();onSearchInput()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.8-3.8"/></svg></button>
+    </div>
+
+    <div class="chipRow" role="group" aria-label="Filter the shelf">
+      <button class="chip active" data-filter="all" onclick="filterLib('all',this)">All notebooks</button>
+      <button class="chip" data-filter="notebook" onclick="filterLib('notebook',this)">Notebooks</button>
+      <button class="chip" data-filter="pdf" onclick="filterLib('pdf',this)">PDFs</button>
+      <button class="chip" data-filter="epub" onclick="filterLib('epub',this)">EPUBs</button>
+      <button class="chip dashed" type="button" onclick="openBook(SAMPLE_ID)">Sample book</button>
+    </div>
+    <p class="kbd" id="libHint" style="margin:2px 0 10px"></p>
+
+    <div id="emptyState" class="empty hidden">
+      <div class="emptyIcon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4a1 1 0 0 0-1-1H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg></div>
+      <h3>A fresh, empty shelf</h3>
+      <p style="color:var(--muted);line-height:1.6;max-width:340px;margin:0 auto;font-size:14px">Tap <strong>+ New notebook</strong> below to start your first notebook, or import a PDF or EPUB to read.</p>
+    </div>
+
+    <div id="libraryGrid" class="grid"></div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:28px">
+      <button class="btn" onclick="exportBackup()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 21h16"/></svg> Backup</button>
+      <label class="btn" for="backupImport"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="M7 7l5-5 5 5"/><path d="M4 21h16"/></svg> Restore</label>
+      <input id="backupImport" type="file" accept=".json" class="hidden" onchange="importBackup(event)"/>
+      <button class="btn" onclick="toggleAbout()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg> About</button>
+      <button class="btn" onclick="openTimer()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> <span id="timerLabel">Focus 25:00</span></button>
+    </div>
+
+    <div id="aboutPanel" class="panel hidden" style="margin-top:14px">
+      <h4>About this shelf</h4>
+      <p class="kbd" style="line-height:1.7;margin:0 0 10px">Inkwell — handwriting notebooks, PDFs and EPUBs in one place, every feature free. Notes live in this tab only; use Backup to keep them. This session: <b id="statNotebooks">0</b> notebooks · <b id="statBooks">0</b> books · <b id="statPages">0</b> pages · <b id="statAnnos">0</b> annotations.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
+        <div class="listRow"><span>Time writing</span><b id="statWrite">0m</b></div>
+        <div class="listRow"><span>Time reading</span><b id="statRead">0m</b></div>
+        <div class="listRow"><span>Strokes drawn</span><b id="statStrokes">0</b></div>
+        <div class="listRow"><span>Pages read</span><b id="statPagesRead">0</b></div>
+        <div class="listRow"><span>Focus sessions done</span><b id="statFocus">0</b></div>
+        <div class="listRow"><span>Words typed</span><b id="statWords">0</b></div>
+      </div>
+    </div>
+
+    <div class="bottomBar" id="libraryBar">
+      <div class="bottomBarInner">
+        <button class="btn newMain" onclick="openNewNotebook()"><span style="font-size:18px;line-height:1">+</span> New notebook</button>
+        <label class="btn outlineBlue" for="pdfImport"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg> PDF</label>
+        <input id="pdfImport" type="file" accept=".pdf" class="hidden" onchange="handleImport(event)"/>
+        <label class="btn outlineBlue" for="epubImport"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4a1 1 0 0 0-1-1H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg> EPUB</label>
+        <input id="epubImport" type="file" accept=".epub,.txt" class="hidden" onchange="handleImport(event)"/>
+      </div>
+    </div>
+  </section>
+
+  <!-- EDITOR -->
+  <section id="view-editor" class="hidden">
+    <div class="editorTop">
+      <button class="iconBtn" style="font-size:18px" onclick="showView('library')" aria-label="Back to library">←</button>
+      <div style="flex:1;min-width:150px">
+        <input id="noteTitle" value="Untitled notebook" aria-label="Notebook title" style="width:100%;border:0;background:transparent;font-family:var(--hand);font-size:25px;font-weight:600;outline:none;color:var(--ink);min-height:30px;padding:0" oninput="syncTitle()"/>
+        <div class="kbd" style="font-size:11px">Notebook</div>
+      </div>
+      <button class="iconBtn" onclick="undoStroke()" aria-label="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
+      <button class="iconBtn" onclick="redoStroke()" aria-label="Redo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></button>
+      <button class="btn small" onclick="openTimer()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Focus</button>
+      <button class="btn small" onclick="exportPagePNG()">PNG</button>
+      <button class="btn small" onclick="exportPageSVG()">SVG</button>
+      <button class="btn small" onclick="exportNotebookPDF()">PDF</button>
+      <button class="btn small" onclick="exportXopp()">.xopp</button>
+      <label class="btn small" for="xoppImport" title="Open a Xournal++ .xopp / .xoj notebook">Open .xopp</label>
+      <input id="xoppImport" type="file" accept=".xopp,.xoj" class="hidden" onchange="importXopp(event)"/>
+      <button class="btn small" onclick="exportBackup()">Backup</button>
+    </div>
+
+    <div class="toolbar" id="mainToolbar" role="toolbar" aria-label="Writing tools">
+      <span class="tool-label">Tools</span>
+      <button class="tool active" data-tool="pen" onclick="setTool('pen',this)" title="Pen — pressure sensitive" aria-label="Pen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+      <button class="tool" data-tool="calligraphy" onclick="setTool('calligraphy',this)" title="Calligraphy pen — nib angle changes width" aria-label="Calligraphy pen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg></button>
+      <button class="tool" data-tool="highlighter" onclick="setTool('highlighter',this)" title="Highlighter — own layer" aria-label="Highlighter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg></button>
+      <button class="tool" data-tool="eraser" onclick="setTool('eraser',this)" title="Stroke eraser" aria-label="Eraser"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></button>
+      <button class="tool" data-tool="hand" onclick="setTool('hand',this)" title="Hand — scroll without drawing" aria-label="Hand — scroll the page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg></button>
+      <button class="tool" data-tool="select" onclick="setTool('select',this)" title="Select — drag a box around strokes, then drag them to move" aria-label="Select strokes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l7 18 2.5-7.5L20 11z"/><path d="M13 13l5 5"/></svg></button>
+      <button class="tool" data-tool="text" onclick="setTool('text',this)" title="Text — tap the page to place typed text on it" aria-label="Text tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 6V4h14v2"/><path d="M12 4v16"/><path d="M9 20h6"/></svg></button>
+      <button class="tool" data-tool="line" onclick="setTool('line',this)" title="Straight line" aria-label="Line tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 19L19 5"/></svg></button>
+      <button class="tool" data-tool="rect" onclick="setTool('rect',this)" title="Rectangle" aria-label="Rectangle tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="6" width="16" height="12" rx="1"/></svg></button>
+      <button class="tool" data-tool="ellipse" onclick="setTool('ellipse',this)" title="Ellipse / circle" aria-label="Ellipse tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><ellipse cx="12" cy="12" rx="9" ry="6"/></svg></button>
+      <button class="tool" data-tool="arrow" onclick="setTool('arrow',this)" title="Arrow" aria-label="Arrow tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20L20 4"/><path d="M12 4h8v8"/></svg></button>
+      <button class="tool" data-tool="spline" onclick="setTool('spline',this)" title="Spline — tap points on the page, double-tap or press Finish to draw a smooth curve through them" aria-label="Spline tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 19c5-1 4-13 9-13s4 9 9 8"/><circle cx="3" cy="19" r="1.6" fill="currentColor"/><circle cx="12" cy="6" r="1.6" fill="currentColor"/><circle cx="21" cy="14" r="1.6" fill="currentColor"/></svg></button>
+      <button class="tool" data-tool="compass" onclick="setTool('compass',this)" title="Compass — drag out from the centre to draw a true circle" aria-label="Compass tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5V1.8"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg></button>
+      <button class="tool" data-tool="lasso" onclick="setTool('lasso',this)" title="Lasso select — draw a free loop around strokes to select them" aria-label="Lasso select"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="3.5 3" aria-hidden="true"><path d="M6 5c6-2.5 13 1 13 7 0 5-5 8-10 7C4.5 18.2 3 14 4 10c.4-1.8 1-3.6 2-5z"/></svg></button>
+      <button class="tool" data-tool="vspace" onclick="setTool('vspace',this)" title="Vertical space — drag down to push everything below the line down and make room" aria-label="Vertical space tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h18"/><path d="M12 11v8"/><path d="M8.5 15.5L12 19l3.5-3.5"/></svg></button>
+      <button class="btn small hidden" id="splineDoneBtn" onclick="finishSpline()">Finish spline</button>
+      <label class="btn small" for="pageImgInput" title="Insert an image onto this page">Insert image</label>
+      <input id="pageImgInput" type="file" accept="image/*" class="hidden" onchange="insertPageImage(event)"/>
+      <span class="tool-label">Colour</span>
+      <span id="swatchBox" style="display:contents">
+      <button class="swatch active" style="background:#1b2a4a" onclick="setColor('#1b2a4a',this)" aria-label="Navy ink"></button>
+      <button class="swatch" style="background:#2456c8" onclick="setColor('#2456c8',this)" aria-label="Blue"></button>
+      <button class="swatch" style="background:#b23a2e" onclick="setColor('#b23a2e',this)" aria-label="Red"></button>
+      <button class="swatch" style="background:#2e7d46" onclick="setColor('#2e7d46',this)" aria-label="Green"></button>
+      <button class="swatch" style="background:#7b4ba8" onclick="setColor('#7b4ba8',this)" aria-label="Purple"></button>
+      <button class="swatch" style="background:#c26d1e" onclick="setColor('#c26d1e',this)" aria-label="Orange"></button>
+      <button class="swatch" style="background:#0e7d86" onclick="setColor('#0e7d86',this)" aria-label="Teal"></button>
+      <button class="swatch" style="background:#d1497a" onclick="setColor('#d1497a',this)" aria-label="Pink"></button>
+      </span>
+      <input type="color" class="colorPick" id="customColor" value="#1b2a4a" title="Custom colour — any colour you pick becomes the ink" oninput="setColor(this.value,null)" aria-label="Custom colour"/>
+      <label class="btn small" for="gplImport" title="Load a GIMP palette (.gpl) as this toolbar's colours">Palette .gpl</label>
+      <input id="gplImport" type="file" accept=".gpl" class="hidden" onchange="importGpl(event)"/>
+      <span class="tool-label">Style</span>
+      <select id="strokeStyleSel" class="shapeSel" onchange="S.strokeStyle=this.value" title="Stroke style for pen, shapes and splines"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option><option value="dashdot">Dash-dot</option></select>
+      <span class="tool-label">Eraser</span>
+      <select id="eraserModeSel" class="shapeSel" onchange="S.eraserMode=this.value" title="Eraser behaviour"><option value="split">Standard — cuts strokes</option><option value="stroke">Delete whole stroke</option><option value="whiteout">Whiteout</option></select>
+      <span class="tool-label">Size</span>
+      <input type="range" min="1" max="16" value="4" id="brushSize" style="width:100px"/>
+      <span class="tool-label">Template</span>
+      <select id="templateSel" onchange="setTemplate(this.value)" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600">
+        <option value="blank">Blank</option><option value="lined" selected>Lined</option><option value="grid">Grid</option><option value="dotted">Dotted</option><option value="music">Music staff</option><option value="cornell">Cornell notes</option><option value="checklist">Checklist</option>
+      </select>
+      <span class="tool-label tbExtra">Smooth</span>
+      <input type="range" class="tbExtra" min="0" max="90" value="28" id="stabilizeRange" title="Input stabilization — higher smooths shaky handwriting more" style="width:80px" oninput="S.stabilize=+this.value"/>
+      <label class="tbExtra" style="display:flex;gap:6px;align-items:center;font-size:12px;font-weight:600" title="Snap shapes, text, images and moved selections to the grid"><input type="checkbox" id="snapTgl" onchange="S.snapGrid=this.checked"/> Snap to grid</label>
+      <button class="btn small" id="setSquareBtn" onclick="toggleSetSquare()">Set square</button>
+      <button class="btn small" onclick="openTexModal()">LaTeX equation</button>
+      <span class="tool-label tbExtra">Text font</span>
+      <select id="textFontSel" class="shapeSel tbExtra" title="Font for text placed with the Text tool"><option value="Newsreader, serif">Serif</option><option value="system-ui, sans-serif">Sans</option><option value="Caveat, cursive">Handwritten</option><option value="ui-monospace, monospace">Mono</option></select>
+      <span class="tool-label tbExtra">Pen button</span>
+      <select id="stylusBtnSel" class="shapeSel tbExtra" title="What the stylus barrel button / eraser end does while held"><option value="eraser">Eraser</option><option value="select">Select</option><option value="none">Nothing</option></select>
+      <span class="tool-label tbExtra">Toolbar</span>
+      <select id="toolbarLayoutSel" class="shapeSel tbExtra" onchange="setToolbarLayout(this.value)" title="Toolbar layout"><option value="">Comfortable</option><option value="compact">Compact</option><option value="minimal">Minimal</option></select>
+      <span class="tool-label">Finger</span>
+      <select id="fingerMode" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600"><option value="scroll">Scrolls page</option><option value="draw">Draws</option></select>
+      <button class="btn small" onclick="toggleBoard()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Board</button>
+      <button class="btn small" onclick="insertTable()">Insert table</button>
+      <button class="btn small" onclick="addSticky()">Sticky note</button>
+      <button class="btn small" id="hwBtn" onclick="handwritingToText()">Handwriting → Text</button>
+      <label style="display:flex;gap:6px;align-items:center;font-size:12px;font-weight:600"><input type="checkbox" id="recognizerTgl"/> Shape recogniser</label>
+      <label style="display:flex;gap:6px;align-items:center;font-size:12px;font-weight:600"><input type="checkbox" id="fillTgl"/> Fill shape</label>
+      <span class="tool-label">Zoom</span>
+      <button class="btn small" onclick="editorZoomBy(0.8)" aria-label="Zoom out">−</button>
+      <span class="kbd" id="zoomLabel">100%</span>
+      <button class="btn small" onclick="editorZoomBy(1.25)" aria-label="Zoom in">+</button>
+      <button class="btn small" onclick="editorZoomBy(0)">Reset</button>
+      <span class="tool-label">Page colour</span>
+      <select id="pageBgSel" class="shapeSel" onchange="setPageBg(this.value)"><option value="#fffdf6">Paper</option><option value="#ffffff">White</option><option value="#f6e8c8">Cream</option><option value="#e8f0e4">Pale green</option><option value="#e3ecf7">Pale blue</option><option value="#2b2f36">Dark slate</option></select>
+    </div>
+
+    <div class="editorWrap">
+      <aside class="panel side open" id="pagesPanel">
+        <h4>Pages</h4>
+        <div id="pageList"></div>
+        <button class="btn" style="width:100%;justify-content:center;margin-top:8px" onclick="addPage()">+ Add page</button>
+        <h4 style="margin-top:18px">Layers</h4>
+        <label style="display:flex;gap:8px;align-items:center;padding:8px 0"><input type="checkbox" id="layerInkTgl" checked onchange="toggleLayer('ink',this.checked)"/> Ink layer</label>
+        <label style="display:flex;gap:8px;align-items:center;padding:8px 0"><input type="checkbox" id="layerHiTgl" checked onchange="toggleLayer('hi',this.checked)"/> Highlight layer</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn small" onclick="selectLayerStrokes('ink')">Select ink layer</button><button class="btn small" onclick="selectLayerStrokes('hi')">Select highlight layer</button></div>
+        <p class="kbd" style="line-height:1.6;margin-top:8px">Advanced layer selection: pick a whole layer's strokes at once, then move, rotate, copy or delete them together with the selection bar under the page.</p>
+        <p class="kbd" style="line-height:1.6">Stylus &amp; mouse draw with real pressure. With Finger = “Scrolls page”, one finger scrolls and never draws — no need to deselect the pen. Tap a selected tool again to put it down.</p>
+        <h4 style="margin-top:18px">Drawing tools</h4>
+        <p class="kbd" style="line-height:1.6">Shapes: drag with Line, Rectangle, Ellipse or Arrow. Tick <b>Fill shape</b> to fill rectangles and ellipses. Tick <b>Shape recogniser</b> and a rough straight pen stroke snaps to a line, a closed loop snaps to an ellipse. <b>Select</b>: drag a box around strokes, then drag inside it to move them, or duplicate / delete them from the bar under the page. <b>Text</b>: tap the page to place typed text right on the paper — tap it again to edit, empty it to remove it. <b>Insert image</b> drops a picture on the page; drag it to move, drag its corner dot to resize. Zoom and page colour are in the toolbar above.</p>
+        <p class="kbd" style="line-height:1.6;margin-top:8px"><b>Spline</b> joins tapped points with a smooth curve. <b>Compass</b> draws a true circle from its centre. <b>Lasso</b> selects with a free loop; <b>Vertical space</b> pushes everything below a line down. Selections can be rotated in 15° steps, resized, flipped, copied and pasted across pages. <b>Style</b> gives pen and shapes dashed, dotted or dash-dot strokes; the <b>Eraser</b> menu switches between cutting strokes, deleting whole strokes and whiteout. <b>Smooth</b> is input stabilization for shaky hands, <b>Snap to grid</b> aligns shapes and moved selections, and the <b>Set square</b> is a draggable, rotatable guide. <b>LaTeX equation</b> places rendered maths on the page. The pen's eraser end or barrel button borrows the tool picked under <b>Pen button</b>. Load a <b>.gpl</b> palette to replace the colour swatches, and export any notebook as <b>.xopp</b> to open it in other handwriting apps — or open a .xopp here.</p>
+      </aside>
+
+      <div class="stageWrap" id="stageWrap">
+        <div>
+          <div class="zoomScroll"><div class="canvasShell" id="canvasShell">
+            <div class="canvasStack">
+              <canvas id="bgCanvas" width="1200" height="800"></canvas>
+              <canvas id="hiCanvas" width="1200" height="800"></canvas>
+              <canvas id="inkCanvas" width="1200" height="800"></canvas>
+              <div id="pageImageLayer"></div>
+              <div id="pageTextLayer"></div>
+              <div id="texLayer"></div>
+            </div>
+            <div id="setSquare" class="setSquare hidden">
+              <div class="sqBody" id="sqBody"></div>
+              <div class="sqHole"></div>
+              <div class="sqBtns"><button type="button" onclick="rotateSetSquare(-15)" title="Rotate −15°">↺</button><button type="button" onclick="rotateSetSquare(15)" title="Rotate +15°">↻</button><button type="button" onclick="toggleSetSquare(false)" title="Hide set square">×</button></div>
+            </div>
+            <div id="floatingBoard" class="board hidden">
+              <div class="boardHead" id="boardHead"><span>Floating board — infinite canvas</span><span><button class="btn small" onclick="cycleBoardColor()">Colour</button> <button class="btn small" onclick="toggleBoard(false)">Close</button></span></div>
+              <div class="boardTools">
+                <button class="btn small" id="boardPenBtn" onclick="setBoardTool('pen')">Pen</button>
+                <button class="btn small" id="boardPanBtn" onclick="setBoardTool('pan')">Pan</button>
+                <button class="btn small" onclick="boardZoom(1.25)">＋</button>
+                <button class="btn small" onclick="boardZoom(0.8)">－</button>
+                <button class="btn small" onclick="boardClear()">Clear</button>
+                <span class="kbd" style="color:#555">Scroll to zoom • two fingers pinch</span>
+              </div>
+              <canvas id="boardCanvas" width="720" height="460"></canvas>
+              <div class="boardGrip" id="boardGrip" title="Drag to resize"></div>
+            </div>
+            <div id="stickyLayer"></div>
+          </div></div>
+          <div id="selBar"><span class="kbd" id="selInfo">Selection</span><button class="btn small" onclick="duplicateSelection()">Duplicate</button><button class="btn small" onclick="copySelection()">Copy</button><button class="btn small" onclick="pasteSelection()">Paste</button><button class="btn small" onclick="rotateSelection(-15)">Rotate −15°</button><button class="btn small" onclick="rotateSelection(15)">Rotate +15°</button><button class="btn small" onclick="scaleSelection(0.85)">Smaller</button><button class="btn small" onclick="scaleSelection(1.18)">Bigger</button><button class="btn small" onclick="flipSelection('x')">Flip ↔</button><button class="btn small" onclick="flipSelection('y')">Flip ↕</button><button class="btn small" onclick="bringSelectionFront()">Bring to front</button><button class="btn small danger" onclick="deleteSelection()">Delete selected</button><button class="btn small" onclick="clearSelection()">Clear</button><span class="kbd">Drag inside the blue box to move the selected strokes. Copy and paste work across pages of this notebook.</span></div>
+          <textarea id="noteText" class="textArea" placeholder="Type here, or write above and tap Handwriting → Text. Use [[links]] — e.g. [[Slow Reading]] — to link notebooks; links and backlinks are live."></textarea>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
+            <span class="badge">Audio-synced notes</span>
+            <button class="btn small" id="recBtn" onclick="toggleRecord()">● Record</button>
+            <button class="btn small hidden" id="playSyncBtn" onclick="playSyncedAudio()">▶ Play with ink sync</button>
+            <span class="kbd" id="recStatus">Record while you write — on playback, ink reappears in time with the audio.</span>
+            <span style="flex:1"></span><span class="kbd" id="wordCount">0 words</span>
+          </div>
+          <div id="tableHost"></div>
+        </div>
+        <div id="splitPane" class="splitPane hidden"></div>
+      </div>
+
+      <aside class="panel side open">
+        <h4>Links &amp; backlinks</h4>
+        <div id="linksList"><p class="kbd">Type [[Title]] in the note to link another notebook.</p></div>
+        <h4 style="margin-top:16px">Split screen</h4>
+        <p class="kbd" style="line-height:1.6">Read the current book beside this notebook — handy on tablet and desktop.</p>
+        <button class="btn" style="width:100%;justify-content:center" onclick="toggleSplit()">Toggle split view</button>
+        <h4 style="margin-top:16px">This notebook</h4>
+        <div class="listRow"><span>Pages</span><b id="statEditorPages">1</b></div>
+        <div class="listRow"><span>Strokes on page</span><b id="statPageStrokes">0</b></div>
+        <div class="listRow"><span>Session writing</span><b id="statWrite2">0m</b></div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- READER -->
+  <section id="view-reader" class="hidden">
+    <div class="readerTop">
+      <button class="iconBtn" style="font-size:18px" onclick="showView('library')" aria-label="Back to library">←</button>
+      <div class="seg" role="tablist"><button class="active" id="modeScrollBtn" onclick="setReaderMode('scroll')">Scroll</button><button id="modePageBtn" onclick="setReaderMode('page')">Page</button></div>
+      <select id="themeSel" onchange="setReaderTheme(this.value)" style="border:1px solid var(--line);border-radius:999px;padding:0 12px;background:var(--card);color:var(--ink);font-weight:600"><option value="">Paper</option><option value="sepia">Sepia</option><option value="dark">Night</option></select>
+      <button class="btn small" onclick="readerFont(-1)">A−</button>
+      <button class="btn small" onclick="readerFont(1)">A+</button>
+      <button class="btn" id="sideToggle" onclick="toggleReaderSide()">☰ Contents</button>
+      <button class="btn" id="bookmarkBtn" onclick="toggleBookmark()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> Bookmark</button>
+      <button class="btn" onclick="highlightSelection()">Highlight selection</button>
+      <button class="btn" onclick="underlineSelection()">Underline</button>
+      <button class="btn" onclick="strikeSelection()">Strikethrough</button>
+      <button class="btn" onclick="lookupSelection()">Dictionary / Wiki</button>
+      <button class="btn" onclick="openOcrPanel()">OCR</button>
+      <span style="flex:1"></span><span class="kbd" id="resumeLabel"></span>
+    </div>
+
+    <div id="readerGrid">
+      <aside class="panel side open" id="readerSide">
+        <h4>Contents</h4>
+        <div id="tocList"><p class="kbd">Open a book to see its contents.</p></div>
+        <h4 style="margin-top:16px">Bookmarks</h4><div id="bookmarkList"><p class="kbd">No bookmarks yet</p></div>
+        <h4 style="margin-top:16px">Annotations</h4><div id="annoList"><p class="kbd">Select text → Highlight selection</p></div>
+        <h4 style="margin-top:16px">Thumbnails</h4><div id="thumbList"><p class="kbd">—</p></div>
+      </aside>
+      <div>
+        <article class="reader" id="readerArticle">
+          <span class="badge" id="readerBadge">Reader</span>
+          <h2 id="readerTitle">Nothing open</h2>
+          <div id="readerBody"><p>Open a book from the library — or import a PDF or EPUB — and it will open here in reading mode first.</p></div>
+          <div id="dictBox" class="resultBox hidden"></div>
+          <div id="ocrBox" class="resultBox hidden">
+            <b>OCR — recognise print on this page</b>
+            <p class="kbd" style="line-height:1.6">Runs on-device with Tesseract.js. Language data downloads on first use for the language you pick. Best on clear print; handwriting is not what this is for.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0">
+              <select id="ocrLang" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600">
+                <option value="eng">English</option><option value="ben">Bengali</option><option value="hin">Hindi</option><option value="urd">Urdu</option><option value="ara">Arabic</option><option value="fra">French</option><option value="deu">German</option><option value="spa">Spanish</option><option value="jpn">Japanese</option><option value="chi_sim">Chinese (simplified)</option>
+              </select>
+              <button class="btn small primary" id="ocrRunBtn" onclick="runOCR()">Recognise this page</button>
+              <label class="btn small" for="ocrImg">OCR an image instead</label>
+              <input id="ocrImg" type="file" accept="image/*" class="hidden" onchange="ocrImageFile(event)"/>
+            </div>
+            <progress id="ocrProgress" class="hidden" value="0" max="1"></progress>
+            <p class="kbd" id="ocrStatus"></p>
+            <p id="ocrText"></p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small hidden" id="ocrCopyBtn" onclick="copyOcrText()">Copy text</button><button class="btn small hidden" id="ocrNoteBtn" onclick="ocrToNote()">Add to a notebook note</button></div>
+          </div>
+        </article>
+
+        <div id="pdfView" class="hidden">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+            <b id="pdfName" style="font-family:Newsreader,serif;font-size:18px">PDF</b>
+            <span class="kbd" id="pdfMeta"></span>
+            <span style="flex:1"></span>
+            <button class="btn small" onclick="annotateCurrentPdf()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg> Annotate this PDF</button>
+            <button class="btn small" onclick="closePdf()">Close PDF</button>
+          </div>
+          <p class="kbd" id="pdfStatus" style="line-height:1.6">Loading PDF…</p>
+          <div id="pdfPages"></div>
+        </div>
+
+        <div class="ttsBar" id="ttsBar">
+          <b style="font-size:13px">Listen</b>
+          <button class="btn primary" id="ttsBtn" onclick="toggleTTS()">▶ Play</button>
+          <label class="kbd" for="accentSel">Accent</label>
+          <select id="accentSel"></select>
+          <label class="kbd" for="genderSel">Voice</label>
+          <select id="genderSel"><option value="">Any</option><option value="female">Female</option><option value="male">Male</option></select>
+          <label class="kbd">Speed</label>
+          <input type="range" id="ttsRate" min="0.7" max="1.4" step="0.1" value="1" style="width:90px"/>
+          <button class="btn" onclick="toggleParallel()">Parallel Read</button>
+          <span class="kbd" id="voiceHint">Loading voices that actually work…</span>
+        </div>
+        <div id="parallelBox" class="hidden" style="margin-top:12px">
+          <div id="parallelGrid">
+            <div class="panel"><h4>Original</h4><p id="parallelOrig" style="font-family:Newsreader,serif;line-height:1.7"></p></div>
+            <div class="panel">
+              <h4>Translation</h4>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+                <select id="parLang" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600"><option value="bn">Bengali</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option><option value="ar">Arabic</option><option value="hi">Hindi</option><option value="ur">Urdu</option></select>
+                <button class="btn small primary" onclick="translateParallel()">Translate this page</button>
+              </div>
+              <p id="parallelTrans" style="font-family:Newsreader,serif;line-height:1.7">Pick a language and translate — the original stays beside it.</p>
+              <h4 style="margin-top:14px">My notes on this page</h4>
+              <textarea id="parallelNotes" style="width:100%;height:80px;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);color:var(--ink)" placeholder="Write while you read…" oninput="saveParallelNotes()"></textarea>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:12px;align-items:center"><button class="btn" onclick="changePage(-1)">← Prev</button><span class="kbd" id="pageLabel">—</span><button class="btn" onclick="changePage(1)">Next →</button></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="newModal" class="modal" role="dialog" aria-modal="true">
+  <div class="modalCard">
+    <h3 style="margin:0;font-size:16px;font-weight:600">New notebook</h3>
+    <label class="kbd">Title</label><input id="newTitle" placeholder="e.g. Biology — Semester 2"/>
+    <label class="kbd">Cover</label><select id="newColor"><option value="#b4552d">Rust</option><option value="#7d8c6f">Sage</option><option value="#4a5a74">Slate</option><option value="#6d4a63">Plum</option><option value="#c1922e">Ochre</option><option value="#2e6f6a">Teal</option><option value="#232c42">Ink</option><option value="#c08552">Rose</option></select>
+    <label class="kbd">Template</label><select id="newTemplate"><option value="lined">Lined</option><option value="blank">Blank</option><option value="grid">Grid</option><option value="dotted">Dotted</option><option value="music">Music staff</option><option value="cornell">Cornell notes</option><option value="checklist">Checklist</option></select>
+    <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1;justify-content:center" onclick="closeModal('newModal')">Cancel</button><button class="btn primary" style="flex:1;justify-content:center" onclick="createNotebook()">Create</button></div>
+  </div>
+</div>
+
+<div id="confirmModal" class="modal" role="dialog" aria-modal="true">
+  <div class="modalCard">
+    <h3 style="margin:0;font-size:16px;font-weight:600" id="confirmTitle">Delete?</h3>
+    <p class="kbd" id="confirmText" style="line-height:1.6;margin-top:8px"></p>
+    <div style="display:flex;gap:8px;margin-top:14px"><button class="btn" style="flex:1;justify-content:center" onclick="closeModal('confirmModal')">Cancel</button><button class="btn danger" style="flex:1;justify-content:center" onclick="doConfirm()">Delete</button></div>
+  </div>
+</div>
+
+<div id="texModal" class="modal" role="dialog" aria-modal="true">
+  <div class="modalCard">
+    <h3 style="margin:0;font-size:16px;font-weight:600">LaTeX equation</h3>
+    <p class="kbd" style="line-height:1.6;margin-top:6px">Rendered on the page with KaTeX. Drag it to move it; tap it again later with the Text tool nearby — or use the × on it to remove it.</p>
+    <label class="kbd">Template</label>
+    <select id="texTemplate" onchange="applyTexTemplate(this.value)"><option value="">Blank</option><option value="frac">Fraction</option><option value="sqrt">Square root</option><option value="int">Integral</option><option value="sum">Summation</option><option value="matrix">2×2 matrix</option><option value="pyth">Pythagoras</option></select>
+    <label class="kbd">TeX</label>
+    <textarea id="texInput" rows="3" style="width:100%;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--bg);color:var(--ink);font-family:ui-monospace,monospace;font-size:14px" placeholder="e.g. \frac{-b \pm \sqrt{b^2-4ac}}{2a}"></textarea>
+    <label class="kbd">Size</label>
+    <input type="range" id="texSize" min="14" max="54" value="26"/>
+    <div id="texPreview" style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:8px;overflow:auto;background:#fff;color:#111"></div>
+    <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1;justify-content:center" onclick="closeModal('texModal')">Cancel</button><button class="btn primary" style="flex:1;justify-content:center" onclick="insertTex()">Place on page</button></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
