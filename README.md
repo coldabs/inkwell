@@ -2,7 +2,6 @@
 
 Open-source handwriting notes and PDF / EPUB reader. All features free — no paywall, no locked notebooks, no VIP tier.
 
-A from-scratch rebuild inspired by Notein (Orion Notein). Not affiliated with Orion Studio.
 
 ## What it does
 
