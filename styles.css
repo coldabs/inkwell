@@ -199,3 +199,21 @@ progress{width:100%;height:8px;accent-color:var(--accent)}
 input[type=color].colorPick{width:34px;height:34px;min-height:34px;border:1px solid var(--line);border-radius:50%;padding:2px;background:var(--surface);cursor:pointer}
 #texLayer{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:4}
 #texLayer .texEl{pointer-events:auto}
+/* --- cleanup pass: one clear row of controls, everything else one tap away --- */
+.bookFace h3{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:24px}
+.textLayer span{transform-origin:0 0}
+#thumbList{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:8px}
+#thumbList .thumbItem{margin-bottom:0}
+#thumbList .kbd{font-size:10px}
+.moreWrap{display:none}
+.moreWrap.open{display:contents}
+.moreRow{display:none}
+.moreRow.open{display:flex}
+#readerMore{margin-top:-6px}
+.popWrap{position:relative}
+.popMenu{position:absolute;right:0;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:6px;display:none;flex-direction:column;gap:2px;z-index:40;min-width:200px}
+.popMenu.open{display:flex}
+.popMenu .btn,.popMenu label.btn{justify-content:flex-start;width:100%;border:0;border-radius:9px;background:transparent}
+.popMenu .btn:hover,.popMenu label.btn:hover{background:var(--paper2)}
+details.helpBox{margin-top:12px;border-top:1px solid var(--line);padding-top:4px}
+details.helpBox summary{cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 0;min-height:40px;display:flex;align-items:center}

@@ -98,7 +98,7 @@ function renderLibrary(){
     let menu='<button type="button" onclick="event.stopPropagation();'+openAct+'">'+(n.kind==='notebook'?'Open':'Read')+'</button>'
       + (n.kind==='pdf'? '<button type="button" onclick="event.stopPropagation();annotatePdf(\''+n.id+'\')">Annotate</button>':'')
       + '<button type="button" class="danger" onclick="event.stopPropagation();askDeleteItem(\''+n.id+'\')">Delete…</button>';
-    return '<article class="bookCard"><button type="button" class="book" style="background:'+cov.bg+';color:'+cov.ink+'" onclick="'+openAct+'" aria-label="Open '+esc(n.title)+'"><span class="bookSpine" style="background:'+cov.spine+'"></span><span class="bookFace"><h3>'+esc(n.title)+'</h3><span class="bookMeta">'+esc(meta)+'<br/>'+(n.sample?'Built-in sample':'Edited '+esc(n.updated||'just now'))+'</span></span></button>'
+    return '<article class="bookCard"><button type="button" class="book" style="background:'+cov.bg+';color:'+cov.ink+'" onclick="'+openAct+'" aria-label="Open '+esc(n.title)+'"><span class="bookSpine" style="background:'+cov.spine+'"></span><span class="bookFace"><h3>'+esc(n.title).split('_').join('_&#8203;')+'</h3><span class="bookMeta">'+esc(meta)+'<br/>'+(n.sample?'Built-in sample':'Edited '+esc(n.updated||'just now'))+'</span></span></button>'
       +'<button type="button" class="bookMenu" aria-label="Options for '+esc(n.title)+'" onclick="toggleCardMenu(this)">•••</button>'
       +'<div class="bookActions">'+menu+'</div></article>';
   }).join('') || '<p class="kbd">Nothing matches this filter.</p>';
@@ -1418,6 +1418,10 @@ function importGpl(e){
   r.readAsText(f);
 }
 function setToolbarLayout(v){ let tb=$('mainToolbar'); tb.classList.remove('compact','minimal'); if(v) tb.classList.add(v); }
+function toggleMoreTools(btn){ let open=false; document.querySelectorAll('.moreWrap').forEach(el=>{ el.classList.toggle('open'); open=el.classList.contains('open'); }); if(btn){ btn.textContent= open? 'Fewer ▴':'More tools ▾'; btn.setAttribute('aria-expanded',open); } }
+function toggleExportMenu(btn){ let p=$('exportPop'); let open=p.classList.toggle('open'); if(btn) btn.setAttribute('aria-expanded',open); }
+function closeExportPop(){ let p=$('exportPop'); if(p) p.classList.remove('open'); let b=$('exportBtn'); if(b) b.setAttribute('aria-expanded','false'); }
+function toggleReaderMore(btn){ let p=$('readerMore'); let open=p.classList.toggle('open'); if(btn){ btn.textContent= open? 'Fewer ▴':'More ▾'; btn.setAttribute('aria-expanded',open); } }
 function selectLayerStrokes(which){ let p=curPageObj(); if(!p) return; S.selection=(which==='ink'? p.ink : p.hi).slice(); drawSelectionOverlay(); toast(S.selection.length? S.selection.length+' stroke(s) selected on the '+(which==='ink'?'ink':'highlight')+' layer' : 'That layer is empty on this page'); }
 
 /* ============ exports ============ */
@@ -1665,6 +1669,7 @@ async function importEpub(f){
 function openBook(id){
   let b=S.items.find(i=>i.id===id); if(!b||b.kind==='notebook') return;
   S.curBookId=id;
+  $('modeScrollBtn').classList.toggle('active',b.mode!=='page'); $('modePageBtn').classList.toggle('active',b.mode==='page');
   $('dictBox').classList.add('hidden'); $('ocrBox').classList.add('hidden'); $('parallelBox').classList.add('hidden');
   if(b.kind==='pdf'){ showPdfChrome(); renderPdfBook(); }
   else { showEpubChrome(); renderEpubBook(); }
@@ -1708,11 +1713,11 @@ async function renderPdfTextLayer(page,vp,holder,book,pageNum){
   try{
     let tc=await page.getTextContent();
     let layer=document.createElement('div'); layer.className='textLayer'; holder.appendChild(layer);
-    let scale=vp.scale/(Math.min(window.devicePixelRatio||1,2));
+    let vpCss=page.getViewport({scale:vp.scale/(Math.min(window.devicePixelRatio||1,2))});
     let full='';
     tc.items.forEach(item=>{
       if(!item.str) return;
-      let tx=pdfjsLib.Util.transform(vp.transform,item.transform);
+      let tx=pdfjsLib.Util.transform(vpCss.transform,item.transform);
       let fontSize=Math.hypot(tx[2],tx[3]);
       let span=document.createElement('span');
       span.textContent=item.str;
@@ -1720,7 +1725,7 @@ async function renderPdfTextLayer(page,vp,holder,book,pageNum){
       span.dataset.pg=pageNum;
       layer.appendChild(span);
       full+=item.str+' ';
-      requestAnimationFrame(()=>{ let w=item.width*scale; let ow=span.offsetWidth; if(ow>2 && w>2) span.style.transform='scaleX('+(w/ow)+')'; });
+      requestAnimationFrame(()=>{ let w=item.width*vpCss.scale; let ow=span.offsetWidth; if(ow>2 && w>2) span.style.transform='scaleX('+(w/ow)+')'; });
     });
     book.textCache[pageNum]=full.trim();
   }catch(e){ /* text layer is best-effort; page image still reads */ }
@@ -1795,9 +1800,12 @@ async function renderReaderSide(){
   bm.innerHTML= b.bookmarks.length? b.bookmarks.map(x=>'<div class="listRow"><span>'+esc(x.label)+'</span><button class="btn small" onclick="jumpBookmark('+x.at+')">Go</button></div>').join('') : '<p class="kbd">No bookmarks yet</p>';
   an.innerHTML= b.annotations.length? b.annotations.map(a=>'<div class="listRow"><span style="font-size:13px;line-height:1.45">“'+esc(a.text.slice(0,90))+'”<br/><span class="kbd">'+esc(a.where)+(a.kind&&a.kind!=='highlight'?' · '+esc(a.kind):'')+'</span></span></div>').join('')+'<button class="btn small" style="margin-top:8px" onclick="exportAnnotations()">Export annotations</button>' : '<p class="kbd">Select text → Highlight, Underline or Strikethrough</p>';
   if(b.kind==='epub'){
+    th.dataset.bookId=b.id;
     toc.innerHTML=b.chapters.map((c,i)=>'<div class="tocItem" onclick="jumpToChapter('+i+')">'+(i+1)+'. '+esc(c.title)+'</div>').join('');
     th.innerHTML=b.chapters.map((c,i)=>'<div class="thumbItem '+(i===b.ch?'active':'')+'" onclick="jumpToChapter('+i+')"><b style="font-size:12px">Ch. '+(i+1)+'</b><br/><span class="kbd">'+esc(c.text.slice(0,70))+'…</span></div>').join('');
   } else {
+    if(th.dataset.bookId===b.id){ th.querySelectorAll('.thumbItem').forEach((el,i)=>el.classList.toggle('active',i+1===b.page)); return; }
+    th.dataset.bookId=b.id;
     toc.innerHTML='<p class="kbd">Loading outline…</p>'; th.innerHTML='<p class="kbd">Rendering thumbnails…</p>';
     try{ let outline=await b.doc.getOutline();
       if(outline&&outline.length){ toc.innerHTML=''; let walk=(items,depth)=>{ items.forEach(o=>{ let d=document.createElement('div'); d.className='tocItem'; d.style.paddingLeft=(6+depth*14)+'px'; d.textContent=o.title||'Section';
