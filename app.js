@@ -12,6 +12,9 @@ function doConfirm(){closeModal('confirmModal');if(pendingConfirm){let f=pending
 
 /* ============ state ============ */
 const CW=1200, CH=800;
+let PH=CH; /* live height of the page being edited — portrait PDF pages grow it so the page fills the width instead of shrinking into the middle of a landscape sheet */
+function pageH(p){ if(p&&p.bgPdf&&p.bgPdf.img&&p.bgPdf.img.width&&p.bgPdf.img.height){ return Math.max(400,Math.min(2200,Math.round(CW*p.bgPdf.img.height/p.bgPdf.img.width))); } return CH; }
+function syncPageHeight(){ let h=pageH(curPageObj()); if(h!==PH||bgC.height!==h){ PH=h; [bgC,hiC,inkC].forEach(c=>{c.height=h}); [bgX,hiX,inkX].forEach(c=>{c.lineCap='round';c.lineJoin='round'}); } }
 const SAMPLE_ID='sample-book';
 function blankPage(){return {ink:[],hi:[],text:'',stickies:[],table:null,board:null,audio:null,bgPdf:null,texts:[],images:[],texs:[],bgColor:'#fffdf6'}}
 function blankBoard(){return {color:0,strokes:[],view:{x:0,y:0,k:1}}}
@@ -61,6 +64,7 @@ function showView(v){
   S.view=v;
   ['library','editor','reader'].forEach(x=>$('view-'+x).classList.toggle('hidden',x!==v));
   $('mainLayout').classList.toggle('shelf',v==='library');
+  document.body.classList.toggle('inEditor',v==='editor'); document.body.classList.toggle('inReader',v==='reader');
   let sr=$('searchResults'); if(sr) sr.classList.add('hidden');
   if(v==='library') renderLibrary();
   if(v==='editor' && !curNb()){ // guarantee an editable notebook exists
@@ -71,6 +75,8 @@ function showView(v){
 }
 function filterLib(f,btn){ S.filter=f; document.querySelectorAll('.chip[data-filter]').forEach(c=>c.classList.toggle('active',c.getAttribute('data-filter')===f)); renderLibrary(); }
 function toggleAbout(){ $('aboutPanel').classList.toggle('hidden'); }
+function toggleLibUtils(){ $('libUtils').classList.toggle('hidden'); }
+function toggleTtsBar(){ let b=$('ttsBar'); b.classList.toggle('hidden'); if(!b.classList.contains('hidden')) b.scrollIntoView({block:'nearest'}); }
 
 /* ============ library ============ */
 function itemPages(it){ if(it.kind==='notebook') return it.pages.length; if(it.kind==='pdf') return it.numPages||0; if(it.kind==='epub') return it.chapters?it.chapters.length:0; return 1 }
@@ -240,12 +246,12 @@ function paintTemplate(x,tpl){
 function drawBackground(){
   let nb=curNb(); if(!nb) return;
   let p=curPageObj();
-  bgX.clearRect(0,0,CW,CH);
-  bgX.fillStyle=(p&&p.bgColor)||'#fffdf6'; bgX.fillRect(0,0,CW,CH);
+  bgX.clearRect(0,0,CW,PH);
+  bgX.fillStyle=(p&&p.bgColor)||'#fffdf6'; bgX.fillRect(0,0,CW,PH);
   if(p && p.bgPdf && p.bgPdf.img){
-    let img=p.bgPdf.img, s=Math.min(CW/img.width, CH/img.height), w=img.width*s, h=img.height*s;
-    bgX.fillStyle='#ffffff'; bgX.fillRect((CW-w)/2,(CH-h)/2,w,h);
-    bgX.drawImage(img,(CW-w)/2,(CH-h)/2,w,h);
+    let img=p.bgPdf.img, s=Math.min(CW/img.width, PH/img.height), w=img.width*s, h=img.height*s;
+    bgX.fillStyle='#ffffff'; bgX.fillRect((CW-w)/2,(PH-h)/2,w,h);
+    bgX.drawImage(img,(CW-w)/2,(PH-h)/2,w,h);
     return;
   }
   paintTemplate(bgX, nb.template);
@@ -304,16 +310,16 @@ function drawStroke(ctx,st){
 function redrawLayer(which){
   let p=curPageObj(); if(!p) return;
   let ctx= which==='ink'? inkX:hiX, arr= which==='ink'? p.ink:p.hi;
-  ctx.clearRect(0,0,CW,CH);
+  ctx.clearRect(0,0,CW,PH);
   let cutoff=(typeof redrawLayer.cutoff==='number')? redrawLayer.cutoff : null;
   arr.forEach(st=>{ if(cutoff!==null && typeof st.t==='number' && st.t>cutoff) return; drawStroke(ctx,st); });
   $('statPageStrokes').textContent=p.ink.length+p.hi.length;
 }
-function redrawAll(){ drawBackground(); redrawLayer('ink'); redrawLayer('hi'); }
+function redrawAll(){ syncPageHeight(); drawBackground(); redrawLayer('ink'); redrawLayer('hi'); }
 function composePage(p, template, out){
-  let c=out||document.createElement('canvas'); c.width=CW; c.height=CH; let x=c.getContext('2d');
-  x.fillStyle=p.bgColor||'#fffdf6'; x.fillRect(0,0,CW,CH);
-  if(p.bgPdf && p.bgPdf.img){ let img=p.bgPdf.img, s=Math.min(CW/img.width,CH/img.height), w=img.width*s,h=img.height*s; x.fillStyle='#fff'; x.fillRect((CW-w)/2,(CH-h)/2,w,h); x.drawImage(img,(CW-w)/2,(CH-h)/2,w,h); }
+  let cH=pageH(p); let c=out||document.createElement('canvas'); c.width=CW; c.height=cH; let x=c.getContext('2d');
+  x.fillStyle=p.bgColor||'#fffdf6'; x.fillRect(0,0,CW,cH);
+  if(p.bgPdf && p.bgPdf.img){ let img=p.bgPdf.img, s=Math.min(CW/img.width,cH/img.height), w=img.width*s,h=img.height*s; x.fillStyle='#fff'; x.fillRect((CW-w)/2,(cH-h)/2,w,h); x.drawImage(img,(CW-w)/2,(cH-h)/2,w,h); }
   else paintTemplate(x, template);
   (p.images||[]).forEach(im=>{ if(im._img && im._img.complete && im._img.naturalWidth) x.drawImage(im._img, im.x, im.y, im.w, im.h); });
   p.hi.forEach(st=>drawStroke(x,st));
@@ -347,7 +353,7 @@ function rotateSelection(deg){ let rad=deg*Math.PI/180, cs=Math.cos(rad), sn=Mat
 function scaleSelection(f){ transformSelection((pt,c)=>({x:c.x+(pt.x-c.x)*f, y:c.y+(pt.y-c.y)*f})); }
 function flipSelection(axis){ transformSelection((pt,c)=> axis==='x'? {x:2*c.x-pt.x, y:pt.y} : {x:pt.x, y:2*c.y-pt.y}); }
 function copySelection(){ if(!S.selection.length){ toast('Select some strokes first'); return; } S.clipboard=JSON.parse(JSON.stringify(S.selection)); toast(S.clipboard.length+' stroke(s) copied — paste works on any page of any notebook'); }
-function pasteSelection(){ let p=curPageObj(); if(!p){ toast('Open a notebook page first'); return; } if(!S.clipboard.length){ toast('Nothing copied yet — select strokes and tap Copy'); return; } snapshotUndo(); let copies=JSON.parse(JSON.stringify(S.clipboard)); copies.forEach(c=>{ c.points=c.points.map(pt=>({x:Math.min(CW-4,(pt.x||0)+36), y:Math.min(CH-4,(pt.y||0)+36), p:pt.p})); delete c._layer; p.ink.push(c); }); S.selection=copies; bumpV(p); drawSelectionOverlay(); renderPages(); toast('Pasted '+copies.length+' stroke(s)'); }
+function pasteSelection(){ let p=curPageObj(); if(!p){ toast('Open a notebook page first'); return; } if(!S.clipboard.length){ toast('Nothing copied yet — select strokes and tap Copy'); return; } snapshotUndo(); let copies=JSON.parse(JSON.stringify(S.clipboard)); copies.forEach(c=>{ c.points=c.points.map(pt=>({x:Math.min(CW-4,(pt.x||0)+36), y:Math.min(PH-4,(pt.y||0)+36), p:pt.p})); delete c._layer; p.ink.push(c); }); S.selection=copies; bumpV(p); drawSelectionOverlay(); renderPages(); toast('Pasted '+copies.length+' stroke(s)'); }
 function snapVal(v){ return S.snapGrid? Math.round(v/24)*24 : v; }
 function finishSelection(){ let p=curPageObj(); if(!p||!S.selRect) return; let r={x1:Math.min(S.selRect.x1,S.selRect.x2),y1:Math.min(S.selRect.y1,S.selRect.y2),x2:Math.max(S.selRect.x1,S.selRect.x2),y2:Math.max(S.selRect.y1,S.selRect.y2)}; S.selRect=null;
   let all=p.ink.concat(p.hi); S.selection=all.filter(st=>{ let b=strokeBBox(st); return b.x2>=r.x1 && b.x1<=r.x2 && b.y2>=r.y1 && b.y1<=r.y2; });
@@ -406,7 +412,7 @@ function finishVspace(){
   (p.texts||[]).forEach(t=>{ if(t.y>=d.y-2) t.y+=dy; });
   (p.texs||[]).forEach(t=>{ if(t.y>=d.y-2) t.y+=dy; });
   (p.images||[]).forEach(im=>{ if(im.y>=d.y-2) im.y+=dy; });
-  (p.stickies||[]).forEach(st=>{ if(st.y/100*CH>=d.y-2) st.y+=dy/CH*100; });
+  (p.stickies||[]).forEach(st=>{ if(st.y/100*PH>=d.y-2) st.y+=dy/PH*100; });
   bumpV(p); redrawLayer('ink'); redrawLayer('hi'); renderCanvasTexts(); renderCanvasImages(); renderTexLayer(); renderStickies(); renderPages();
   toast(moved? 'Moved '+moved+' stroke(s) '+(dy>0?'down':'up')+' to '+(dy>0?'make':'close')+' space' : 'Nothing below that line to move');
 }
@@ -711,7 +717,7 @@ function renderCanvasTexts(){
   let p=curPageObj(); let host=$('pageTextLayer'); if(!host) return; host.innerHTML=''; if(!p) return;
   (p.texts||[]).forEach(t=>{
     let d=document.createElement('div'); d.className='canvasText'; d.contentEditable='true'; d.textContent=t.text;
-    d.style.left=(t.x/CW*100)+'%'; d.style.top=(t.y/CH*100)+'%'; d.style.color=t.color; if(t.font) d.style.fontFamily=t.font; let cwPx=inkC.getBoundingClientRect().width; let scale=cwPx? cwPx/CW : 0.55; d.style.fontSize=Math.max(10,(t.size||26)*scale)+'px';
+    d.style.left=(t.x/CW*100)+'%'; d.style.top=(t.y/PH*100)+'%'; d.style.color=t.color; if(t.font) d.style.fontFamily=t.font; let cwPx=inkC.getBoundingClientRect().width; let scale=cwPx? cwPx/CW : 0.55; d.style.fontSize=Math.max(10,(t.size||26)*scale)+'px';
     d.addEventListener('input',()=>{ t.text=d.textContent; bumpV(p); });
     d.addEventListener('blur',()=>{ if(!d.textContent.trim()){ p.texts=p.texts.filter(x=>x!==t); renderCanvasTexts(); renderPages(); } });
     d.addEventListener('pointerdown',e=>e.stopPropagation());
@@ -731,7 +737,7 @@ function renderCanvasImages(){
   (p.images||[]).forEach(im=>{
     if(!im._img){ let img=new Image(); img.src=im.src; im._img=img; img.onload=()=>renderPages(); }
     let wrap=document.createElement('div'); wrap.className='canvasImgWrap';
-    wrap.style.left=(im.x/CW*100)+'%'; wrap.style.top=(im.y/CH*100)+'%'; wrap.style.width=(im.w/CW*100)+'%'; wrap.style.height=(im.h/CH*100)+'%';
+    wrap.style.left=(im.x/CW*100)+'%'; wrap.style.top=(im.y/PH*100)+'%'; wrap.style.width=(im.w/CW*100)+'%'; wrap.style.height=(im.h/PH*100)+'%';
     let imgEl=document.createElement('img'); imgEl.src=im.src; imgEl.alt='Inserted image on this page'; wrap.appendChild(imgEl);
     let grip=document.createElement('span'); grip.className='canvasImgGrip'; grip.textContent='↘'; wrap.appendChild(grip);
     let del=document.createElement('button'); del.className='miniBtn'; del.textContent='×'; del.title='Remove image'; del.style.cssText='position:absolute;top:-10px;left:-10px;z-index:3;background:#fff'; del.onclick=e=>{ e.stopPropagation(); p.images=p.images.filter(x=>x!==im); bumpV(p); renderCanvasImages(); renderPages(); };
@@ -739,14 +745,14 @@ function renderCanvasImages(){
     wrap.addEventListener('pointerdown',e=>{
       if(e.target===grip||e.target===del) return; e.stopPropagation(); wrap.setPointerCapture(e.pointerId);
       let shell=inkC.getBoundingClientRect(); let sx=e.clientX, sy=e.clientY, ox=im.x, oy=im.y;
-      function mv(ev){ im.x=ox+(ev.clientX-sx)*(CW/shell.width); im.y=oy+(ev.clientY-sy)*(CH/shell.height); wrap.style.left=(im.x/CW*100)+'%'; wrap.style.top=(im.y/CH*100)+'%'; }
+      function mv(ev){ im.x=ox+(ev.clientX-sx)*(CW/shell.width); im.y=oy+(ev.clientY-sy)*((inkC.height||CH)/shell.height); wrap.style.left=(im.x/CW*100)+'%'; wrap.style.top=(im.y/PH*100)+'%'; }
       function up(){ wrap.removeEventListener('pointermove',mv); wrap.removeEventListener('pointerup',up); bumpV(p); renderPages(); }
       wrap.addEventListener('pointermove',mv); wrap.addEventListener('pointerup',up);
     });
     grip.addEventListener('pointerdown',e=>{
       e.stopPropagation(); grip.setPointerCapture(e.pointerId);
       let shell=inkC.getBoundingClientRect(); let sx=e.clientX, sy=e.clientY, ow=im.w, oh=im.h;
-      function mv(ev){ im.w=Math.max(40, ow+(ev.clientX-sx)*(CW/shell.width)); im.h=Math.max(30, oh+(ev.clientY-sy)*(CH/shell.height)); wrap.style.width=(im.w/CW*100)+'%'; wrap.style.height=(im.h/CH*100)+'%'; }
+      function mv(ev){ im.w=Math.max(40, ow+(ev.clientX-sx)*(CW/shell.width)); im.h=Math.max(30, oh+(ev.clientY-sy)*((inkC.height||CH)/shell.height)); wrap.style.width=(im.w/CW*100)+'%'; wrap.style.height=(im.h/PH*100)+'%'; }
       function up(){ grip.removeEventListener('pointermove',mv); grip.removeEventListener('pointerup',up); bumpV(p); renderPages(); }
       grip.addEventListener('pointermove',mv); grip.addEventListener('pointerup',up);
     });
@@ -767,7 +773,7 @@ function setPageBg(v){ let p=curPageObj(); if(!p) return; p.bgColor=v; bumpV(p);
 
 /* pointer drawing */
 let drawing=false, curStroke=null, lastPt=null, lastT=0, eraseChanged=false;
-function canvasPos(e){ let r=inkC.getBoundingClientRect(); return { x:(e.clientX-r.left)*(CW/r.width), y:(e.clientY-r.top)*(CH/r.height) }; }
+function canvasPos(e){ let r=inkC.getBoundingClientRect(); return { x:(e.clientX-r.left)*(CW/r.width), y:(e.clientY-r.top)*((inkC.height||CH)/r.height) }; }
 function pointerPressure(e,pt){
   if(e.pointerType==='pen' && e.pressure && e.pressure>0) return e.pressure;
   if(lastPt){ let d=Math.hypot(pt.x-lastPt.x,pt.y-lastPt.y); return Math.max(0.2,Math.min(1, 1.05 - d/46)); }
@@ -784,7 +790,7 @@ function renderLive(){
   if(!curStroke) return;
   let p=curPageObj(); if(!p) return;
   let layer=curStroke._layer, ctx= layer==='ink'? inkX:hiX;
-  ctx.clearRect(0,0,CW,CH);
+  ctx.clearRect(0,0,CW,PH);
   p[layer].forEach(st=>drawStroke(ctx,st));
   drawStroke(ctx,curStroke);
 }
@@ -1172,7 +1178,7 @@ function renderPages(){
   nb.pages.forEach((p,i)=>{
     let th=document.querySelector('canvas[data-thumb="'+i+'"]'); if(!th) return;
     if(!p._thumb || p._thumbV!==p._v){ p._thumb=composePage(p, nb.template); p._thumbV=p._v; }
-    let x=th.getContext('2d'); x.clearRect(0,0,300,200); x.drawImage(p._thumb,0,0,300,200);
+    let x=th.getContext('2d'); x.clearRect(0,0,300,200); x.fillStyle='#fff'; x.fillRect(0,0,300,200); let iw=p._thumb.width, ih=p._thumb.height, ts=Math.min(300/iw,200/ih); x.drawImage(p._thumb,(300-iw*ts)/2,(200-ih*ts)/2,iw*ts,ih*ts);
   });
 }
 
@@ -1363,7 +1369,7 @@ function renderTexLayer(){
   let scale=(inkC.getBoundingClientRect().width||660)/CW;
   (p.texs||[]).forEach(t=>{
     let d=document.createElement('div'); d.className='texEl';
-    d.style.left=(t.x/CW*100)+'%'; d.style.top=(t.y/CH*100)+'%';
+    d.style.left=(t.x/CW*100)+'%'; d.style.top=(t.y/PH*100)+'%';
     texRenderInto(d, t.tex, Math.max(10,(t.size||26)*scale), t.color);
     let del=document.createElement('button'); del.className='miniBtn'; del.textContent='×'; del.title='Remove equation'; del.style.cssText='position:absolute;top:-10px;right:-10px;z-index:3;background:#fff';
     del.onclick=e=>{ e.stopPropagation(); p.texs=p.texs.filter(x=>x!==t); bumpV(p); renderTexLayer(); renderPages(); };
@@ -1371,7 +1377,7 @@ function renderTexLayer(){
     d.addEventListener('pointerdown',e=>{
       if(e.target===del) return; e.stopPropagation(); d.setPointerCapture(e.pointerId);
       let shell=inkC.getBoundingClientRect(); let sx=e.clientX, sy=e.clientY, ox=t.x, oy=t.y;
-      function mv(ev){ t.x=ox+(ev.clientX-sx)*(CW/shell.width); t.y=oy+(ev.clientY-sy)*(CH/shell.height); d.style.left=(t.x/CW*100)+'%'; d.style.top=(t.y/CH*100)+'%'; }
+      function mv(ev){ t.x=ox+(ev.clientX-sx)*(CW/shell.width); t.y=oy+(ev.clientY-sy)*((inkC.height||CH)/shell.height); d.style.left=(t.x/CW*100)+'%'; d.style.top=(t.y/PH*100)+'%'; }
       function up(){ d.removeEventListener('pointermove',mv); d.removeEventListener('pointerup',up); bumpV(p); renderPages(); }
       d.addEventListener('pointermove',mv); d.addEventListener('pointerup',up);
     });
@@ -1429,8 +1435,8 @@ function exportPagePNG(){ let nb=curNb(); if(!nb) return; saveEditorToModel(); l
 function exportNotebookPDF(){
   let nb=curNb(); if(!nb) return; saveEditorToModel();
   if(!window.jspdf){ toast('PDF export library could not load — check connection'); return; }
-  let doc=new window.jspdf.jsPDF({unit:'px', format:[CW,CH], orientation:'landscape'});
-  nb.pages.forEach((p,i)=>{ if(i>0) doc.addPage([CW,CH],'landscape'); let c=composePage(p, nb.template); doc.addImage(c.toDataURL('image/jpeg',0.92),'JPEG',0,0,CW,CH); });
+  let doc=new window.jspdf.jsPDF({unit:'px', format:[CW,pageH(nb.pages[0])], orientation: pageH(nb.pages[0])>CW?'portrait':'landscape'});
+  nb.pages.forEach((p,i)=>{ let ph=pageH(p); if(i>0) doc.addPage([CW,ph], ph>CW?'portrait':'landscape'); let c=composePage(p, nb.template); doc.addImage(c.toDataURL('image/jpeg',0.92),'JPEG',0,0,CW,c.height); });
   doc.save(nb.title.replace(/[^\w\- ]+/g,'')+'.pdf'); toast('Notebook exported as PDF');
 }
 /* SVG export — strokes become real vector elements, so the page opens in
@@ -1547,14 +1553,14 @@ async function relinkPdfBackgrounds(){
     for(let p of nb.pages){ if(!p.bgPdf || p.bgPdf.img) continue;
       let book=S.items.find(i=>i.kind==='pdf' && i.title===p.bgPdf.bookTitle);
       if(!book) continue;
-      try{ let page=await book.doc.getPage(p.bgPdf.page); let v0=page.getViewport({scale:1}); let vp=page.getViewport({scale:Math.min(CW/v0.width,CH/v0.height)});
+      try{ let page=await book.doc.getPage(p.bgPdf.page); let v0=page.getViewport({scale:1}); let vp=page.getViewport({scale:CW/v0.width});
         let cv=document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
         await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
         p.bgPdf.img=cv;
       }catch(e){}
     }
   }
-  if(S.view==='editor' && curNb()){ drawBackground(); renderPages(); }
+  if(S.view==='editor' && curNb()){ loadPageIntoEditor(); }
 }
 function importBackup(e){
   let f=e.target.files[0]; e.target.value=''; if(!f) return;
@@ -2035,7 +2041,7 @@ async function annotatePdf(id){
   let nb={id:uid(),kind:'notebook',title:'Annotations — '+b.title,color:'#1e3a5f',template:'blank',cur:0,updated:'Just now',annotations:[],pdfBookId:id,pages:[]};
   for(let n=1;n<=b.numPages;n++){
     let pg=blankPage();
-    try{ let page=await b.doc.getPage(n); let v0=page.getViewport({scale:1}); let vp=page.getViewport({scale:Math.min(CW/v0.width,CH/v0.height)});
+    try{ let page=await b.doc.getPage(n); let v0=page.getViewport({scale:1}); let vp=page.getViewport({scale:CW/v0.width});
       let cv=document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
       await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
       pg.bgPdf={img:cv,page:n,bookTitle:b.title};

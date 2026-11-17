@@ -217,3 +217,29 @@ input[type=color].colorPick{width:34px;height:34px;min-height:34px;border:1px so
 .popMenu .btn:hover,.popMenu label.btn:hover{background:var(--paper2)}
 details.helpBox{margin-top:12px;border-top:1px solid var(--line);padding-top:4px}
 details.helpBox summary{cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 0;min-height:40px;display:flex;align-items:center}
+
+/* --- minimal pass: one clear action per screen; in the editor the page comes first --- */
+#noteTitle{font-size:22px!important}
+#readerTitle{font-size:30px}
+body.inEditor .layout{padding-top:12px}
+@media(max-width:860px){
+  body.inEditor .layout{padding:8px 6px 64px}
+  .editorTop{position:static;flex-wrap:nowrap;padding:5px 6px;border-radius:12px}
+  .editorTop .kbd{display:none}
+  .editorTop .edFocus{display:none}
+  #noteTitle{font-size:18px!important}
+  #mainToolbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;padding:6px;gap:2px;top:0;scrollbar-width:none;border-radius:12px}
+  #mainToolbar::-webkit-scrollbar{display:none}
+  #mainToolbar .tool{flex:0 0 auto;width:40px;height:40px;min-height:40px}
+  #mainToolbar .swatch{flex:0 0 auto;width:26px;height:26px;min-height:26px}
+  #mainToolbar .btn,#mainToolbar select,#mainToolbar input{flex:0 0 auto}
+  #mainToolbar .tool-label{display:none}
+  #mainToolbar input[type=range]{width:64px!important}
+  .editorWrap{margin-top:8px;gap:10px}
+  .editorWrap .panel{border-radius:14px}
+  .canvasShell{border-radius:12px}
+  .textArea{font-size:16px;min-height:96px}
+  .readerTop{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .readerTop::-webkit-scrollbar{display:none}
+  .readerTop .btn,.readerTop .seg{flex:0 0 auto}
+}

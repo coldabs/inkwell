@@ -33,6 +33,7 @@
       <button class="chip" data-filter="pdf" onclick="filterLib('pdf',this)">PDFs</button>
       <button class="chip" data-filter="epub" onclick="filterLib('epub',this)">EPUBs</button>
       <button class="chip dashed" type="button" onclick="openBook(SAMPLE_ID)">Sample book</button>
+      <button class="chip" type="button" onclick="toggleLibUtils()">Shelf options ▾</button>
     </div>
     <p class="kbd" id="libHint" style="margin:2px 0 10px"></p>
 
@@ -44,7 +45,7 @@
 
     <div id="libraryGrid" class="grid"></div>
 
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:28px">
+    <div id="libUtils" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
       <button class="btn" onclick="exportBackup()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 21h16"/></svg> Backup</button>
       <label class="btn" for="backupImport"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="M7 7l5-5 5 5"/><path d="M4 21h16"/></svg> Restore</label>
       <input id="backupImport" type="file" accept=".json" class="hidden" onchange="importBackup(event)"/>
@@ -86,7 +87,7 @@
       </div>
       <button class="iconBtn" onclick="undoStroke()" aria-label="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
       <button class="iconBtn" onclick="redoStroke()" aria-label="Redo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></button>
-      <button class="btn small" onclick="openTimer()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Focus</button>
+      <button class="btn small edFocus" onclick="openTimer()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Focus</button>
       <span class="popWrap">
         <button class="btn small" id="exportBtn" aria-haspopup="true" aria-expanded="false" onclick="toggleExportMenu(this)">Export ▾</button>
         <span class="popMenu" id="exportPop">
@@ -164,6 +165,7 @@
       <select id="toolbarLayoutSel" class="shapeSel tbExtra" onchange="setToolbarLayout(this.value)" title="Toolbar layout"><option value="">Comfortable</option><option value="compact">Compact</option><option value="minimal">Minimal</option></select>
       <span class="tool-label">Finger</span>
       <select id="fingerMode" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600"><option value="scroll">Scrolls page</option><option value="draw">Draws</option></select>
+      <button class="btn small" onclick="openTimer()">Focus timer</button>
       <button class="btn small" onclick="toggleBoard()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Board</button>
       <button class="btn small" onclick="insertTable()">Insert table</button>
       <button class="btn small" onclick="addSticky()">Sticky note</button>
@@ -278,15 +280,16 @@
       <button class="btn" onclick="strikeSelection()">Strikethrough</button>
       <button class="btn" onclick="lookupSelection()">Dictionary / Wiki</button>
       <button class="btn" onclick="openOcrPanel()">OCR</button>
+      <button class="btn" onclick="toggleTtsBar()">Listen — text to speech</button>
     </div>
 
     <div id="readerGrid">
       <aside class="panel" id="readerSide">
         <h4>Contents</h4>
         <div id="tocList"><p class="kbd">Open a book to see its contents.</p></div>
-        <h4 style="margin-top:16px">Bookmarks</h4><div id="bookmarkList"><p class="kbd">No bookmarks yet</p></div>
-        <h4 style="margin-top:16px">Annotations</h4><div id="annoList"><p class="kbd">Select text → Highlight selection</p></div>
-        <h4 style="margin-top:16px">Thumbnails</h4><div id="thumbList"><p class="kbd">—</p></div>
+        <details class="helpBox"><summary>Bookmarks</summary><div id="bookmarkList"><p class="kbd">No bookmarks yet</p></div></details>
+        <details class="helpBox"><summary>Annotations</summary><div id="annoList"><p class="kbd">Select text → Highlight selection</p></div></details>
+        <details class="helpBox"><summary>Thumbnails</summary><div id="thumbList"><p class="kbd">—</p></div></details>
       </aside>
       <div>
         <article class="reader" id="readerArticle">
@@ -324,7 +327,7 @@
           <div id="pdfPages"></div>
         </div>
 
-        <div class="ttsBar" id="ttsBar">
+        <div class="ttsBar hidden" id="ttsBar">
           <b style="font-size:13px">Listen</b>
           <button class="btn primary" id="ttsBtn" onclick="toggleTTS()">▶ Play</button>
           <label class="kbd" for="accentSel">Accent</label>
