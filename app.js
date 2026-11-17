@@ -788,26 +788,39 @@ function pointerPressure(e,pt){
 }
 const SHAPE_TOOLS=['line','rect','ellipse','arrow'];
 function isShapeTool(t){ return SHAPE_TOOLS.indexOf(t)>=0; }
-function shouldDraw(e){ if(S.tool==='hand') return false; if(['select','text','lasso','vspace','spline','compass'].indexOf(S.tool)>=0 || isShapeTool(S.tool)) return true; if(e.pointerType==='touch' && $('fingerMode').value==='scroll') return false; return true; }
-/* Finger input used to fail silently: the Finger control defaulted to
-   "Scrolls page" and sat hidden inside More tools, so on a phone with no
-   stylus every pen stroke was swallowed — and touch-action:none meant the
-   drag didn't even scroll. Now Finger defaults to Draws and lives in the
-   always-visible toolbar. This keeps the canvas's touch behaviour in step
-   with the mode: drawing modes capture the gesture (touch-action:none);
-   Hand tool or Finger=Scrolls hands the gesture back to the browser so
-   the page genuinely pans instead of feeling dead. Pen/mouse input is
-   unaffected — browsers don't scroll on pen drags. */
-function updateInkTouchAction(){
-  let fm=$('fingerMode'); let fingerDraws= !fm || fm.value!=='scroll';
-  inkC.style.touchAction= (S.tool==='hand' || !fingerDraws)? 'pan-x pan-y' : 'none';
+function shouldDraw(e){ return S.tool!=='hand'; }
+/* Scrolling while annotating — the way note apps do it. The canvas keeps
+   touch-action:none at all times, so a drawing finger never makes the
+   page jump; scrolling is done by hand here instead. ONE finger (or a
+   stylus / mouse) draws with whatever tool is picked. A TWO-finger drag
+   pans the page — and the zoomed canvas inside its scroller — even while
+   a drawing tool is active. The Hand tool pans with one finger. There is
+   no Finger mode to set and nothing to confirm: a selected tool just
+   works, and two fingers always move the page.
+   When the second finger lands, any half-drawn stroke is thrown away
+   (it was never committed to the page) along with its undo snapshot, and
+   both fingers are marked "dead" for drawing: the finger that stays down
+   after the pan ends is ignored until it lifts, so lifting one finger
+   never drops the other back into a stroke mid-page. A touch that lands
+   while a stylus is down is treated as a palm, not a pan. */
+let inkPtrs=new Map(), panMid=null, handPan=null, panDead=new Set(), strokeUndoPushed=false;
+function updateInkTouchAction(){ inkC.style.touchAction='none'; inkC.style.cursor= S.tool==='hand'? 'grab' : 'crosshair'; }
+function zoomScroller(){ return inkC.closest? inkC.closest('.zoomScroll') : null; }
+function panViewportBy(dx,dy){
+  /* Content follows the fingers: scroll positions move against the drag.
+     The zoom scroller consumes what it can; the rest pans the window. */
+  let remX=dx, remY=dy, sc=zoomScroller();
+  if(sc){ let pl=sc.scrollLeft, pt=sc.scrollTop; sc.scrollLeft-=dx; sc.scrollTop-=dy; remX=dx-(pl-sc.scrollLeft); remY=dy-(pt-sc.scrollTop); }
+  if(remX||remY) window.scrollBy(-remX,-remY);
 }
-function onFingerMode(){
-  updateInkTouchAction();
-  let fm=$('fingerMode');
-  toast(fm && fm.value==='draw'
-    ? 'Finger draws on the page — tap the Hand tool when you want to drag-scroll instead.'
-    : 'Finger scrolls the page — a stylus or mouse still draws. Set Finger to “Draws” to write with your finger.');
+function inkPtrMid(){ let ps=Array.from(inkPtrs.values()); return ps.length>=2? {x:(ps[0].x+ps[1].x)/2, y:(ps[0].y+ps[1].y)/2} : null; }
+function abortGestureForPan(){
+  let wasMove=!!moveDrag;
+  if(curStroke){ if(strokeUndoPushed && S.undoStack.length) S.undoStack.pop(); curStroke=null; }
+  drawing=false; lastPt=null; strokeUndoPushed=false; handPan=null;
+  selDrag=false; moveDrag=null; lassoPts=null; vspaceDrag=null; S.selRect=null;
+  drawSelectionOverlay();
+  if(wasMove || S.tool==='eraser') renderPages();
 }
 function cloneStrokes(a){ return JSON.parse(JSON.stringify(a||[])); }
 function snapshotUndo(){ let p=curPageObj(); if(!p) return; S.undoStack.push({ink:cloneStrokes(p.ink),hi:cloneStrokes(p.hi)}); if(S.undoStack.length>60) S.undoStack.shift(); S.redoStack=[]; }
@@ -837,17 +850,31 @@ function applyStylusButton(e){
 inkC.addEventListener('pointerup',()=>{ if(barrelSavedTool!==null){ S.tool=barrelSavedTool; barrelSavedTool=null; } });
 inkC.addEventListener('pointercancel',()=>{ if(barrelSavedTool!==null){ S.tool=barrelSavedTool; barrelSavedTool=null; } });
 inkC.addEventListener('pointerdown',e=>{
-  applyStylusButton(e);
-  if(!curPageObj()) return;
-  if(!shouldDraw(e)){
-    /* Never swallow a fingertip stroke silently again: if the pen family
-       is active but Finger is set to scroll, say exactly how to fix it. */
-    if(e.pointerType==='touch' && ['pen','calligraphy','highlighter','eraser'].indexOf(S.tool)>=0 && $('fingerMode').value==='scroll'){
-      let now=Date.now();
-      if(now-(inkC._hintAt||0)>6000){ inkC._hintAt=now; toast('Your finger is set to scroll, so it can’t draw. Set Finger to “Draws” in the toolbar to write with your finger — a stylus or mouse draws either way.',4600); }
-    }
+  inkPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY,type:e.pointerType});
+  if(inkPtrs.size===2){
+    /* Second finger down: abandon whatever the first finger was doing and
+       turn the gesture into a two-finger pan. Skipped when a stylus is
+       down (that touch is a resting palm) or the new pointer isn't touch. */
+    let types=Array.from(inkPtrs.values()).map(p=>p.type);
+    if(e.pointerType!=='touch' || types.indexOf('pen')>=0) return;
+    e.preventDefault();
+    try{ inkC.setPointerCapture(e.pointerId); }catch(err){}
+    abortGestureForPan();
+    panMid=inkPtrMid();
+    inkPtrs.forEach((v,id)=>panDead.add(id));
     return;
   }
+  if(inkPtrs.size>2 || panMid || panDead.has(e.pointerId)) return;
+  applyStylusButton(e);
+  if(!curPageObj()) return;
+  if(S.tool==='hand'){
+    /* Hand tool: one finger pans, through the same manual pan as two fingers. */
+    e.preventDefault();
+    try{ inkC.setPointerCapture(e.pointerId); }catch(err){}
+    handPan={x:e.clientX,y:e.clientY};
+    return;
+  }
+  if(!shouldDraw(e)) return;
   let pt0=canvasPos(e);
   if(S.tool==='text'){ e.preventDefault(); addPageText(pt0); return; }
   if(S.tool==='select'){
@@ -874,13 +901,13 @@ inkC.addEventListener('pointerdown',e=>{
   }
   if(S.tool==='compass'){
     e.preventDefault(); inkC.setPointerCapture(e.pointerId);
-    drawing=true; snapshotUndo();
+    drawing=true; snapshotUndo(); strokeUndoPushed=true;
     curStroke={tool:'shape', shape:'ellipse', color:S.color, size:+$('brushSize').value, fill:!!$('fillTgl').checked, style:S.strokeStyle, points:[{x:pt0.x,y:pt0.y},{x:pt0.x,y:pt0.y}]};
     curStroke._layer='ink'; curStroke._compassCenter={x:pt0.x,y:pt0.y};
     renderLive(); return;
   }
   e.preventDefault(); inkC.setPointerCapture(e.pointerId);
-  drawing=true; eraseChanged=false; snapshotUndo();
+  drawing=true; eraseChanged=false; snapshotUndo(); strokeUndoPushed=true;
   let pt=pt0; pt.p=pointerPressure(e,pt); lastPt=pt;
   if(S.tool==='eraser'){
     if(S.eraserMode==='whiteout'){ let pg=curPageObj(); curStroke={tool:'pen', color:(pg&&pg.bgColor)||'#fffdf6', size:Math.max(10,+$('brushSize').value*3), points:[pt]}; curStroke._layer='ink'; curStroke._whiteout=true; renderLive(); return; }
@@ -893,6 +920,19 @@ inkC.addEventListener('pointerdown',e=>{
   renderLive();
 });
 inkC.addEventListener('pointermove',e=>{
+  if(inkPtrs.has(e.pointerId)) inkPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY,type:e.pointerType});
+  if(panMid){
+    let m=inkPtrMid(); if(!m) return;
+    let dx=m.x-panMid.x, dy=m.y-panMid.y; panMid=m;
+    if(dx||dy){ e.preventDefault(); panViewportBy(dx,dy); }
+    return;
+  }
+  if(panDead.has(e.pointerId)) return;
+  if(handPan){
+    let dx=e.clientX-handPan.x, dy=e.clientY-handPan.y; handPan={x:e.clientX,y:e.clientY};
+    if(dx||dy){ e.preventDefault(); panViewportBy(dx,dy); }
+    return;
+  }
   if(S.tool==='select'){
     let pt=canvasPos(e);
     if(moveDrag){ let dx=pt.x-moveDrag.x, dy=pt.y-moveDrag.y; moveDrag.x=pt.x; moveDrag.y=pt.y;
@@ -942,8 +982,17 @@ function endStroke(){
   if(S.tool==='eraser'){ redrawLayer('ink'); redrawLayer('hi'); } /* clear the eraser touch ring */
   renderPages();
 }
-inkC.addEventListener('pointerup',endStroke);
-inkC.addEventListener('pointercancel',endStroke);
+function inkPointerUp(e){
+  let wasPan=!!panMid, wasHand=!!handPan;
+  inkPtrs.delete(e.pointerId); panDead.delete(e.pointerId);
+  if(wasPan){ if(inkPtrs.size<2) panMid=null; return; }
+  if(panDead.size) return; /* a finger left over from a pan never draws */
+  if(wasHand){ handPan=null; return; }
+  endStroke();
+  strokeUndoPushed=false;
+}
+inkC.addEventListener('pointerup',inkPointerUp);
+inkC.addEventListener('pointercancel',inkPointerUp);
 /* ============ Eraser: padded-box stroke splitting ============
    The eraser is a square. Around it sits a second, larger square padded
    by 0.4 x the stroke's width (the round-cap padding coefficient). A

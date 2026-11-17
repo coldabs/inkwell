@@ -276,3 +276,44 @@ body.inEditor .layout{padding-top:12px}
   .readerTop::-webkit-scrollbar{display:none}
   .readerTop .btn,.readerTop .seg{flex:0 0 auto}
 }
+
+/* --- mobile view pass: real reflow at phone width. Toolbars wrap into
+   rows instead of scrolling sideways, the brush size gets its own
+   full-width row so it is always reachable, and tap targets, the shelf
+   grid, the bottom bar and modals all size for a phone. --- */
+@media(max-width:860px){
+  #mainToolbar{flex-wrap:wrap;overflow:visible;position:static;gap:4px;padding:8px}
+  #brushSizeGroup{order:20;flex:1 1 100%;background:var(--paper2);border:1px solid var(--line);border-radius:999px;padding:3px 10px;gap:6px}
+  #brushSizeGroup .tool-label{display:block}
+  #brushSizeGroup input[type=range]{flex:1;width:auto!important}
+  #eraserModeGroup{order:21;flex:1 1 100%}
+  #eraserModeGroup select{flex:1;width:100%;min-width:0}
+  .editorTop{flex-wrap:wrap}
+  .readerTop{flex-wrap:wrap;overflow:visible}
+  .readerTop .btn,.readerTop .seg{flex:0 1 auto}
+  #readerMore{flex-wrap:wrap}
+  .ttsBar select{max-width:100%}
+  .reader{padding:18px 14px 26px}
+}
+@media(max-width:640px){
+  .layout{padding:14px 10px 84px}
+  .layout.shelf{padding:12px 12px 112px}
+  .grid{gap:10px}
+  .book{min-height:148px}
+  .bookFace{padding:10px 32px 10px 10px}
+  .bookFace h3{font-size:21px}
+  .chipRow{gap:6px;margin:12px 0 2px}
+  .chip{padding:7px 11px;font-size:13px;min-height:36px}
+  .search input{font-size:16px}
+  .modalCard input,.modalCard select,.modalCard textarea{font-size:16px}
+  .bottomBarInner{gap:6px;padding:10px 10px calc(10px + env(safe-area-inset-bottom))}
+  .bottomBar .btn{padding:0 10px;font-size:13px;min-height:44px}
+  .empty{padding:32px 8px}
+  .modal{padding:10px}
+  .modalCard{padding:16px;border-radius:16px}
+  .toast{bottom:84px}
+  table.inkTable td,table.inkTable th{min-width:0;padding:6px;font-size:14px;overflow-wrap:anywhere}
+  .board{left:8px;right:8px;top:8px;width:auto;max-width:none}
+  .sticky{width:150px}
+  .sticky textarea{height:80px}
+}
