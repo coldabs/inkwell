@@ -6,94 +6,160 @@
 <meta name="color-scheme" content="light dark"/>
 <link rel="icon" href="data:,"/>
 <title>Inkwell — Notes & Reading</title>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{
   --bg:#f7f5ef; --paper:#fffef8; --paper2:#fdfaf0; --ink:#191c19; --muted:#6f746e; --line:#e6e2d6;
   --accent:#234f35; --accent2:#c9a86a; --card:#ffffff; --toolbar:#ffffff; --shadow:0 8px 30px rgba(0,0,0,.08);
-  --radius:18px;
+  --reader-fs:19px;
 }
 @media (prefers-color-scheme: dark){
-  :root{ --bg:#111311; --paper:#1c1e1c; --paper2:#22241f; --ink:#ece9df; --muted:#9aa09a; --line:#2e312e; --card:#1e201e; --toolbar:#1e201e; --accent:#7bc49a; --accent2:#c9a86a; }
+  :root{ --bg:#111311; --paper:#1c1e1c; --paper2:#22241f; --ink:#ece9df; --muted:#9aa09a; --line:#2e312e; --card:#1e201e; --toolbar:#1e201e; --accent:#7bc49a; }
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 button,[role=button],select,input{ min-height:40px; }
-button{cursor:pointer}
+button{cursor:pointer;font-family:inherit}
 a{color:var(--accent)}
-.topbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%, transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:10px 16px}
+.topbar{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--bg) 88%, transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:10px 16px}
 .logo{font-family:Newsreader,Georgia,serif;font-weight:700;font-size:28px;letter-spacing:-.02em;line-height:1}
 .logo span{color:var(--accent)}
 .pillnav{display:flex;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px;margin-left:8px}
-.pillnav button{border:0;background:transparent;padding:8px 14px;border-radius:999px;font-weight:600;font-size:13px}
+.pillnav button{border:0;background:transparent;padding:8px 14px;border-radius:999px;font-weight:600;font-size:13px;color:var(--ink)}
 .pillnav button.active{background:var(--ink);color:var(--bg)}
-.search{flex:1;max-width:520px;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:0 14px}
-.search input{flex:1;border:0;outline:0;background:transparent;height:40px;font-size:14px;color:var(--ink)}
-.btn{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:0 16px;font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:8px}
+.searchWrap{flex:1;max-width:520px;position:relative}
+.search{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:0 14px}
+.search input{flex:1;border:0;outline:0;background:transparent;height:40px;font-size:14px;color:var(--ink);min-height:40px}
+.searchResults{position:absolute;top:calc(100% + 8px);left:0;right:0;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);max-height:56vh;overflow:auto;z-index:45}
+.srItem{padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+.srItem:last-child{border-bottom:0}
+.srItem:hover{background:var(--paper2)}
+.srItem b{font-size:13px;display:block}
+.srItem span{font-size:12px;color:var(--muted);line-height:1.45;display:block}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:0 16px;font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:8px;color:var(--ink);min-height:40px}
 .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 .btn.dark{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.small{min-height:32px;padding:0 10px;font-size:12px}
+.btn.danger{color:#b3261e;border-color:#e5b4b0}
+.btn:disabled{opacity:.45;cursor:default}
 .layout{max-width:1180px;margin:0 auto;padding:18px 16px 90px}
 .hero{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;flex-wrap:wrap;margin:10px 0 18px}
 .hero h1{font-family:Newsreader,Georgia,serif;font-size:42px;line-height:.95;letter-spacing:-.03em;margin:0;font-weight:600}
 .hero h1 em{font-style:italic;font-weight:400}
 .hero p{color:var(--muted);max-width:520px;line-height:1.6;margin:10px 0 0;font-size:15px}
 .stats{display:flex;gap:10px;flex-wrap:wrap}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;min-width:110px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;min-width:104px}
 .stat b{font-size:20px;display:block}
-.stat span{font-size:12px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.stat span{font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 @media(max-width:820px){.grid{grid-template-columns:repeat(2,1fr)} .hero h1{font-size:34px}}
-@media(max-width:700px){.topbar{flex-wrap:wrap} .search{order:3;flex-basis:100%;max-width:none} .topbar .btn{white-space:nowrap}}
-@media(max-width:560px){.grid{grid-template-columns:1fr 1fr} .pillnav{display:none} .search{max-width:none}}
-.card{background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden;text-align:left;padding:0}
+@media(max-width:700px){.topbar{flex-wrap:wrap} .searchWrap{order:3;flex-basis:100%;max-width:none} .topbar .btn{white-space:nowrap}}
+@media(max-width:560px){.grid{grid-template-columns:1fr 1fr} .pillnav{display:none}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden;text-align:left;padding:0;display:flex;flex-direction:column}
 .card-cover{height:132px;padding:16px;display:flex;flex-direction:column;justify-content:space-between}
 .card-cover h3{margin:0;font-family:Newsreader,serif;font-size:20px;line-height:1.1}
-.card-body{padding:12px 14px 14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
-.badge{font-size:11px;letter-spacing:.06em;text-transform:uppercase;background:var(--bg);border:1px solid var(--line);padding:5px 8px;border-radius:999px}
+.card-body{padding:12px 14px 14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.badge{font-size:11px;letter-spacing:.06em;text-transform:uppercase;background:var(--bg);border:1px solid var(--line);padding:5px 8px;border-radius:999px;display:inline-block}
 .empty{border:1.5px dashed var(--line);border-radius:20px;padding:28px;text-align:center;background:var(--paper)}
 .empty h3{font-family:Newsreader,serif;font-size:24px;margin:0 0 6px}
 .toolbar{position:sticky;top:61px;z-index:15;background:var(--toolbar);border:1px solid var(--line);border-radius:16px;padding:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;box-shadow:var(--shadow)}
-.tool{width:44px;height:44px;border-radius:12px;border:1px solid transparent;background:transparent;display:grid;place-items:center;font-size:18px}
+.tool{width:44px;height:44px;border-radius:12px;border:1px solid transparent;background:transparent;display:grid;place-items:center;font-size:18px;color:var(--ink)}
 .tool.active{background:var(--ink);color:var(--bg)}
 .tool-label{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:0 6px}
-.swatch{width:28px;height:28px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.swatch{width:28px;height:28px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line);min-height:28px}
 .swatch.active{box-shadow:0 0 0 2px var(--ink)}
-.editorWrap{display:grid;grid-template-columns:180px 1fr 260px;gap:14px;margin-top:14px}
-@media(max-width:900px){.editorWrap{grid-template-columns:1fr} .side{display:none} .side.open{display:block}}
+.editorWrap{display:grid;grid-template-columns:190px 1fr 260px;gap:14px;margin-top:14px;align-items:start}
+@media(max-width:980px){.editorWrap{grid-template-columns:1fr} .side{display:none} .side.open{display:block}}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px}
 .panel h4{margin:0 0 10px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-.pageThumb{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;background:var(--paper);cursor:pointer}
+.pageThumb{border:1px solid var(--line);border-radius:12px;padding:8px;margin-bottom:8px;background:var(--paper);cursor:pointer}
 .pageThumb.active{border-color:var(--accent);outline:2px solid color-mix(in srgb,var(--accent) 20%, transparent)}
+.pageThumb canvas{width:100%;height:auto;display:block;border-radius:6px;background:#fff}
+.pageThumb .ptRow{display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:4px}
+.miniBtn{border:1px solid var(--line);background:var(--card);border-radius:8px;min-height:26px;min-width:26px;padding:0 6px;font-size:12px;color:var(--ink)}
 .canvasShell{background:var(--paper);border:1px solid var(--line);border-radius:20px;overflow:hidden;position:relative;box-shadow:var(--shadow)}
-.canvasShell.template-lined{background-image:repeating-linear-gradient(transparent,transparent 31px, var(--line) 32px);background-color:var(--paper)}
-.canvasShell.template-grid{background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:28px 28px;background-color:var(--paper)}
-.canvasShell.template-dotted{background-image:radial-gradient(var(--line) 1.2px,transparent 1.2px);background-size:22px 22px;background-color:var(--paper)}
-#drawCanvas,#layerCanvas{width:100%;height:560px;display:block;touch-action:none;cursor:crosshair}
-#layerCanvas{position:absolute;inset:0;pointer-events:none;opacity:.9}
+.canvasStack{position:relative;width:100%}
+.canvasStack canvas{width:100%;height:auto;display:block}
+#bgCanvas{position:relative}
+#hiCanvas,#inkCanvas{position:absolute;inset:0;height:100%}
+#inkCanvas{touch-action:none;cursor:crosshair}
 .textArea{width:100%;min-height:120px;border:0;border-top:1px solid var(--line);padding:14px;font-family:Newsreader,serif;font-size:18px;line-height:1.6;background:var(--paper2);color:var(--ink);resize:vertical;outline:none}
+.stageWrap{display:grid;gap:14px}
+.stageWrap.split{grid-template-columns:1fr 1fr}
+@media(max-width:900px){.stageWrap.split{grid-template-columns:1fr}}
+.splitPane{border:1px solid var(--line);border-radius:20px;background:var(--paper);padding:18px;overflow:auto;max-height:640px;box-shadow:var(--shadow)}
+.splitPane h3{font-family:Newsreader,serif;margin:0 0 8px}
+.splitPane p{font-family:Newsreader,serif;line-height:1.7;font-size:15px}
 .reader{max-width:760px;margin:0 auto;background:var(--paper);border:1px solid var(--line);border-radius:22px;padding:28px 28px 36px;box-shadow:var(--shadow)}
-.reader.sepia{--paper:#fbf3d9;--ink:#3b2f1a}
-.reader.dark{--paper:#171917;--ink:#e8e6df;color:var(--ink)}
-.reader h2{font-family:Newsreader,serif;font-size:32px;line-height:1;margin:6px 0 8px}
-.reader p{font-family:Newsreader,serif;font-size:19px;line-height:1.75}
+.reader.sepia{--paper:#fbf3d9;--ink:#3b2f1a;color:#3b2f1a}
+.reader.dark{--paper:#171917;--ink:#e8e6df;color:#e8e6df}
+.reader h2{font-family:Newsreader,serif;font-size:32px;line-height:1.05;margin:6px 0 8px}
+.reader h1,.reader h3,.reader h4{font-family:Newsreader,serif}
+.reader p,.reader li{font-family:Newsreader,serif;font-size:var(--reader-fs);line-height:1.75}
+.reader img{max-width:100%;height:auto;border-radius:8px}
+.reader blockquote{border-left:3px solid var(--accent2);margin:14px 0;padding:4px 0 4px 14px;font-style:italic}
+#readerGrid{display:grid;grid-template-columns:230px 1fr;gap:14px;align-items:start}
+#sideToggle{display:none}
+#pdfView{background:var(--paper);border:1px solid var(--line);border-radius:22px;padding:16px;box-shadow:var(--shadow)}
+#pdfPages{display:flex;flex-direction:column;gap:16px}
+.pdfPage{background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden;width:100%}
+.pdfPage canvas{display:block;width:100%;height:auto}
+.pdfPageNum{font-size:11px;color:#8a8f8a;text-align:center;padding:6px 0;letter-spacing:.05em;text-transform:uppercase;background:#fff}
+.pageHolder{position:relative}
+.textLayer{position:absolute;inset:0;overflow:hidden}
+.textLayer span{position:absolute;color:transparent;white-space:pre;cursor:text;line-height:1}
+.textLayer span::selection{background:rgba(46,110,66,.35)}
+.textLayer mark{background:rgba(255,220,90,.6);color:transparent;border-radius:2px}
+.thumbItem{border:1px solid var(--line);border-radius:10px;padding:6px;margin-bottom:8px;background:var(--paper);cursor:pointer}
+.thumbItem.active{border-color:var(--accent);outline:2px solid color-mix(in srgb,var(--accent) 20%, transparent)}
+.thumbItem canvas{width:100%;height:auto;display:block;border-radius:4px;background:#fff}
+.tocItem{padding:8px 6px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;line-height:1.4}
+.tocItem:hover{color:var(--accent)}
+@media(max-width:860px){
+  #readerGrid{grid-template-columns:1fr}
+  #readerSide{display:none}
+  #readerSide.open{display:block}
+  #sideToggle{display:inline-flex}
+  .reader{padding:20px 16px 28px}
+  .reader h2{font-size:26px}
+  #pdfView{padding:10px;border-radius:16px}
+}
 mark{background:#ffe98a;color:#111;padding:0 2px;border-radius:3px}
 .ttsBar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px;margin-top:14px}
 .ttsBar select{border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600;font-size:13px}
 .seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px}
-.seg button{border:0;background:transparent;padding:6px 12px;border-radius:999px;font-weight:600;font-size:13px}
+.seg button{border:0;background:transparent;padding:6px 12px;border-radius:999px;font-weight:600;font-size:13px;color:var(--ink);min-height:34px}
 .seg button.active{background:var(--ink);color:var(--bg)}
-.board{position:absolute;right:16px;top:16px;width:340px;max-width:calc(100% - 32px);background:#fff8d6;border:1px solid #e6d98a;border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,.18);overflow:hidden;z-index:5}
-.boardHead{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(0,0,0,.06);cursor:grab;font-weight:700;font-size:13px}
-#boardCanvas{width:100%;height:220px;display:block;touch-action:none;background:transparent}
+.board{position:absolute;right:16px;top:16px;width:360px;max-width:calc(100% - 32px);border:1px solid #d8cf9a;border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,.22);overflow:hidden;z-index:8;color:#191c19}
+.boardHead{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:6px 8px;background:rgba(0,0,0,.07);cursor:grab;font-weight:700;font-size:12px;flex-wrap:wrap}
+.boardTools{display:flex;gap:6px;align-items:center;padding:6px 8px;background:rgba(255,255,255,.55);flex-wrap:wrap}
+#boardCanvas{width:100%;height:230px;display:block;touch-action:none;background:transparent;cursor:crosshair}
+.boardGrip{position:absolute;right:0;bottom:0;width:24px;height:24px;cursor:nwse-resize;z-index:9;touch-action:none}
+.boardGrip::after{content:"";position:absolute;right:4px;bottom:4px;width:10px;height:10px;border-right:2px solid rgba(0,0,0,.4);border-bottom:2px solid rgba(0,0,0,.4)}
+.sticky{position:absolute;width:176px;border-radius:4px 4px 10px 4px;box-shadow:0 10px 24px rgba(0,0,0,.2);z-index:7;padding:0;overflow:hidden}
+.stickyHead{display:flex;justify-content:space-between;align-items:center;padding:2px 6px;background:rgba(0,0,0,.08);cursor:grab}
+.stickyHead button{border:0;background:transparent;min-height:24px;min-width:24px;font-size:13px;color:#111}
+.sticky textarea{width:100%;height:96px;border:0;background:transparent;resize:none;padding:8px;font-size:13px;line-height:1.5;color:#111;outline:none;font-family:Inter,sans-serif}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;place-items:center;z-index:50;padding:16px}
 .modal.open{display:grid}
-.modalCard{background:var(--card);border-radius:20px;padding:20px;width:100%;max-width:420px;border:1px solid var(--line)}
+.modalCard{background:var(--card);border-radius:20px;padding:20px;width:100%;max-width:430px;border:1px solid var(--line);max-height:88vh;overflow:auto}
 .modalCard input,.modalCard select{width:100%;border:1px solid var(--line);border-radius:12px;padding:0 12px;background:var(--bg);color:var(--ink);margin:8px 0}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:999px;font-size:13px;font-weight:600;display:none;z-index:60}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:999px;font-size:13px;font-weight:600;display:none;z-index:60;max-width:92vw;text-align:center}
 .kbd{font-size:12px;color:var(--muted)}
-.listRow{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.listRow{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);align-items:flex-start}
 .hidden{display:none!important}
+.resultBox{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:12px;background:var(--paper2)}
+.resultBox p{font-family:Newsreader,serif;line-height:1.65;font-size:16px;white-space:pre-wrap}
+#parallelGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){#parallelGrid{grid-template-columns:1fr}}
+table.inkTable{width:100%;border-collapse:collapse}
+table.inkTable td,table.inkTable th{border:1px solid var(--line);padding:8px;text-align:left;min-width:70px}
+table.inkTable td:focus{outline:2px solid color-mix(in srgb,var(--accent) 35%, transparent)}
+progress{width:100%;height:8px;accent-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -104,7 +170,10 @@ mark{background:#ffe98a;color:#111;padding:0 2px;border-radius:3px}
     <button id="navEditor" onclick="showView('editor')">Notebook</button>
     <button id="navReader" onclick="showView('reader')">Reader</button>
   </nav>
-  <div class="search"><span>⌕</span><input id="globalSearch" placeholder="Search notebooks, books, notes…" oninput="renderLibrary()"/></div>
+  <div class="searchWrap">
+    <div class="search"><span>⌕</span><input id="globalSearch" placeholder="Search notebooks, books, notes, annotations…" oninput="onSearchInput()" autocomplete="off"/></div>
+    <div id="searchResults" class="searchResults hidden"></div>
+  </div>
   <button class="btn" onclick="openTimer()">◷ <span id="timerLabel">Focus 25:00</span></button>
   <button class="btn primary" onclick="openNewNotebook()">+ New</button>
 </header>
@@ -115,53 +184,52 @@ mark{background:#ffe98a;color:#111;padding:0 2px;border-radius:3px}
     <div class="hero">
       <div>
         <h1>Your notebooks,<br/><em>without the paywall.</em></h1>
-        <p>Handwriting, PDFs and EPUBs in one place. Everything free, everything on this device in this tab — draw, annotate, listen and export. No account, no locked pens.</p>
+        <p>Handwriting, PDFs and EPUBs in one place. Every feature below actually works — draw with pressure, annotate real PDFs, read real EPUBs, run OCR, listen, translate side-by-side and export. Notes live in this tab; back them up any time.</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
           <button class="btn dark" onclick="openNewNotebook()">Create notebook</button>
           <label class="btn" for="fileImport">Import PDF / EPUB</label>
           <input id="fileImport" type="file" accept=".pdf,.epub,.txt" class="hidden" onchange="handleImport(event)"/>
-          <button class="btn" onclick="showView('reader')">Open sample book →</button>
+          <label class="btn" for="backupImport">Restore backup</label>
+          <input id="backupImport" type="file" accept=".json" class="hidden" onchange="importBackup(event)"/>
+          <button class="btn" onclick="openBook(SAMPLE_ID)">Open sample book →</button>
         </div>
       </div>
       <div class="stats">
         <div class="stat"><b id="statNotebooks">0</b><span>Notebooks</span></div>
+        <div class="stat"><b id="statBooks">0</b><span>Books</span></div>
         <div class="stat"><b id="statPages">0</b><span>Pages</span></div>
-        <div class="stat"><b>12</b><span>Reader tools</span></div>
+        <div class="stat"><b id="statAnnos">0</b><span>Annotations</span></div>
       </div>
     </div>
 
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-      <button class="btn" onclick="filterLib('all',this)">All</button>
-      <button class="btn" onclick="filterLib('notebook',this)">Notebooks</button>
-      <button class="btn" onclick="filterLib('pdf',this)">PDFs</button>
-      <button class="btn" onclick="filterLib('epub',this)">EPUBs</button>
+      <button class="btn small" onclick="filterLib('all',this)">All</button>
+      <button class="btn small" onclick="filterLib('notebook',this)">Notebooks</button>
+      <button class="btn small" onclick="filterLib('pdf',this)">PDFs</button>
+      <button class="btn small" onclick="filterLib('epub',this)">EPUBs</button>
       <span style="flex:1"></span>
-      <span class="kbd" id="libHint">Starts empty — your first notebook is one tap away.</span>
+      <span class="kbd" id="libHint"></span>
     </div>
 
-    <div id="emptyState" class="empty">
+    <div id="emptyState" class="empty hidden">
       <div style="font-size:28px">✎</div>
-      <h3>Nothing here yet — and that's right.</h3>
-      <p style="color:var(--muted);line-height:1.6;max-width:460px;margin:0 auto">Inkwell starts empty by design. Create a notebook to start writing, or import a PDF/EPUB to read and annotate. The sample book below is there so you can try the reader.</p>
+      <h3>Nothing here yet.</h3>
+      <p style="color:var(--muted);line-height:1.6;max-width:460px;margin:0 auto">Create a notebook to start writing, or import a PDF/EPUB to read and annotate. The sample book is in the library so every reader tool can be tried straight away.</p>
       <button class="btn primary" style="margin-top:14px" onclick="openNewNotebook()">Create your first notebook</button>
     </div>
 
     <div id="libraryGrid" class="grid" style="margin-top:14px"></div>
 
-    <h3 style="font-family:Newsreader,serif;font-size:22px;margin:26px 0 10px">Try the reader</h3>
-    <div class="grid">
-      <article class="card">
-        <div class="card-cover" style="background:#234f35;color:#fff"><span class="badge" style="background:rgba(255,255,255,.15);color:#fff;border-color:transparent">EPUB • Sample</span><h3>The Art of Slow Reading</h3><p style="opacity:.8;margin:0;font-size:13px">Chapter 1 included — highlights, TTS, themes &amp; Parallel Read</p></div>
-        <div class="card-body"><span class="kbd">24 pages • Resumes where you left off</span><button class="btn primary" onclick="showView('reader')">Read</button></div>
-      </article>
-      <article class="card">
-        <div class="card-cover" style="background:#111;color:#fff"><span class="badge" style="background:rgba(255,255,255,.12);color:#fff;border-color:transparent">PDF • Annotate</span><h3>Your PDFs open in reading mode first</h3><p style="opacity:.75;margin:0;font-size:13px">Scroll to read, tap Annotate to write. Finger scrolls, stylus draws.</p></div>
-        <div class="card-body"><span class="kbd">Scroll / Page view</span><label class="btn" for="fileImport2">Import PDF</label><input id="fileImport2" type="file" accept=".pdf" class="hidden" onchange="handleImport(event)"/></div>
-      </article>
-      <article class="card">
-        <div class="card-cover" style="background:#f3e8c8"><span class="badge">Board</span><h3>Floating board for rough work</h3><p style="color:var(--muted);margin:0;font-size:13px">Infinite canvas over any page — solve, sketch, then close it. The page underneath stays clean.</p></div>
-        <div class="card-body"><span class="kbd">7 colours • Per page</span><button class="btn" onclick="showView('editor');toggleBoard(true)">Try board</button></div>
-      </article>
+    <div class="panel" style="margin-top:22px">
+      <h4>Reading &amp; writing stats — this session</h4>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
+        <div class="listRow"><span>Time writing</span><b id="statWrite">0m</b></div>
+        <div class="listRow"><span>Time reading</span><b id="statRead">0m</b></div>
+        <div class="listRow"><span>Strokes drawn</span><b id="statStrokes">0</b></div>
+        <div class="listRow"><span>Pages read</span><b id="statPagesRead">0</b></div>
+        <div class="listRow"><span>Focus sessions done</span><b id="statFocus">0</b></div>
+        <div class="listRow"><span>Words typed</span><b id="statWords">0</b></div>
+      </div>
     </div>
   </section>
 
@@ -170,80 +238,97 @@ mark{background:#ffe98a;color:#111;padding:0 2px;border-radius:3px}
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <button class="btn" onclick="showView('library')">← Library</button>
       <input id="noteTitle" value="Untitled notebook" style="flex:1;min-width:180px;border:0;background:transparent;font-family:Newsreader,serif;font-size:26px;font-weight:700;outline:none;color:var(--ink)" oninput="syncTitle()"/>
-      <button class="btn" onclick="undo()">↩ Undo</button>
-      <button class="btn" onclick="redo()">↪ Redo</button>
-      <button class="btn" onclick="exportPNG()">Export PNG</button>
+      <button class="btn" onclick="undoStroke()">↩ Undo</button>
+      <button class="btn" onclick="redoStroke()">↪ Redo</button>
+      <button class="btn" onclick="exportPagePNG()">Export PNG</button>
+      <button class="btn" onclick="exportNotebookPDF()">Export PDF</button>
       <button class="btn primary" onclick="exportBackup()">Backup .json</button>
     </div>
 
     <div class="toolbar" role="toolbar" aria-label="Writing tools">
       <span class="tool-label">Tools</span>
-      <button class="tool active" data-tool="pen" onclick="setTool('pen',this)" title="Pen">✒️</button>
-      <button class="tool" data-tool="calligraphy" onclick="setTool('calligraphy',this)" title="Calligraphy pen">🖋️</button>
-      <button class="tool" data-tool="highlighter" onclick="setTool('highlighter',this)" title="Highlighter">🖍️</button>
-      <button class="tool" data-tool="eraser" onclick="setTool('eraser',this)" title="Eraser">⌫</button>
-      <button class="tool" data-tool="hand" onclick="setTool('hand',this)" title="Hand / scroll">✋</button>
+      <button class="tool active" data-tool="pen" onclick="setTool('pen',this)" title="Pen — pressure sensitive">✒️</button>
+      <button class="tool" data-tool="calligraphy" onclick="setTool('calligraphy',this)" title="Calligraphy pen — nib angle changes width">🖋️</button>
+      <button class="tool" data-tool="highlighter" onclick="setTool('highlighter',this)" title="Highlighter — own layer">🖍️</button>
+      <button class="tool" data-tool="eraser" onclick="setTool('eraser',this)" title="Stroke eraser">⌫</button>
+      <button class="tool" data-tool="hand" onclick="setTool('hand',this)" title="Hand — scroll without drawing">✋</button>
       <span class="tool-label">Colour</span>
-      <button class="swatch active" style="background:#111" onclick="setColor('#111111',this)" aria-label="Black"></button>
+      <button class="swatch active" style="background:#191c19" onclick="setColor('#191c19',this)" aria-label="Black"></button>
       <button class="swatch" style="background:#234f35" onclick="setColor('#234f35',this)" aria-label="Green"></button>
       <button class="swatch" style="background:#1d4ed8" onclick="setColor('#1d4ed8',this)" aria-label="Blue"></button>
       <button class="swatch" style="background:#dc2626" onclick="setColor('#dc2626',this)" aria-label="Red"></button>
-      <button class="swatch" style="background:#facc15" onclick="setColor('#facc15',this)" aria-label="Yellow"></button>
+      <button class="swatch" style="background:#eab308" onclick="setColor('#eab308',this)" aria-label="Yellow"></button>
       <span class="tool-label">Size</span>
-      <input type="range" min="1" max="14" value="3" id="brushSize" style="width:110px"/>
+      <input type="range" min="1" max="16" value="4" id="brushSize" style="width:100px"/>
       <span class="tool-label">Template</span>
       <select id="templateSel" onchange="setTemplate(this.value)" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600">
         <option value="blank">Blank</option><option value="lined" selected>Lined</option><option value="grid">Grid</option><option value="dotted">Dotted</option>
       </select>
       <span class="tool-label">Finger</span>
       <select id="fingerMode" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600"><option value="scroll">Scrolls page</option><option value="draw">Draws</option></select>
-      <button class="btn" onclick="toggleBoard()">▦ Board</button>
-      <button class="btn" onclick="insertTable()">Insert table</button>
-      <button class="btn" onclick="addSticky()">Sticky note</button>
-      <button class="btn" onclick="handwritingToText()">Handwriting → Text</button>
+      <button class="btn small" onclick="toggleBoard()">▦ Board</button>
+      <button class="btn small" onclick="insertTable()">Insert table</button>
+      <button class="btn small" onclick="addSticky()">Sticky note</button>
+      <button class="btn small" id="hwBtn" onclick="handwritingToText()">Handwriting → Text</button>
     </div>
 
     <div class="editorWrap">
-      <aside class="panel side" id="pagesPanel">
+      <aside class="panel side open" id="pagesPanel">
         <h4>Pages</h4>
         <div id="pageList"></div>
         <button class="btn" style="width:100%;justify-content:center;margin-top:8px" onclick="addPage()">+ Add page</button>
         <h4 style="margin-top:18px">Layers</h4>
-        <label style="display:flex;gap:8px;align-items:center;padding:8px 0"><input type="checkbox" checked onchange="toggleLayer(0,this.checked)"/> Ink layer</label>
-        <label style="display:flex;gap:8px;align-items:center;padding:8px 0"><input type="checkbox" checked onchange="toggleLayer(1,this.checked)"/> Highlight layer</label>
-        <p class="kbd">Stylus &amp; mouse draw. One finger scrolls when Finger = Scrolls page — no need to deselect the pen.</p>
+        <label style="display:flex;gap:8px;align-items:center;padding:8px 0"><input type="checkbox" id="layerInkTgl" checked onchange="toggleLayer('ink',this.checked)"/> Ink layer</label>
+        <label style="display:flex;gap:8px;align-items:center;padding:8px 0"><input type="checkbox" id="layerHiTgl" checked onchange="toggleLayer('hi',this.checked)"/> Highlight layer</label>
+        <p class="kbd" style="line-height:1.6">Stylus &amp; mouse draw with real pressure. With Finger = “Scrolls page”, one finger scrolls and never draws — no need to deselect the pen. Tap a selected tool again to put it down.</p>
       </aside>
 
-      <div>
-        <div class="canvasShell template-lined" id="canvasShell">
-          <canvas id="drawCanvas" width="900" height="560"></canvas>
-          <canvas id="layerCanvas" width="900" height="560"></canvas>
-          <div id="floatingBoard" class="board hidden">
-            <div class="boardHead" id="boardHead"><span>Floating board — infinite rough canvas</span><span><button class="btn" style="min-height:32px;padding:0 10px" onclick="cycleBoardColor()">Colour</button> <button class="btn" style="min-height:32px;padding:0 10px" onclick="toggleBoard(false)">Close</button></span></div>
-            <canvas id="boardCanvas" width="680" height="440"></canvas>
-            <div style="padding:8px 10px;display:flex;gap:6px;flex-wrap:wrap;background:#fff"><span class="kbd">Drag header to move • Board is saved with this page in Inkwell only, never in exports of the PDF.</span></div>
+      <div class="stageWrap" id="stageWrap">
+        <div>
+          <div class="canvasShell" id="canvasShell">
+            <div class="canvasStack">
+              <canvas id="bgCanvas" width="1200" height="800"></canvas>
+              <canvas id="hiCanvas" width="1200" height="800"></canvas>
+              <canvas id="inkCanvas" width="1200" height="800"></canvas>
+            </div>
+            <div id="floatingBoard" class="board hidden">
+              <div class="boardHead" id="boardHead"><span>Floating board — infinite canvas</span><span><button class="btn small" onclick="cycleBoardColor()">Colour</button> <button class="btn small" onclick="toggleBoard(false)">Close</button></span></div>
+              <div class="boardTools">
+                <button class="btn small" id="boardPenBtn" onclick="setBoardTool('pen')">✒ Pen</button>
+                <button class="btn small" id="boardPanBtn" onclick="setBoardTool('pan')">✋ Pan</button>
+                <button class="btn small" onclick="boardZoom(1.25)">＋</button>
+                <button class="btn small" onclick="boardZoom(0.8)">－</button>
+                <button class="btn small" onclick="boardClear()">Clear</button>
+                <span class="kbd" style="color:#555">Scroll to zoom • two fingers pinch</span>
+              </div>
+              <canvas id="boardCanvas" width="720" height="460"></canvas>
+              <div class="boardGrip" id="boardGrip" title="Drag to resize"></div>
+            </div>
+            <div id="stickyLayer"></div>
           </div>
-          <div id="stickyLayer"></div>
+          <textarea id="noteText" class="textArea" placeholder="Type here, or write above and tap Handwriting → Text. Use [[links]] — e.g. [[Slow Reading]] — to link notebooks; links and backlinks are live."></textarea>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
+            <span class="badge">Audio-synced notes</span>
+            <button class="btn small" id="recBtn" onclick="toggleRecord()">● Record</button>
+            <button class="btn small hidden" id="playSyncBtn" onclick="playSyncedAudio()">▶ Play with ink sync</button>
+            <span class="kbd" id="recStatus">Record while you write — on playback, ink reappears in time with the audio.</span>
+            <span style="flex:1"></span><span class="kbd" id="wordCount">0 words</span>
+          </div>
+          <div id="tableHost"></div>
         </div>
-        <textarea id="noteText" class="textArea" placeholder="Type here, or write above and tap Handwriting → Text. Use [[links]] to link notes — e.g. [[Slow Reading]] creates a bidirectional link."></textarea>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-          <span class="badge">Audio-synced notes</span><button class="btn" id="recBtn" onclick="toggleRecord()">● Record note audio</button><span class="kbd" id="recStatus">Tap record while you write — playback highlights in sync (in this tab).</span>
-          <span style="flex:1"></span><span class="kbd" id="wordCount">0 words</span>
-        </div>
-        <div id="tableHost"></div>
+        <div id="splitPane" class="splitPane hidden"></div>
       </div>
 
       <aside class="panel side open">
-        <h4>Outline &amp; links</h4>
-        <div id="linksList"><div class="listRow"><span>[[Slow Reading]]</span><span class="kbd">linked</span></div><div class="listRow"><span>[[Exam Notes]]</span><span class="kbd">backlink</span></div></div>
+        <h4>Links &amp; backlinks</h4>
+        <div id="linksList"><p class="kbd">Type [[Title]] in the note to link another notebook.</p></div>
         <h4 style="margin-top:16px">Split screen</h4>
-        <p class="kbd" style="line-height:1.6">Open the reader beside this notebook on tablet / desktop.</p>
+        <p class="kbd" style="line-height:1.6">Read the current book beside this notebook — handy on tablet and desktop.</p>
         <button class="btn" style="width:100%;justify-content:center" onclick="toggleSplit()">Toggle split view</button>
-        <div id="splitPane" class="hidden" style="margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--paper)"><b style="font-family:Newsreader,serif">The Art of Slow Reading — Ch. 1</b><p style="font-family:Newsreader,serif;line-height:1.6;font-size:14px">Reading slowly is not reading less. It is noticing what speed hides…</p></div>
-        <h4 style="margin-top:16px">Reading stats (this session)</h4>
-        <div class="listRow"><span>Time writing</span><b id="statWrite">0m</b></div>
-        <div class="listRow"><span>Strokes</span><b id="statStrokes">0</b></div>
+        <h4 style="margin-top:16px">This notebook</h4>
         <div class="listRow"><span>Pages</span><b id="statEditorPages">1</b></div>
+        <div class="listRow"><span>Strokes on page</span><b id="statPageStrokes">0</b></div>
+        <div class="listRow"><span>Session writing</span><b id="statWrite2">0m</b></div>
       </aside>
     </div>
   </section>
@@ -252,38 +337,63 @@ mark{background:#ffe98a;color:#111;padding:0 2px;border-radius:3px}
   <section id="view-reader" class="hidden">
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
       <button class="btn" onclick="showView('library')">← Library</button>
-      <div class="seg" role="tablist"><button class="active" onclick="setReaderMode('scroll',this)">Scroll</button><button onclick="setReaderMode('page',this)">Page</button></div>
+      <div class="seg" role="tablist"><button class="active" id="modeScrollBtn" onclick="setReaderMode('scroll')">Scroll</button><button id="modePageBtn" onclick="setReaderMode('page')">Page</button></div>
       <select id="themeSel" onchange="setReaderTheme(this.value)" style="border:1px solid var(--line);border-radius:999px;padding:0 12px;background:var(--card);color:var(--ink);font-weight:600"><option value="">Paper</option><option value="sepia">Sepia</option><option value="dark">Night</option></select>
-      <button class="btn" onclick="toggleBookmark()">☆ Bookmark</button>
+      <button class="btn small" onclick="readerFont(-1)">A−</button>
+      <button class="btn small" onclick="readerFont(1)">A+</button>
+      <button class="btn" id="sideToggle" onclick="toggleReaderSide()">☰ Contents</button>
+      <button class="btn" id="bookmarkBtn" onclick="toggleBookmark()">☆ Bookmark</button>
       <button class="btn" onclick="highlightSelection()">Highlight selection</button>
       <button class="btn" onclick="lookupSelection()">Dictionary / Wiki</button>
-      <button class="btn" onclick="runOCR()">OCR this page</button>
-      <span style="flex:1"></span><span class="kbd" id="resumeLabel">Resumed • Page 1 of 24 • 12%</span>
+      <button class="btn" onclick="openOcrPanel()">OCR</button>
+      <span style="flex:1"></span><span class="kbd" id="resumeLabel"></span>
     </div>
 
-    <div style="display:grid;grid-template-columns:220px 1fr;gap:14px" id="readerGrid">
-      <aside class="panel side open">
+    <div id="readerGrid">
+      <aside class="panel side open" id="readerSide">
         <h4>Contents</h4>
-        <div class="listRow"><span>1. Why speed lies</span><b>1</b></div>
-        <div class="listRow"><span>2. Margins &amp; marks</span><b>9</b></div>
-        <div class="listRow"><span>3. Reading aloud</span><b>17</b></div>
+        <div id="tocList"><p class="kbd">Open a book to see its contents.</p></div>
         <h4 style="margin-top:16px">Bookmarks</h4><div id="bookmarkList"><p class="kbd">No bookmarks yet</p></div>
-        <h4 style="margin-top:16px">Annotations</h4><div id="annoList"><p class="kbd">Select text → Highlight</p></div>
-        <h4 style="margin-top:16px">Thumbnails</h4><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="pageThumb active">p.1<br/><span class="kbd">Why speed lies</span></div><div class="pageThumb">p.2<br/><span class="kbd">Attention</span></div><div class="pageThumb">p.3<br/><span class="kbd">Margins</span></div><div class="pageThumb">p.4<br/><span class="kbd">Voice</span></div></div>
+        <h4 style="margin-top:16px">Annotations</h4><div id="annoList"><p class="kbd">Select text → Highlight selection</p></div>
+        <h4 style="margin-top:16px">Thumbnails</h4><div id="thumbList"><p class="kbd">—</p></div>
       </aside>
       <div>
         <article class="reader" id="readerArticle">
-          <span class="badge">Chapter 1 • EPUB &amp; PDF share this reader</span>
-          <h2>Why speed lies</h2>
-          <p class="kbd" style="font-family:Inter,sans-serif">From <i>The Art of Slow Reading</i> — sample included so every reader tool can be tried without importing a file.</p>
-          <p id="readableText">Reading slowly is not reading less. It is noticing what speed hides: the turn of an argument, the weight of a word, the place where you stopped agreeing and started merely nodding. A page read once, carefully, stays with you longer than three pages skimmed in a hurry.</p>
-          <p>That is why Inkwell opens books in reading mode first. You scroll to read. When you want to write, you tap Annotate and the pen appears — your finger still scrolls, your stylus still draws, and the two never fight each other.</p>
-          <p>Try it: select any sentence and tap Highlight. Add a bookmark. Switch to Sepia or Night. Press Listen below and pick an accent — only a few, named, and only the ones that actually speak on this device.</p>
-          <div id="ocrBox" class="hidden" style="border:1px dashed var(--line);border-radius:12px;padding:12px;margin-top:12px"><b>OCR result</b><p class="kbd" style="line-height:1.6">Print text recognised on-device with Tesseract.js in the full build (~3–10s/page, most languages downloadable on demand). Handwriting is not OCR’d here — use Handwriting → Text in the notebook for that demo.</p></div>
-          <div id="dictBox" class="hidden" style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:12px"></div>
+          <span class="badge" id="readerBadge">Reader</span>
+          <h2 id="readerTitle">Nothing open</h2>
+          <div id="readerBody"><p>Open a book from the library — or import a PDF or EPUB — and it will open here in reading mode first.</p></div>
+          <div id="dictBox" class="resultBox hidden"></div>
+          <div id="ocrBox" class="resultBox hidden">
+            <b>OCR — recognise print on this page</b>
+            <p class="kbd" style="line-height:1.6">Runs on-device with Tesseract.js. Language data downloads on first use for the language you pick. Best on clear print; handwriting is not what this is for.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0">
+              <select id="ocrLang" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600">
+                <option value="eng">English</option><option value="ben">Bengali</option><option value="hin">Hindi</option><option value="urd">Urdu</option><option value="ara">Arabic</option><option value="fra">French</option><option value="deu">German</option><option value="spa">Spanish</option><option value="jpn">Japanese</option><option value="chi_sim">Chinese (simplified)</option>
+              </select>
+              <button class="btn small primary" id="ocrRunBtn" onclick="runOCR()">Recognise this page</button>
+              <label class="btn small" for="ocrImg">OCR an image instead</label>
+              <input id="ocrImg" type="file" accept="image/*" class="hidden" onchange="ocrImageFile(event)"/>
+            </div>
+            <progress id="ocrProgress" class="hidden" value="0" max="1"></progress>
+            <p class="kbd" id="ocrStatus"></p>
+            <p id="ocrText"></p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small hidden" id="ocrCopyBtn" onclick="copyOcrText()">Copy text</button><button class="btn small hidden" id="ocrNoteBtn" onclick="ocrToNote()">Add to a notebook note</button></div>
+          </div>
         </article>
 
-        <div class="ttsBar">
+        <div id="pdfView" class="hidden">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+            <b id="pdfName" style="font-family:Newsreader,serif;font-size:18px">PDF</b>
+            <span class="kbd" id="pdfMeta"></span>
+            <span style="flex:1"></span>
+            <button class="btn small" onclick="annotateCurrentPdf()">✒ Annotate this PDF</button>
+            <button class="btn small" onclick="closePdf()">Close PDF</button>
+          </div>
+          <p class="kbd" id="pdfStatus" style="line-height:1.6">Loading PDF…</p>
+          <div id="pdfPages"></div>
+        </div>
+
+        <div class="ttsBar" id="ttsBar">
           <b style="font-size:13px">Listen</b>
           <button class="btn primary" id="ttsBtn" onclick="toggleTTS()">▶ Play</button>
           <label class="kbd" for="accentSel">Accent</label>
@@ -291,15 +401,26 @@ mark{background:#ffe98a;color:#111;padding:0 2px;border-radius:3px}
           <label class="kbd" for="genderSel">Voice</label>
           <select id="genderSel"><option value="">Any</option><option value="female">Female</option><option value="male">Male</option></select>
           <label class="kbd">Speed</label>
-          <input type="range" id="ttsRate" min="0.7" max="1.3" step="0.1" value="1" style="width:90px"/>
+          <input type="range" id="ttsRate" min="0.7" max="1.4" step="0.1" value="1" style="width:90px"/>
           <button class="btn" onclick="toggleParallel()">Parallel Read</button>
           <span class="kbd" id="voiceHint">Loading voices that actually work…</span>
         </div>
-        <div id="parallelBox" class="hidden" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
-          <div class="panel"><h4>Original</h4><p style="font-family:Newsreader,serif;line-height:1.7">Reading slowly is not reading less. It is noticing what speed hides.</p></div>
-          <div class="panel"><h4>Notes side-by-side</h4><textarea style="width:100%;height:90px;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);color:var(--ink)" placeholder="Write while you read…"></textarea></div>
+        <div id="parallelBox" class="hidden" style="margin-top:12px">
+          <div id="parallelGrid">
+            <div class="panel"><h4>Original</h4><p id="parallelOrig" style="font-family:Newsreader,serif;line-height:1.7"></p></div>
+            <div class="panel">
+              <h4>Translation</h4>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+                <select id="parLang" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600"><option value="bn">Bengali</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option><option value="ar">Arabic</option><option value="hi">Hindi</option><option value="ur">Urdu</option></select>
+                <button class="btn small primary" onclick="translateParallel()">Translate this page</button>
+              </div>
+              <p id="parallelTrans" style="font-family:Newsreader,serif;line-height:1.7">Pick a language and translate — the original stays beside it.</p>
+              <h4 style="margin-top:14px">My notes on this page</h4>
+              <textarea id="parallelNotes" style="width:100%;height:80px;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);color:var(--ink)" placeholder="Write while you read…" oninput="saveParallelNotes()"></textarea>
+            </div>
+          </div>
         </div>
-        <div style="display:flex;justify-content:space-between;margin-top:12px"><button class="btn" onclick="changePage(-1)">← Prev page</button><span class="kbd" id="pageLabel">Page 1 / 24</span><button class="btn" onclick="changePage(1)">Next page →</button></div>
+        <div style="display:flex;justify-content:space-between;margin-top:12px;align-items:center"><button class="btn" onclick="changePage(-1)">← Prev</button><span class="kbd" id="pageLabel">—</span><button class="btn" onclick="changePage(1)">Next →</button></div>
       </div>
     </div>
   </section>
@@ -310,134 +431,1074 @@ mark{background:#ffe98a;color:#111;padding:0 2px;border-radius:3px}
     <h3 style="margin:0;font-family:Newsreader,serif;font-size:24px">New notebook</h3>
     <p class="kbd">Unlimited notebooks. No paywall, no 3-notebook limit.</p>
     <label class="kbd">Title</label><input id="newTitle" placeholder="e.g. Physics — Vectors"/>
-    <label class="kbd">Cover</label><select id="newColor"><option value="#234f35">Forest ink</option><option value="#111111">Charcoal</option><option value="#7c2d12">Terracotta</option><option value="#1e3a5f">Midnight blue</option><option value="#f3e8c8">Parchment</option></select>
+    <label class="kbd">Cover</label><select id="newColor"><option value="#234f35">Forest ink</option><option value="#191c19">Charcoal</option><option value="#7c2d12">Terracotta</option><option value="#1e3a5f">Midnight blue</option><option value="#f3e8c8">Parchment</option></select>
     <label class="kbd">Template</label><select id="newTemplate"><option value="lined">Lined</option><option value="blank">Blank</option><option value="grid">Grid</option><option value="dotted">Dotted</option></select>
-    <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1;justify-content:center" onclick="closeModal()">Cancel</button><button class="btn primary" style="flex:1;justify-content:center" onclick="createNotebook()">Create</button></div>
+    <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1;justify-content:center" onclick="closeModal('newModal')">Cancel</button><button class="btn primary" style="flex:1;justify-content:center" onclick="createNotebook()">Create</button></div>
+  </div>
+</div>
+
+<div id="confirmModal" class="modal" role="dialog" aria-modal="true">
+  <div class="modalCard">
+    <h3 style="margin:0;font-family:Newsreader,serif;font-size:22px" id="confirmTitle">Delete?</h3>
+    <p class="kbd" id="confirmText" style="line-height:1.6;margin-top:8px"></p>
+    <div style="display:flex;gap:8px;margin-top:14px"><button class="btn" style="flex:1;justify-content:center" onclick="closeModal('confirmModal')">Cancel</button><button class="btn danger" style="flex:1;justify-content:center" onclick="doConfirm()">Delete</button></div>
   </div>
 </div>
 
 <div id="toast" class="toast"></div>
 
 <script>
-let state={ notebooks:[], filter:'all', tool:'pen', color:'#111111', pages:[{strokes:[]}], curPage:0, undoStack:[], redoStack:[], strokesCount:0, readerPage:1, bookmarks:[], annotations:[], start:Date.now(), boardColors:['#fff8d6','#fdfaf0','#e0f2fe','#dcfce7','#ffe4e6','#ede9fe','#334155'], boardIdx:0, split:false, recording:false };
+/* ============ utils ============ */
 function $(id){return document.getElementById(id)}
-function toast(msg){let t=$('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',2600)}
-function showView(v){
-  ['library','editor','reader'].forEach(x=>$('view-'+x).classList.toggle('hidden',x!==v));
-  $('navLibrary').classList.toggle('active',v==='library'); $('navEditor').classList.toggle('active',v==='editor'); $('navReader').classList.toggle('active',v==='reader');
-  if(v==='library') renderLibrary(); window.scrollTo({top:0,behavior:'smooth'});
-}
-function filterLib(f,btn){state.filter=f; renderLibrary()}
-function renderLibrary(){
-  let q=($('globalSearch').value||'').toLowerCase();
-  let items=state.notebooks.filter(n=> (state.filter==='all'||n.type===state.filter) && n.title.toLowerCase().includes(q));
-  // sample book always searchable as epub
-  let showSample = (state.filter==='all'||state.filter==='epub') && 'the art of slow reading'.includes(q||'');
-  $('statNotebooks').textContent=state.notebooks.length;
-  $('statPages').textContent=state.notebooks.reduce((a,n)=>a+(n.pages||1),0);
-  $('emptyState').style.display=state.notebooks.length? 'none':'block';
-  let html='';
-  items.forEach((n,i)=>{ html+=`<article class="card"><button style="all:unset;display:block;width:100%;cursor:pointer" onclick="openNotebook(${i})"><div class="card-cover" style="background:${n.color};color:${n.color==='#f3e8c8'?'#111':'#fff'}"><span class="badge" style="background:rgba(255,255,255,.15);color:inherit;border-color:transparent">${n.type.toUpperCase()} • ${n.template}</span><h3>${escapeHtml(n.title)}</h3></div><div class="card-body"><span class="kbd">${n.pages||1} page(s) • ${n.updated}</span><span class="btn primary">Open</span></div></button></article>`});
-  if(showSample){ html+=`<article class="card"><div class="card-cover" style="background:#234f35;color:#fff"><span class="badge" style="background:rgba(255,255,255,.15);color:#fff;border-color:transparent">EPUB • Sample</span><h3>The Art of Slow Reading</h3></div><div class="card-body"><span class="kbd">24 pages</span><button class="btn primary" onclick="showView('reader')">Read</button></div></article>`}
-  $('libraryGrid').innerHTML=html || (q? '<p class="kbd">No matches for that search.</p>':'');
-  $('libHint').textContent=state.notebooks.length? 'Library-wide search covers titles, notes & board text in this tab.' : 'Starts empty — your first notebook is one tap away.';
-}
-function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function openNewNotebook(){$('newModal').classList.add('open'); setTimeout(()=>$('newTitle').focus(),50)}
-function closeModal(){$('newModal').classList.remove('open')}
-function createNotebook(){
-  let title=$('newTitle').value.trim()||'Untitled notebook'; let color=$('newColor').value; let tpl=$('newTemplate').value;
-  state.notebooks.unshift({title,color,template:tpl,type:'notebook',pages:1,updated:'Just now'});
-  closeModal(); $('newTitle').value=''; $('noteTitle').value=title; $('templateSel').value=tpl; setTemplate(tpl); renderLibrary(); showView('editor'); toast('Notebook created — unlimited, no paywall');
-}
-function openNotebook(i){ let n=state.notebooks[i]; if(!n) return; $('noteTitle').value=n.title; $('templateSel').value=n.template; setTemplate(n.template); showView('editor'); }
-function syncTitle(){ let t=$('noteTitle').value; if(state.notebooks[0]) state.notebooks[0].title=t; }
-function handleImport(e){ let f=e.target.files[0]; if(!f) return; let type=f.name.toLowerCase().endsWith('.epub')?'epub':'pdf'; state.notebooks.unshift({title:f.name.replace(/\.[^.]+$/,''),color:type==='pdf'?'#111111':'#234f35',template:'blank',type,pages:type==='pdf'?12:24,updated:'Imported just now'}); renderLibrary(); toast(`Imported ${f.name} — opens in reading mode first`); showView('reader'); $('resumeLabel').textContent=`Resumed • ${f.name} • Page 1`; }
+let _uid=1; function uid(){return 'id'+(Date.now().toString(36))+(_uid++)}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+let toastT=null;
+function toast(msg,ms){let t=$('toast');t.textContent=msg;t.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>t.style.display='none',ms||2600)}
+function download(name, blob){let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},400)}
+function closeModal(id){$(id).classList.remove('open')}
+let pendingConfirm=null;
+function askConfirm(title,text,fn){$('confirmTitle').textContent=title;$('confirmText').textContent=text;pendingConfirm=fn;$('confirmModal').classList.add('open')}
+function doConfirm(){closeModal('confirmModal');if(pendingConfirm){let f=pendingConfirm;pendingConfirm=null;f()}}
 
-// Canvas drawing
-let canvas=$('drawCanvas'), ctx=canvas.getContext('2d'); let board=$('boardCanvas'), bctx=board.getContext('2d');
-let drawing=false, last=null, currentStroke=null;
-function setupCanvas(c,context){ context.lineCap='round'; context.lineJoin='round'; }
-setupCanvas(canvas,ctx); setupCanvas(board,bctx);
-function pos(e,c){ let r=c.getBoundingClientRect(); let x=(e.clientX-r.left)*(c.width/r.width); let y=(e.clientY-r.top)*(c.height/r.height); let p=e.pressure||0.5; return {x,y,p}; }
-function shouldDraw(e){ if(state.tool==='hand') return false; if(e.pointerType==='touch' && $('fingerMode').value==='scroll') return false; return true; }
-canvas.addEventListener('pointerdown',e=>{ if(!shouldDraw(e)) return; canvas.setPointerCapture(e.pointerId); drawing=true; last=pos(e,canvas); currentStroke={tool:state.tool,color:state.color,size:+$('brushSize').value,points:[last]}; state.undoStack.push(ctx.getImageData(0,0,canvas.width,canvas.height)); state.redoStack=[]; });
-canvas.addEventListener('pointermove',e=>{ if(!drawing) return; let evts=e.getCoalescedEvents?e.getCoalescedEvents():[e]; evts.forEach(ev=>{ let p=pos(ev,canvas); drawSeg(ctx,last,p); last=p; currentStroke && currentStroke.points.push(p); }); });
-canvas.addEventListener('pointerup',()=>{ if(drawing){ drawing=false; state.strokesCount++; $('statStrokes').textContent=state.strokesCount; }});
-function drawSeg(context,a,b){ if(!a||!b) return; context.save(); if(state.tool==='eraser'){ context.globalCompositeOperation='destination-out'; context.strokeStyle='rgba(0,0,0,1)'; context.lineWidth=18; } else if(state.tool==='highlighter'){ context.globalCompositeOperation='multiply'; context.strokeStyle=state.color; context.globalAlpha=.45; context.lineWidth=14; } else if(state.tool==='calligraphy'){ context.strokeStyle=state.color; context.lineWidth=Math.max(1,(+$('brushSize').value)*(0.6+ (b.p||.5)*1.6)); } else { context.strokeStyle=state.color; context.lineWidth=+$('brushSize').value * (0.7+(b.p||.5)); } context.beginPath(); context.moveTo(a.x,a.y); context.lineTo(b.x,b.y); context.stroke(); context.restore(); }
-let bDrawing=false,bLast=null;
-board.addEventListener('pointerdown',e=>{ bDrawing=true; bLast=pos(e,board); board.setPointerCapture(e.pointerId)});
-board.addEventListener('pointermove',e=>{ if(!bDrawing) return; let p=pos(e,board); bctx.strokeStyle= state.boardIdx===6 ? '#f8fafc':'#111'; bctx.lineWidth=3; bctx.beginPath(); bctx.moveTo(bLast.x,bLast.y); bctx.lineTo(p.x,p.y); bctx.stroke(); bLast=p; });
-board.addEventListener('pointerup',()=>bDrawing=false);
-function setTool(t,el){ state.tool=t; document.querySelectorAll('.tool').forEach(b=>b.classList.remove('active')); if(el) el.classList.add('active'); if(el && el.classList.contains('active') && el.dataset.tool===t && el._wasActive){ /* toggle off */ } document.querySelectorAll('.tool').forEach(b=>{ if(b.dataset.tool===t) b.classList.add('active')}); toast(t==='hand'?'Hand tool — drag to scroll / pan':'Tool: '+t); }
-document.querySelectorAll('.tool').forEach(b=>{ b.addEventListener('click',()=>{ let was=b.classList.contains('active'); if(was && state.tool===b.dataset.tool){ /* allow deselect */ b.classList.remove('active'); state.tool='hand'; } })});
-function setColor(c,el){ state.color=c; document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active')); el.classList.add('active'); }
-function setTemplate(v){ let sh=$('canvasShell'); sh.className='canvasShell template-'+v; }
-function undo(){ let img=state.undoStack.pop(); if(!img){toast('Nothing to undo');return} state.redoStack.push(ctx.getImageData(0,0,canvas.width,canvas.height)); ctx.putImageData(img,0,0); }
-function redo(){ let img=state.redoStack.pop(); if(!img){toast('Nothing to redo');return} state.undoStack.push(ctx.getImageData(0,0,canvas.width,canvas.height)); ctx.putImageData(img,0,0); }
-function toggleLayer(idx,checked){ if(idx===1) $('layerCanvas').style.display=checked?'block':'none'; else canvas.style.opacity=checked?1:.25; }
-function renderPages(){ $('pageList').innerHTML=state.pages.map((p,i)=>`<div class="pageThumb ${i===state.curPage?'active':''}" onclick="switchPage(${i})">Page ${i+1}<br/><span class="kbd">${p.strokes.length} strokes ${i===0?'• Board':''}</span></div>`).join(''); $('statEditorPages').textContent=state.pages.length; }
-function addPage(){ state.pages.push({strokes:[]}); state.curPage=state.pages.length-1; ctx.clearRect(0,0,canvas.width,canvas.height); renderPages(); toast('Page added'); }
-function switchPage(i){ state.curPage=i; ctx.clearRect(0,0,canvas.width,canvas.height); renderPages(); }
-function toggleBoard(force){ let b=$('floatingBoard'); let show=typeof force==='boolean'?force:b.classList.contains('hidden'); b.classList.toggle('hidden',!show); if(show) toast('Floating board — drag its header, draw freely'); }
-function cycleBoardColor(){ state.boardIdx=(state.boardIdx+1)%state.boardColors.length; $('floatingBoard').style.background=state.boardColors[state.boardIdx]; toast('Board colour changed — remembered for this page'); }
-// drag board
-let dragB=null; $('boardHead').addEventListener('pointerdown',e=>{ if(e.target.tagName==='BUTTON') return; dragB={x:e.clientX,y:e.clientY,el:$('floatingBoard'),l:$('floatingBoard').offsetLeft,t:$('floatingBoard').offsetTop}; });
-window.addEventListener('pointermove',e=>{ if(!dragB) return; dragB.el.style.left=(dragB.l+e.clientX-dragB.x)+'px'; dragB.el.style.top=(dragB.t+e.clientY-dragB.y)+'px'; dragB.el.style.right='auto'; });
+/* ============ state ============ */
+const CW=1200, CH=800;
+const SAMPLE_ID='sample-book';
+function blankPage(){return {ink:[],hi:[],text:'',stickies:[],table:null,board:null,audio:null,bgPdf:null}}
+function blankBoard(){return {color:0,strokes:[],view:{x:0,y:0,k:1}}}
+const BOARD_COLORS=['#fff8d6','#fdfaf0','#e0f2fe','#dcfce7','#ffe4e6','#ede9fe','#334155'];
+let S={
+  items:[], filter:'all',
+  curNbId:null, curBookId:null,
+  tool:'pen', color:'#191c19',
+  undoStack:[], redoStack:[],
+  view:'library',
+  stats:{writeSec:0, readSec:0, strokes:0, pagesRead:{}, focusDone:0},
+  split:false, recording:false, recStart:0,
+  searchResults:[]
+};
+function curNb(){return S.items.find(i=>i.id===S.curNbId)||null}
+function curBook(){return S.items.find(i=>i.id===S.curBookId)||null}
+function curPageObj(){let nb=curNb();if(!nb)return null;return nb.pages[nb.cur]||null}
+
+/* ============ sample book (built-in, so reader tools work offline) ============ */
+function sampleBook(){
+  const ch=(t,paras)=>({title:t, html:paras.map(p=>'<p>'+p+'</p>').join(''), text:paras.join('\n\n')});
+  return { id:SAMPLE_ID, kind:'epub', title:'The Art of Slow Reading', sample:true, updated:'Sample',
+    ch:0, mode:'scroll', bookmarks:[], annotations:[], parallelNotes:{},
+    chapters:[
+      ch('Why speed lies',[
+        'Reading slowly is not reading less. It is noticing what speed hides: the turn of an argument, the weight of a word, the place where you stopped agreeing and started merely nodding. A page read once, carefully, stays with you longer than three pages skimmed in a hurry.',
+        'Speed feels like progress because it produces a number — pages turned, chapters finished. But a number is not understanding. The reader who races to the end of a chapter often arrives there having met none of its ideas, the way a traveller who flies over a country has visited it without ever standing in it.',
+        'Slow reading begins with permission: permission to stop, to re-read a sentence, to argue in the margin. The margin is where reading becomes thinking. A mark in the margin is a small act of honesty — here I was confused, here I disagreed, here something mattered.',
+        'Try it with this book. Select any sentence and highlight it. Add a bookmark where you want to return. Switch the theme to Sepia or Night. Press Listen and hear the page read aloud. Nothing here is locked, and nothing you mark is lost while this tab is open.']),
+      ch('Margins and marks',[
+        'Every serious reader develops a private shorthand: a star for what matters, a question mark for what doubts, a line beside what sings. These marks are not vandalism. They are the visible half of a conversation between the reader and the page.',
+        'Annotations age well. Return to a book after a year and your old marks show you who you were — what you feared, what you hoped, what you had not yet understood. The unmarked page tells you nothing about the person who read it.',
+        'That is why this reader keeps your highlights in a list beside the text, and why you can export them. A highlight you cannot find again is only a coloured sentence; a highlight you can revisit is a thought you can build on.']),
+      ch('Reading aloud',[
+        'Reading aloud is the oldest form of slow reading. The voice cannot skim: it must give every word its moment, and in doing so it catches what the eye forgives — the clumsy sentence, the hidden rhythm, the argument that only sounds convincing.',
+        'Poets have always known this, and so have teachers. A paragraph read aloud either holds together or falls apart in the mouth. When you study, read your notes aloud once; the parts you stumble on are the parts you do not yet know.',
+        'Use the Listen bar below to hear this chapter. Change the accent, slow the voice down, and notice how the same words become a different text when they are given time.']),
+      ch('The quiet habit',[
+        'Slow reading is not a technique to master but a habit to keep: one page with full attention is worth more than a chapter at a glance. Keep the book open a moment after you finish. Let the last sentence settle.',
+        'Then close it, and write one line of your own. Reading that ends in writing is reading that stays.'])
+    ]};
+}
+
+/* ============ views ============ */
+function showView(v){
+  S.view=v;
+  ['library','editor','reader'].forEach(x=>$('view-'+x).classList.toggle('hidden',x!==v));
+  $('navLibrary').classList.toggle('active',v==='library');
+  $('navEditor').classList.toggle('active',v==='editor');
+  $('navReader').classList.toggle('active',v==='reader');
+  $('searchResults').classList.add('hidden');
+  if(v==='library') renderLibrary();
+  if(v==='editor' && !curNb()){ // guarantee an editable notebook exists
+    let nb=S.items.find(i=>i.kind==='notebook');
+    if(nb) openNotebook(nb.id); else { createNotebookSilent('Untitled notebook','#234f35','lined'); }
+  }
+  window.scrollTo({top:0});
+}
+function filterLib(f,btn){S.filter=f;renderLibrary()}
+
+/* ============ library ============ */
+function itemPages(it){ if(it.kind==='notebook') return it.pages.length; if(it.kind==='pdf') return it.numPages||0; if(it.kind==='epub') return it.chapters?it.chapters.length:0; return 1 }
+function renderLibrary(){
+  let q=($('globalSearch').value||'').toLowerCase().trim();
+  let items=S.items.filter(n=>{
+    if(S.filter!=='all' && n.kind!==S.filter) return false;
+    if(!q) return true;
+    return n.title.toLowerCase().includes(q);
+  });
+  $('statNotebooks').textContent=S.items.filter(i=>i.kind==='notebook').length;
+  $('statBooks').textContent=S.items.filter(i=>i.kind!=='notebook').length;
+  $('statPages').textContent=S.items.reduce((a,n)=>a+itemPages(n),0);
+  $('statAnnos').textContent=S.items.reduce((a,n)=>a+((n.annotations||[]).length),0);
+  let userItems=S.items.filter(i=>!i.sample);
+  $('emptyState').classList.toggle('hidden', userItems.length>0);
+  $('libHint').textContent=q? items.length+' match(es) — search above also looks inside notes, books and annotations.' : S.items.length+' item(s) in this tab.';
+  $('libraryGrid').innerHTML=items.map(n=>{
+    let kindLabel=n.kind==='notebook'?'Notebook':n.kind.toUpperCase();
+    let meta=n.kind==='notebook'? itemPages(n)+' page(s)' : n.kind==='pdf'? (n.numPages||'?')+' pages' : (n.chapters?n.chapters.length:0)+' chapters';
+    let darkCover=n.color!=='#f3e8c8';
+    let actions = n.kind==='notebook'
+      ? '<button class="btn primary small" onclick="openNotebook(\''+n.id+'\')">Open</button>'
+      : '<button class="btn primary small" onclick="openBook(\''+n.id+'\')">Read</button>' + (n.kind==='pdf'? ' <button class="btn small" onclick="annotatePdf(\''+n.id+'\')">Annotate</button>':'');
+    return '<article class="card"><div class="card-cover" style="background:'+n.color+';color:'+(darkCover?'#fff':'#191c19')+'"><span class="badge" style="background:rgba(255,255,255,.15);color:inherit;border-color:transparent">'+kindLabel+(n.sample?' • Sample':'')+(n.kind==='notebook'?' • '+esc(n.template):'')+'</span><h3>'+esc(n.title)+'</h3></div>'
+      +'<div class="card-body"><span class="kbd">'+meta+' • '+esc(n.updated||'')+'</span><span style="display:flex;gap:6px;flex-wrap:wrap">'+actions+'<button class="btn small danger" onclick="askDeleteItem(\''+n.id+'\')">Delete</button></span></div></article>';
+  }).join('') || '<p class="kbd">Nothing matches this filter.</p>';
+  updateStatsPanel();
+}
+function askDeleteItem(id){
+  let it=S.items.find(i=>i.id===id); if(!it) return;
+  askConfirm('Delete “'+it.title+'”?','This removes it from this tab. Export a backup first if you want to keep it.',()=>{
+    S.items=S.items.filter(i=>i.id!==id);
+    if(S.curNbId===id) S.curNbId=null;
+    if(S.curBookId===id) S.curBookId=null;
+    renderLibrary(); toast('Deleted');
+  });
+}
+function updateStatsPanel(){
+  let words=S.items.filter(i=>i.kind==='notebook').reduce((a,nb)=>a+nb.pages.reduce((b,p)=>b+(p.text.trim()?p.text.trim().split(/\s+/).length:0),0),0);
+  $('statWrite').textContent=Math.floor(S.stats.writeSec/60)+'m';
+  $('statRead').textContent=Math.floor(S.stats.readSec/60)+'m';
+  $('statStrokes').textContent=S.stats.strokes;
+  $('statPagesRead').textContent=Object.keys(S.stats.pagesRead).length;
+  $('statFocus').textContent=S.stats.focusDone;
+  $('statWords').textContent=words;
+  let w2=$('statWrite2'); if(w2) w2.textContent=Math.floor(S.stats.writeSec/60)+'m';
+}
+
+/* ============ library-wide search ============ */
+function onSearchInput(){
+  let q=($('globalSearch').value||'').trim().toLowerCase();
+  let box=$('searchResults');
+  if(S.view==='library') renderLibrary();
+  if(q.length<2){ box.classList.add('hidden'); S.searchResults=[]; return; }
+  let res=[];
+  S.items.forEach(it=>{
+    if(it.title.toLowerCase().includes(q)) res.push({label:it.title, sub:(it.kind==='notebook'?'Notebook':'Book')+' — title match', act:()=> it.kind==='notebook'? openNotebook(it.id): openBook(it.id)});
+    if(it.kind==='notebook') it.pages.forEach((p,pi)=>{
+      let idx=p.text.toLowerCase().indexOf(q);
+      if(idx>=0) res.push({label:it.title+' — page '+(pi+1), sub:'“…'+esc(p.text.slice(Math.max(0,idx-30),idx+60))+'…”', act:()=>{openNotebook(it.id); switchPage(pi);}});
+      (p.stickies||[]).forEach(st=>{ if(st.text.toLowerCase().includes(q)) res.push({label:it.title+' — sticky, page '+(pi+1), sub:esc(st.text.slice(0,80)), act:()=>{openNotebook(it.id); switchPage(pi);}}); });
+      if(p.board && p.board.strokes.length && 'board'.includes(q)) res.push({label:it.title+' — floating board, page '+(pi+1), sub:'This page has board work', act:()=>{openNotebook(it.id); switchPage(pi); toggleBoard(true);}});
+    });
+    if(it.kind==='epub' && it.chapters) it.chapters.forEach((c,ci)=>{
+      let idx=c.text.toLowerCase().indexOf(q);
+      if(idx>=0) res.push({label:it.title+' — '+c.title, sub:'“…'+esc(c.text.slice(Math.max(0,idx-30),idx+60))+'…”', act:()=>{openBook(it.id); jumpToChapter(ci);}});
+    });
+    if(it.kind==='pdf' && it.textCache) Object.keys(it.textCache).forEach(pg=>{
+      let idx=it.textCache[pg].toLowerCase().indexOf(q);
+      if(idx>=0) res.push({label:it.title+' — PDF page '+pg, sub:'“…'+esc(it.textCache[pg].slice(Math.max(0,idx-30),idx+60))+'…”', act:()=>{openBook(it.id); jumpToPdfPage(+pg);}});
+    });
+    (it.annotations||[]).forEach(a=>{ if(a.text.toLowerCase().includes(q)) res.push({label:it.title+' — annotation', sub:'“'+esc(a.text.slice(0,80))+'”', act:()=> openBook(it.id)}); });
+  });
+  S.searchResults=res.slice(0,14);
+  box.innerHTML= S.searchResults.length? S.searchResults.map((r,i)=>'<div class="srItem" onclick="runSearchResult('+i+')"><b>'+esc(r.label)+'</b><span>'+r.sub+'</span></div>').join('') : '<div class="srItem"><span>No matches inside your notes and books.</span></div>';
+  box.classList.remove('hidden');
+}
+function runSearchResult(i){ let r=S.searchResults[i]; $('searchResults').classList.add('hidden'); if(r&&r.act) r.act(); }
+document.addEventListener('click',e=>{ if(!e.target.closest('.searchWrap')) $('searchResults').classList.add('hidden'); });
+
+/* ============ notebooks: create / open ============ */
+function openNewNotebook(){$('newModal').classList.add('open'); setTimeout(()=>$('newTitle').focus(),50)}
+function createNotebook(){
+  let title=$('newTitle').value.trim()||'Untitled notebook';
+  createNotebookSilent(title,$('newColor').value,$('newTemplate').value);
+  closeModal('newModal'); $('newTitle').value='';
+  toast('Notebook created — unlimited, no paywall');
+}
+function createNotebookSilent(title,color,template){
+  let nb={id:uid(), kind:'notebook', title:title, color:color, template:template, pages:[blankPage()], cur:0, updated:'Just now', annotations:[]};
+  S.items.unshift(nb); openNotebook(nb.id); return nb;
+}
+function openNotebook(id){
+  let nb=S.items.find(i=>i.id===id); if(!nb||nb.kind!=='notebook') return;
+  saveEditorToModel();
+  S.curNbId=id;
+  $('noteTitle').value=nb.title;
+  $('templateSel').value=nb.template;
+  loadPageIntoEditor();
+  showView('editor');
+  renderLibrary();
+}
+function syncTitle(){ let nb=curNb(); if(nb){ nb.title=$('noteTitle').value; nb.updated='Just now'; } refreshLinks(); }
+function saveEditorToModel(){
+  let nb=curNb(); if(!nb) return;
+  let p=nb.pages[nb.cur]; if(!p) return;
+  p.text=$('noteText').value;
+}
+function setTemplate(v){ let nb=curNb(); if(nb) nb.template=v; drawBackground(); }
+
+/* ============ editor: canvas engine ============ */
+const bgC=$('bgCanvas'), hiC=$('hiCanvas'), inkC=$('inkCanvas');
+const bgX=bgC.getContext('2d'), hiX=hiC.getContext('2d'), inkX=inkC.getContext('2d');
+[bgX,hiX,inkX].forEach(c=>{c.lineCap='round';c.lineJoin='round'});
+
+function drawBackground(){
+  let nb=curNb(); if(!nb) return;
+  let p=curPageObj();
+  let dark=window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  bgX.clearRect(0,0,CW,CH);
+  bgX.fillStyle= dark? '#1c1e1c':'#fffef8'; bgX.fillRect(0,0,CW,CH);
+  if(p && p.bgPdf && p.bgPdf.img){
+    let img=p.bgPdf.img, s=Math.min(CW/img.width, CH/img.height), w=img.width*s, h=img.height*s;
+    bgX.fillStyle='#ffffff'; bgX.fillRect((CW-w)/2,(CH-h)/2,w,h);
+    bgX.drawImage(img,(CW-w)/2,(CH-h)/2,w,h);
+    return;
+  }
+  let line= dark? 'rgba(255,255,255,.10)':'rgba(25,28,25,.10)';
+  bgX.strokeStyle=line; bgX.fillStyle=line; bgX.lineWidth=1;
+  let tpl=nb.template;
+  if(tpl==='lined'){ bgX.beginPath(); for(let y=64;y<CH;y+=42){ bgX.moveTo(28,y); bgX.lineTo(CW-28,y);} bgX.stroke(); }
+  if(tpl==='grid'){ bgX.beginPath(); for(let x=28;x<CW;x+=36){ bgX.moveTo(x,0); bgX.lineTo(x,CH);} for(let y=28;y<CH;y+=36){ bgX.moveTo(0,y); bgX.lineTo(CW,y);} bgX.stroke(); }
+  if(tpl==='dotted'){ for(let x=34;x<CW;x+=36) for(let y=34;y<CH;y+=36){ bgX.beginPath(); bgX.arc(x,y,1.6,0,7); bgX.fill(); } }
+}
+function strokeRadius(p,size,tool,dirAng){
+  if(tool==='calligraphy'){ let f=0.22+0.78*Math.abs(Math.sin((dirAng||0)-0.785)); return Math.max(0.7, size*1.7*f*(0.45+0.55*(p.p||0.5))); }
+  return Math.max(0.6, size*(0.32+0.95*(p.p||0.5)));
+}
+function drawStroke(ctx,st){
+  let pts=st.points; if(!pts.length) return;
+  if(st.tool==='highlighter'){
+    ctx.save(); ctx.globalCompositeOperation='multiply'; ctx.globalAlpha=0.42; ctx.strokeStyle=st.color; ctx.lineWidth=st.size*4.5;
+    ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y); ctx.stroke(); ctx.restore(); return;
+  }
+  if(pts.length===1){ ctx.fillStyle=st.color; ctx.beginPath(); ctx.arc(pts[0].x,pts[0].y,Math.max(1.1,st.size*0.6),0,7); ctx.fill(); return; }
+  let left=[],right=[];
+  for(let i=0;i<pts.length;i++){
+    let p=pts[i], pa=pts[Math.max(0,i-1)], pb=pts[Math.min(pts.length-1,i+1)];
+    let dx=pb.x-pa.x, dy=pb.y-pa.y, len=Math.hypot(dx,dy)||1; dx/=len; dy/=len;
+    let r=strokeRadius(p,st.size,st.tool,Math.atan2(dy,dx));
+    let taper=Math.min(1,(Math.min(i,pts.length-1-i)/4)+0.18); if(pts.length>4) r*=taper;
+    left.push({x:p.x-dy*r,y:p.y+dx*r}); right.push({x:p.x+dy*r,y:p.y-dx*r});
+  }
+  ctx.fillStyle=st.color; ctx.beginPath();
+  ctx.moveTo(left[0].x,left[0].y);
+  for(let i=1;i<left.length-1;i++){ ctx.quadraticCurveTo(left[i].x,left[i].y,(left[i].x+left[i+1].x)/2,(left[i].y+left[i+1].y)/2); }
+  ctx.lineTo(left[left.length-1].x,left[left.length-1].y);
+  for(let i=right.length-1;i>0;i--){ ctx.quadraticCurveTo(right[i].x,right[i].y,(right[i].x+right[i-1].x)/2,(right[i].y+right[i-1].y)/2); }
+  ctx.lineTo(right[0].x,right[0].y); ctx.closePath(); ctx.fill();
+}
+function redrawLayer(which){
+  let p=curPageObj(); if(!p) return;
+  let ctx= which==='ink'? inkX:hiX, arr= which==='ink'? p.ink:p.hi;
+  ctx.clearRect(0,0,CW,CH);
+  let cutoff=(typeof redrawLayer.cutoff==='number')? redrawLayer.cutoff : null;
+  arr.forEach(st=>{ if(cutoff!==null && typeof st.t==='number' && st.t>cutoff) return; drawStroke(ctx,st); });
+  $('statPageStrokes').textContent=p.ink.length+p.hi.length;
+}
+function redrawAll(){ drawBackground(); redrawLayer('ink'); redrawLayer('hi'); }
+function composePage(p, template, out){
+  let c=out||document.createElement('canvas'); c.width=CW; c.height=CH; let x=c.getContext('2d');
+  let dark=window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  x.fillStyle= dark? '#1c1e1c':'#fffef8'; x.fillRect(0,0,CW,CH);
+  if(p.bgPdf && p.bgPdf.img){ let img=p.bgPdf.img, s=Math.min(CW/img.width,CH/img.height), w=img.width*s,h=img.height*s; x.fillStyle='#fff'; x.fillRect((CW-w)/2,(CH-h)/2,w,h); x.drawImage(img,(CW-w)/2,(CH-h)/2,w,h); }
+  else { let line=dark?'rgba(255,255,255,.10)':'rgba(25,28,25,.10)'; x.strokeStyle=line; x.fillStyle=line; x.lineWidth=1;
+    if(template==='lined'){ x.beginPath(); for(let y=64;y<CH;y+=42){x.moveTo(28,y);x.lineTo(CW-28,y);} x.stroke(); }
+    if(template==='grid'){ x.beginPath(); for(let xx=28;xx<CW;xx+=36){x.moveTo(xx,0);x.lineTo(xx,CH);} for(let y=28;y<CH;y+=36){x.moveTo(0,y);x.lineTo(CW,y);} x.stroke(); }
+    if(template==='dotted'){ for(let xx=34;xx<CW;xx+=36) for(let y=34;y<CH;y+=36){ x.beginPath(); x.arc(xx,y,1.6,0,7); x.fill(); } } }
+  p.hi.forEach(st=>drawStroke(x,st));
+  p.ink.forEach(st=>drawStroke(x,st));
+  return c;
+}
+
+/* pointer drawing */
+let drawing=false, curStroke=null, lastPt=null, lastT=0, eraseChanged=false;
+function canvasPos(e){ let r=inkC.getBoundingClientRect(); return { x:(e.clientX-r.left)*(CW/r.width), y:(e.clientY-r.top)*(CH/r.height) }; }
+function pointerPressure(e,pt){
+  if(e.pointerType==='pen' && e.pressure && e.pressure>0) return e.pressure;
+  if(lastPt){ let d=Math.hypot(pt.x-lastPt.x,pt.y-lastPt.y); return Math.max(0.2,Math.min(1, 1.05 - d/46)); }
+  return 0.6;
+}
+function shouldDraw(e){ if(S.tool==='hand') return false; if(e.pointerType==='touch' && $('fingerMode').value==='scroll') return false; return true; }
+function snapshotUndo(){ let p=curPageObj(); if(!p) return; S.undoStack.push({ink:p.ink.slice(),hi:p.hi.slice()}); if(S.undoStack.length>60) S.undoStack.shift(); S.redoStack=[]; }
+function undoStroke(){ let p=curPageObj(); if(!p) return; let s=S.undoStack.pop(); if(!s){toast('Nothing to undo');return} S.redoStack.push({ink:p.ink.slice(),hi:p.hi.slice()}); p.ink=s.ink; p.hi=s.hi; bumpV(p); redrawLayer('ink'); redrawLayer('hi'); renderPages(); }
+function redoStroke(){ let p=curPageObj(); if(!p) return; let s=S.redoStack.pop(); if(!s){toast('Nothing to redo');return} S.undoStack.push({ink:p.ink.slice(),hi:p.hi.slice()}); p.ink=s.ink; p.hi=s.hi; bumpV(p); redrawLayer('ink'); redrawLayer('hi'); renderPages(); }
+function renderLive(){
+  if(!curStroke) return;
+  let p=curPageObj(); if(!p) return;
+  let layer=curStroke._layer, ctx= layer==='ink'? inkX:hiX;
+  ctx.clearRect(0,0,CW,CH);
+  p[layer].forEach(st=>drawStroke(ctx,st));
+  drawStroke(ctx,curStroke);
+}
+inkC.addEventListener('pointerdown',e=>{
+  if(!curPageObj() || !shouldDraw(e)) return;
+  e.preventDefault(); inkC.setPointerCapture(e.pointerId);
+  drawing=true; eraseChanged=false; snapshotUndo();
+  let pt=canvasPos(e); pt.p=pointerPressure(e,pt); lastPt=pt;
+  if(S.tool==='eraser'){ eraseAt(pt); return; }
+  curStroke={tool:S.tool, color:S.color, size:+$('brushSize').value, points:[pt]};
+  if(S.recording) curStroke.t=Date.now()-S.recStart;
+  curStroke._layer= S.tool==='highlighter'? 'hi':'ink';
+  renderLive();
+});
+inkC.addEventListener('pointermove',e=>{
+  if(!drawing) return;
+  let evts=e.getCoalescedEvents? e.getCoalescedEvents():[e];
+  evts.forEach(ev=>{
+    let pt=canvasPos(ev); pt.p=pointerPressure(ev,pt);
+    if(lastPt){ pt.x=lastPt.x+(pt.x-lastPt.x)*0.72; pt.y=lastPt.y+(pt.y-lastPt.y)*0.72; } // streamline
+    if(S.tool==='eraser'){ eraseAt(pt); lastPt=pt; return; }
+    if(curStroke){ curStroke.points.push(pt); renderLive(); }
+    lastPt=pt;
+  });
+});
+function bumpV(p){ if(p) p._v=(p._v||0)+1; }
+function endStroke(){
+  if(!drawing) return; drawing=false;
+  let p=curPageObj();
+  if(curStroke && p){ p[curStroke._layer].push(curStroke); S.stats.strokes++; redrawLayer(curStroke._layer); bumpV(p); }
+  curStroke=null; lastPt=null;
+  renderPages();
+}
+inkC.addEventListener('pointerup',endStroke);
+inkC.addEventListener('pointercancel',endStroke);
+function distToStroke(pt,st){ let best=1e9; for(let i=0;i<st.points.length;i++){ let q=st.points[i]; let d=Math.hypot(pt.x-q.x,pt.y-q.y); if(d<best)best=d; } return best; }
+function eraseAt(pt){
+  let p=curPageObj(); if(!p) return;
+  let before=p.ink.length+p.hi.length;
+  p.ink=p.ink.filter(st=>distToStroke(pt,st)>16+st.size);
+  p.hi=p.hi.filter(st=>distToStroke(pt,st)>16+st.size);
+  if(p.ink.length+p.hi.length!==before){ eraseChanged=true; bumpV(p); redrawLayer('ink'); redrawLayer('hi'); }
+}
+function setTool(t,el){
+  if(S.tool===t && el && el.classList.contains('active')){ S.tool='hand'; document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('active',b.dataset.tool==='hand')); toast('Tool put down — hand mode'); return; }
+  S.tool=t; document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));
+}
+function setColor(c,el){ S.color=c; document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active')); if(el) el.classList.add('active'); }
+function toggleLayer(which,on){ (which==='ink'?inkC:hiC).style.display= on? 'block':'none'; }
+document.addEventListener('keydown',e=>{
+  if(S.view!=='editor') return;
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z' && !e.shiftKey){ e.preventDefault(); undoStroke(); }
+  if((e.ctrlKey||e.metaKey) && (e.key.toLowerCase()==='y' || (e.key.toLowerCase()==='z'&&e.shiftKey))){ e.preventDefault(); redoStroke(); }
+});
+
+/* ============ editor: pages ============ */
+function loadPageIntoEditor(){
+  let nb=curNb(); if(!nb) return;
+  let p=nb.pages[nb.cur];
+  $('templateSel').value=nb.template;
+  $('noteText').value=p.text||'';
+  redrawAll(); renderStickies(); renderTable(); renderPages(); refreshLinks(); updateWordCount(); updateAudioUI();
+  if(!$('floatingBoard').classList.contains('hidden')) loadBoard();
+}
+function switchPage(i){
+  let nb=curNb(); if(!nb) return;
+  saveEditorToModel(); nb.cur=i; S.undoStack=[]; S.redoStack=[];
+  loadPageIntoEditor();
+}
+function addPage(){ let nb=curNb(); if(!nb) return; saveEditorToModel(); nb.pages.push(blankPage()); nb.cur=nb.pages.length-1; S.undoStack=[]; S.redoStack=[]; loadPageIntoEditor(); toast('Page added'); }
+function pageAction(i,act,ev){
+  if(ev) ev.stopPropagation();
+  let nb=curNb(); if(!nb) return;
+  saveEditorToModel();
+  if(act==='del'){ if(nb.pages.length===1){ toast('A notebook keeps at least one page'); return; }
+    askConfirm('Delete page '+(i+1)+'?','Its ink, notes, stickies and board go with it.',()=>{ nb.pages.splice(i,1); if(nb.cur>=nb.pages.length) nb.cur=nb.pages.length-1; loadPageIntoEditor(); });
+    return; }
+  if(act==='dup'){ let copy=JSON.parse(JSON.stringify(nb.pages[i],(k,v)=>k==='img'?undefined:v)); copy.bgPdf=nb.pages[i].bgPdf; delete copy._thumb; delete copy._thumbV; copy._v=0; nb.pages.splice(i+1,0,copy); nb.cur=i+1; }
+  if(act==='up' && i>0){ let t=nb.pages[i-1]; nb.pages[i-1]=nb.pages[i]; nb.pages[i]=t; nb.cur=i-1; }
+  if(act==='down' && i<nb.pages.length-1){ let t=nb.pages[i+1]; nb.pages[i+1]=nb.pages[i]; nb.pages[i]=t; nb.cur=i+1; }
+  loadPageIntoEditor();
+}
+function renderPages(){
+  let nb=curNb(); if(!nb) return;
+  $('pageList').innerHTML=nb.pages.map((p,i)=>{
+    return '<div class="pageThumb '+(i===nb.cur?'active':'')+'" onclick="switchPage('+i+')"><canvas width="300" height="200" data-thumb="'+i+'"></canvas>'
+    +'<div class="ptRow"><span class="kbd">Page '+(i+1)+(p.board&&p.board.strokes.length?' • ▦ board':'')+(p.bgPdf?' • PDF p.'+p.bgPdf.page:'')+'</span><span>'
+    +'<button class="miniBtn" title="Move up" onclick="pageAction('+i+',\'up\',event)">↑</button> '
+    +'<button class="miniBtn" title="Move down" onclick="pageAction('+i+',\'down\',event)">↓</button> '
+    +'<button class="miniBtn" title="Duplicate" onclick="pageAction('+i+',\'dup\',event)">⧉</button> '
+    +'<button class="miniBtn" title="Delete page" onclick="pageAction('+i+',\'del\',event)">×</button></span></div></div>';
+  }).join('');
+  $('statEditorPages').textContent=nb.pages.length;
+  nb.pages.forEach((p,i)=>{
+    let th=document.querySelector('canvas[data-thumb="'+i+'"]'); if(!th) return;
+    if(!p._thumb || p._thumbV!==p._v){ p._thumb=composePage(p, nb.template); p._thumbV=p._v; }
+    let x=th.getContext('2d'); x.clearRect(0,0,300,200); x.drawImage(p._thumb,0,0,300,200);
+  });
+}
+
+/* ============ floating board: true infinite canvas ============ */
+let boardTool='pen', bDrawing=false, bStroke=null, bLast=null, boardPointers={}, pinchStart=null;
+const boardC=$('boardCanvas'), bX=boardC.getContext('2d'); bX.lineCap='round'; bX.lineJoin='round';
+function pageBoard(){ let p=curPageObj(); if(!p) return null; if(!p.board) p.board=blankBoard(); return p.board; }
+function toggleBoard(force){
+  let b=$('floatingBoard'); let show= typeof force==='boolean'? force : b.classList.contains('hidden');
+  b.classList.toggle('hidden',!show);
+  if(show){ loadBoard(); toast('Floating board — saved with this page, never in the PDF'); }
+}
+function loadBoard(){
+  let bd=pageBoard(); if(!bd) return;
+  $('floatingBoard').style.background=BOARD_COLORS[bd.color];
+  if(bd.color===6){ $('floatingBoard').style.color='#f8fafc'; } else { $('floatingBoard').style.color='#191c19'; }
+  sizeBoardCanvas(); redrawBoard();
+}
+function sizeBoardCanvas(){
+  let w=boardC.clientWidth||340, h=boardC.clientHeight||230, dpr=Math.min(window.devicePixelRatio||1,2);
+  boardC.width=Math.round(w*dpr); boardC.height=Math.round(h*dpr); redrawBoard();
+}
+function redrawBoard(){
+  let bd=pageBoard(); if(!bd) return;
+  let v=bd.view;
+  bX.setTransform(1,0,0,1,0,0); bX.clearRect(0,0,boardC.width,boardC.height);
+  bX.setTransform(v.k,0,0,v.k, v.x, v.y);
+  bd.strokes.forEach(st=>{
+    bX.strokeStyle=st.color; bX.lineWidth=st.size; bX.beginPath();
+    bX.moveTo(st.points[0].x,st.points[0].y);
+    for(let i=1;i<st.points.length;i++) bX.lineTo(st.points[i].x,st.points[i].y);
+    bX.stroke();
+  });
+  bX.setTransform(1,0,0,1,0,0);
+}
+function boardWorld(e){ let r=boardC.getBoundingClientRect(); let bd=pageBoard(); let sx=(e.clientX-r.left)*(boardC.width/r.width), sy=(e.clientY-r.top)*(boardC.height/r.height); return { x:(sx-bd.view.x)/bd.view.k, y:(sy-bd.view.y)/bd.view.k, sx, sy }; }
+function setBoardTool(t){ boardTool=t; $('boardPenBtn').classList.toggle('primary',t==='pen'); $('boardPanBtn').classList.toggle('primary',t==='pan'); boardC.style.cursor= t==='pan'?'grab':'crosshair'; }
+boardC.addEventListener('pointerdown',e=>{
+  boardC.setPointerCapture(e.pointerId); boardPointers[e.pointerId]={x:e.clientX,y:e.clientY};
+  if(Object.keys(boardPointers).length===2){ let ps=Object.values(boardPointers); pinchStart={d:Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y), k:pageBoard().view.k}; bDrawing=false; bStroke=null; return; }
+  let w=boardWorld(e);
+  if(boardTool==='pan'){ bLast={x:e.clientX,y:e.clientY}; bDrawing=true; return; }
+  bDrawing=true; let bd=pageBoard();
+  bStroke={color: bd.color===6? '#f8fafc':'#191c19', size:3/bd.view.k*1.6, points:[{x:w.x,y:w.y}]};
+  bLast=w;
+});
+boardC.addEventListener('pointermove',e=>{
+  if(boardPointers[e.pointerId]) boardPointers[e.pointerId]={x:e.clientX,y:e.clientY};
+  let bd=pageBoard(); if(!bd) return;
+  if(pinchStart && Object.keys(boardPointers).length===2){
+    let ps=Object.values(boardPointers); let d=Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y);
+    bd.view.k=Math.max(0.2,Math.min(6, pinchStart.k*(d/Math.max(20,pinchStart.d)))); redrawBoard(); return;
+  }
+  if(!bDrawing) return;
+  if(boardTool==='pan' && bLast){ let r=boardC.getBoundingClientRect(); bd.view.x+=(e.clientX-bLast.x)*(boardC.width/r.width); bd.view.y+=(e.clientY-bLast.y)*(boardC.height/r.height); bLast={x:e.clientX,y:e.clientY}; redrawBoard(); return; }
+  let w=boardWorld(e); if(bStroke){ bStroke.points.push({x:w.x,y:w.y}); bd.strokes=bd.strokes.filter(s=>s!==bStroke); bd.strokes.push(bStroke); redrawBoard(); }
+});
+function boardEnd(e){ delete boardPointers[e.pointerId]; if(Object.keys(boardPointers).length<2) pinchStart=null; if(bDrawing && bStroke){ renderPages(); } bDrawing=false; bStroke=null; bLast=null; }
+boardC.addEventListener('pointerup',boardEnd); boardC.addEventListener('pointercancel',boardEnd);
+boardC.addEventListener('wheel',e=>{ e.preventDefault(); let bd=pageBoard(); let f=e.deltaY<0?1.12:0.89; bd.view.k=Math.max(0.2,Math.min(6,bd.view.k*f)); redrawBoard(); },{passive:false});
+function boardZoom(f){ let bd=pageBoard(); bd.view.k=Math.max(0.2,Math.min(6,bd.view.k*f)); redrawBoard(); }
+function boardClear(){ let bd=pageBoard(); askConfirm('Clear this board?','The board on this page is emptied; the page itself is untouched.',()=>{ bd.strokes=[]; redrawBoard(); renderPages(); }); }
+function cycleBoardColor(){ let bd=pageBoard(); bd.color=(bd.color+1)%BOARD_COLORS.length; loadBoard(); toast('Board colour saved for this page'); }
+/* drag + resize board */
+let dragB=null;
+$('boardHead').addEventListener('pointerdown',e=>{ if(e.target.tagName==='BUTTON') return; let el=$('floatingBoard'); dragB={x:e.clientX,y:e.clientY,l:el.offsetLeft,t:el.offsetTop}; });
+let gripDrag=null;
+$('boardGrip').addEventListener('pointerdown',e=>{ e.stopPropagation(); let el=$('floatingBoard'); gripDrag={x:e.clientX,y:e.clientY,w:el.offsetWidth,h:boardC.clientHeight}; $('boardGrip').setPointerCapture(e.pointerId); });
+$('boardGrip').addEventListener('pointermove',e=>{ if(!gripDrag) return; let el=$('floatingBoard'); el.style.width=Math.max(240,gripDrag.w+(e.clientX-gripDrag.x))+'px'; boardC.style.height=Math.max(140,gripDrag.h+(e.clientY-gripDrag.y))+'px'; sizeBoardCanvas(); });
+$('boardGrip').addEventListener('pointerup',()=>gripDrag=null);
+window.addEventListener('pointermove',e=>{ if(!dragB) return; let el=$('floatingBoard'); el.style.left=(dragB.l+e.clientX-dragB.x)+'px'; el.style.top=(dragB.t+e.clientY-dragB.y)+'px'; el.style.right='auto'; });
 window.addEventListener('pointerup',()=>dragB=null);
-function insertTable(){ $('tableHost').innerHTML=`<div class="panel" style="margin-top:12px"><h4>Table</h4><table style="width:100%;border-collapse:collapse"><tr><th style="border:1px solid var(--line);padding:8px;text-align:left">Item</th><th style="border:1px solid var(--line);padding:8px;text-align:left">Notes</th></tr><tr><td contenteditable="true" style="border:1px solid var(--line);padding:8px">Vector A</td><td contenteditable="true" style="border:1px solid var(--line);padding:8px">Magnitude…</td></tr><tr><td contenteditable="true" style="border:1px solid var(--line);padding:8px">Vector B</td><td contenteditable="true" style="border:1px solid var(--line);padding:8px"></td></tr></table></div>`; toast('Table inserted — tap cells to edit'); }
-function addSticky(){ let d=document.createElement('div'); d.contentEditable=true; d.textContent='Sticky note — type here'; d.style.cssText='position:absolute;right:18px;bottom:18px;background:#fef08a;color:#111;padding:12px;border-radius:6px;box-shadow:0 10px 24px rgba(0,0,0,.18);max-width:180px;font-size:13px;line-height:1.5;z-index:6'; $('stickyLayer').appendChild(d); d.focus(); }
-function handwritingToText(){ // honest demo: no fake OCR claim
-  let txt=$('noteText').value; if(!txt) $('noteText').value='[From handwriting] Resultant (লব্ধি) — write a few words above, then this converts the typed draft in the full build via on-device recognition. This web demo keeps your ink as ink and does not invent text.';
-  updateWordCount(); toast('Handwriting-to-text runs on-device in the full build — demo note added below'); }
-function updateWordCount(){ let v=$('noteText').value.trim(); $('wordCount').textContent=(v? v.split(/\s+/).length:0)+' words'; // links
-  let links=[...v.matchAll(/\[\[([^\]]+)\]\]/g)].map(m=>m[1]); if(links.length) $('linksList').innerHTML=links.map(l=>`<div class="listRow"><span>[[${escapeHtml(l)}]]</span><span class="kbd">linked • backlink</span></div>`).join(''); }
-$('noteText').addEventListener('input',updateWordCount);
-function exportPNG(){ let a=document.createElement('a'); a.download=($('noteTitle').value||'inkwell')+'.png'; a.href=canvas.toDataURL('image/png'); a.click(); toast('PNG exported'); }
-function exportBackup(){ let data={title:$('noteTitle').value,text:$('noteText').value,pages:state.pages.length,strokes:state.strokesCount,exported:new Date().toISOString()}; let blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); let a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='inkwell-backup.json'; a.click(); toast('Backup downloaded — import it any time'); }
-function toggleSplit(){ state.split=!state.split; $('splitPane').classList.toggle('hidden',!state.split); }
-function toggleRecord(){ state.recording=!state.recording; $('recBtn').textContent=state.recording?'■ Stop recording':'● Record note audio'; $('recStatus').textContent=state.recording?'Recording… strokes are timestamped to audio in this tab.':'Audio-synced notes ready.'; if(!state.recording) toast('Audio note saved with this page (in this tab)'); }
-let timerSec=25*60,timerInt=null;
-function openTimer(){ if(timerInt){ clearInterval(timerInt); timerInt=null; $('timerLabel').textContent='Focus 25:00'; timerSec=25*60; return; } toast('Focus timer started — 25 minutes'); timerInt=setInterval(()=>{ timerSec--; let m=Math.floor(timerSec/60),s=timerSec%60; $('timerLabel').textContent=`Focus ${m}:${String(s).padStart(2,'0')}`; if(timerSec<=0){clearInterval(timerInt); timerInt=null; toast('Focus session done');}},1000); }
-// Reader
-function setReaderMode(m,btn){ document.querySelectorAll('#view-reader .seg button').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); toast(m==='scroll'?'Scroll view — default for PDFs & EPUBs':'Page view — use Prev / Next'); $('readerGrid').style.gridTemplateColumns= m==='page'?'220px 1fr':'220px 1fr'; }
-function setReaderTheme(v){ let a=$('readerArticle'); a.className='reader '+v; }
-function changePage(d){ state.readerPage=Math.min(24,Math.max(1,state.readerPage+d)); $('pageLabel').textContent=`Page ${state.readerPage} / 24`; $('resumeLabel').textContent=`Resumed • Page ${state.readerPage} of 24 • ${Math.round(state.readerPage/24*100)}%`; }
-function toggleBookmark(){ let p=state.readerPage; if(!state.bookmarks.includes(p)){ state.bookmarks.push(p); $('bookmarkList').innerHTML=state.bookmarks.map(b=>`<div class="listRow"><span>Page ${b} — Why speed lies</span><b>★</b></div>`).join(''); toast('Bookmarked page '+p);} }
-function highlightSelection(){ let sel=window.getSelection().toString().trim(); if(!sel){ toast('Select some text in the chapter first'); return; } let range=window.getSelection().getRangeAt(0); let mark=document.createElement('mark'); try{ range.surroundContents(mark); state.annotations.push(sel); $('annoList').innerHTML=state.annotations.map(a=>`<div class="listRow"><span style="font-size:13px;line-height:1.4">“${escapeHtml(a.slice(0,80))}”</span></div>`).join('')+`<button class="btn" style="margin-top:8px" onclick="exportAnnotations()">Export annotations</button>`; toast('Highlighted & added to annotation list'); }catch(e){ toast('Select a clean sentence inside one paragraph'); } }
-function exportAnnotations(){ let blob=new Blob([state.annotations.join('\n\n')],{type:'text/plain'}); let a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='annotations.txt'; a.click(); }
-function lookupSelection(){ let w=window.getSelection().toString().trim().split(/\s+/)[0]||'reading'; let box=$('dictBox'); box.classList.remove('hidden'); box.innerHTML=`<b>${escapeHtml(w)}</b> — <span class="kbd">Dictionary / Wikipedia lookup</span><p style="line-height:1.6;font-family:Newsreader,serif">In the full build this opens the dictionary entry and Wikipedia summary for “${escapeHtml(w)}” without leaving the page. <a href=https://en.wiktionary.org/wiki/${encodeURIComponent(w.toLowerCase())} target=_blank rel=noopener>Open Wiktionary →</a> · <a href=https://en.wikipedia.org/wiki/${encodeURIComponent(w)} target=_blank rel=noopener>Wikipedia →</a></p>`; }
-function runOCR(){ $('ocrBox').classList.remove('hidden'); toast('OCR — print only, on-device in full build'); }
-function toggleParallel(){ let b=$('parallelBox'); b.classList.toggle('hidden'); b.style.display=b.classList.contains('hidden')?'none':'grid'; }
-// TTS — few named accents, only working (local) voices, male/female when signal exists
+
+/* ============ stickies & tables ============ */
+const STICKY_COLORS=['#fef08a','#fda4af','#93c5fd','#86efac','#f3e8c8'];
+function renderStickies(){
+  let p=curPageObj(); let host=$('stickyLayer'); host.innerHTML=''; if(!p) return;
+  p.stickies.forEach(st=>{
+    let d=document.createElement('div'); d.className='sticky'; d.style.left=st.x+'%'; d.style.top=st.y+'%'; d.style.background=st.color;
+    d.innerHTML='<div class="stickyHead"><span style="font-size:11px;font-weight:700">Sticky</span><span><button title="Colour">●</button><button title="Delete">×</button></span></div><textarea placeholder="Type…">'+esc(st.text)+'</textarea>';
+    let [colorBtn,delBtn]=d.querySelectorAll('.stickyHead button');
+    let ta=d.querySelector('textarea');
+    ta.addEventListener('input',()=>{ st.text=ta.value; });
+    ta.addEventListener('pointerdown',e=>e.stopPropagation());
+    colorBtn.onclick=()=>{ let i=STICKY_COLORS.indexOf(st.color); st.color=STICKY_COLORS[(i+1)%STICKY_COLORS.length]; d.style.background=st.color; };
+    delBtn.onclick=()=>{ p.stickies=p.stickies.filter(s=>s!==st); renderStickies(); };
+    d.querySelector('.stickyHead').addEventListener('pointerdown',e=>{
+      if(e.target.tagName==='BUTTON') return;
+      let shell=$('canvasShell').getBoundingClientRect(); let sx=e.clientX, sy=e.clientY, ox=st.x, oy=st.y;
+      function mv(ev){ st.x=Math.max(0,Math.min(82, ox+(ev.clientX-sx)/shell.width*100)); st.y=Math.max(0,Math.min(80, oy+(ev.clientY-sy)/shell.height*100)); d.style.left=st.x+'%'; d.style.top=st.y+'%'; }
+      function up(){ window.removeEventListener('pointermove',mv); window.removeEventListener('pointerup',up); }
+      window.addEventListener('pointermove',mv); window.addEventListener('pointerup',up);
+    });
+    host.appendChild(d);
+  });
+}
+function addSticky(){ let p=curPageObj(); if(!p) return; p.stickies.push({x:62,y:58,text:'',color:STICKY_COLORS[0]}); renderStickies(); toast('Sticky added — drag it by its top bar'); }
+function renderTable(){
+  let p=curPageObj(); let host=$('tableHost'); if(!p||!p.table){ host.innerHTML=''; return; }
+  let rows=p.table.rows;
+  let html='<div class="panel" style="margin-top:12px"><h4>Table</h4><table class="inkTable">';
+  rows.forEach((r,ri)=>{ html+='<tr>'+r.map((c,ci)=>'<td contenteditable="true" data-r="'+ri+'" data-c="'+ci+'">'+esc(c)+'</td>').join('')+'</tr>'; });
+  html+='</table><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn small" onclick="tableAddRow()">+ Row</button><button class="btn small" onclick="tableAddCol()">+ Column</button><button class="btn small danger" onclick="tableDelete()">Delete table</button></div></div>';
+  host.innerHTML=html;
+  host.querySelectorAll('td').forEach(td=>td.addEventListener('input',()=>{ p.table.rows[+td.dataset.r][+td.dataset.c]=td.textContent; }));
+}
+function insertTable(){ let p=curPageObj(); if(!p) return; if(p.table){ toast('This page already has a table'); return; } p.table={rows:[['Item','Notes'],['',''],['','']]}; renderTable(); toast('Table inserted — tap cells to edit'); }
+function tableAddRow(){ let p=curPageObj(); p.table.rows.push(p.table.rows[0].map(()=>'') ); renderTable(); }
+function tableAddCol(){ let p=curPageObj(); p.table.rows.forEach(r=>r.push('')); renderTable(); }
+function tableDelete(){ let p=curPageObj(); askConfirm('Delete this table?','',()=>{ p.table=null; renderTable(); }); }
+
+/* ============ audio-synced notes (real mic recording) ============ */
+let mediaRec=null, recChunks=[], syncAudio=null, syncRaf=null;
+async function toggleRecord(){
+  let p=curPageObj(); if(!p) return;
+  if(S.recording){
+    mediaRec && mediaRec.stop(); return;
+  }
+  if(!navigator.mediaDevices || !window.MediaRecorder){ toast('Recording is not supported in this browser'); return; }
+  try{
+    let stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    recChunks=[]; mediaRec=new MediaRecorder(stream);
+    mediaRec.ondataavailable=e=>{ if(e.data.size) recChunks.push(e.data); };
+    mediaRec.onstop=()=>{
+      stream.getTracks().forEach(t=>t.stop());
+      let blob=new Blob(recChunks,{type:mediaRec.mimeType||'audio/webm'});
+      p.audio={url:URL.createObjectURL(blob), dur:(Date.now()-S.recStart)/1000};
+      S.recording=false; $('recBtn').textContent='● Record';
+      $('recStatus').textContent='Saved — ' + Math.round(p.audio.dur) + 's of audio synced to the ink you drew while recording.';
+      updateAudioUI(); toast('Audio note saved with this page');
+    };
+    S.recStart=Date.now(); mediaRec.start(); S.recording=true;
+    $('recBtn').textContent='■ Stop';
+    $('recStatus').textContent='Recording… strokes you draw now are timestamped to the audio.';
+  }catch(err){ toast('Microphone unavailable — permission is needed to record'); }
+}
+function updateAudioUI(){ let p=curPageObj(); $('playSyncBtn').classList.toggle('hidden', !(p&&p.audio)); }
+function playSyncedAudio(){
+  let p=curPageObj(); if(!p||!p.audio) return;
+  if(syncAudio){ syncAudio.pause(); syncAudio=null; cancelAnimationFrame(syncRaf); redrawLayer.cutoff=null; redrawLayer('ink'); $('playSyncBtn').textContent='▶ Play with ink sync'; return; }
+  syncAudio=new Audio(p.audio.url);
+  let tick=()=>{ if(!syncAudio) return; redrawLayer.cutoff=syncAudio.currentTime*1000; redrawLayer('ink'); if(!syncAudio.ended && !syncAudio.paused) syncRaf=requestAnimationFrame(tick); };
+  syncAudio.onplay=()=>{ $('playSyncBtn').textContent='■ Stop sync playback'; tick(); };
+  syncAudio.onended=()=>{ redrawLayer.cutoff=null; redrawLayer('ink'); syncAudio=null; $('playSyncBtn').textContent='▶ Play with ink sync'; };
+  syncAudio.play();
+}
+
+/* ============ links & backlinks, split view ============ */
+function refreshLinks(){
+  let nb=curNb(); let host=$('linksList'); if(!nb||!host) return;
+  let text=$('noteText')? $('noteText').value : '';
+  let out=[...new Set([...text.matchAll(/\[\[([^\]]+)\]\]/g)].map(m=>m[1]))];
+  let back=S.items.filter(i=>i.kind==='notebook' && i.id!==nb.id && i.pages.some(p=>p.text.includes('[['+nb.title+']]'))).map(i=>i.title);
+  let html='';
+  if(out.length) html+=out.map(l=>'<div class="listRow"><a href="#" onclick="openLink(\''+esc(l).replace(/'/g,"\\'")+'\');return false">[[ '+esc(l)+' ]]</a><span class="kbd">link</span></div>').join('');
+  if(back.length) html+='<h4 style="margin-top:12px">Backlinks</h4>'+back.map(t=>'<div class="listRow"><span>'+esc(t)+'</span><span class="kbd">links here</span></div>').join('');
+  host.innerHTML= html || '<p class="kbd">Type [[Title]] in the note to link another notebook. Links create the notebook if it does not exist yet.</p>';
+}
+function openLink(title){
+  let nb=S.items.find(i=>i.kind==='notebook' && i.title.toLowerCase()===title.toLowerCase());
+  if(nb){ openNotebook(nb.id); return; }
+  let created=createNotebookSilent(title,'#1e3a5f','lined');
+  toast('Created linked notebook “'+title+'”');
+}
+function updateWordCount(){ let v=$('noteText').value; $('wordCount').textContent=(v.trim()? v.trim().split(/\s+/).length:0)+' words'; refreshLinks(); }
+$('noteText').addEventListener('input',()=>{ updateWordCount(); });
+function toggleSplit(){
+  S.split=!S.split;
+  $('stageWrap').classList.toggle('split',S.split);
+  let pane=$('splitPane'); pane.classList.toggle('hidden',!S.split);
+  if(S.split){
+    let b=curBook()||S.items.find(i=>i.kind==='epub');
+    if(b && b.kind==='epub'){ let c=b.chapters[b.ch]; pane.innerHTML='<span class="badge">'+esc(b.title)+'</span><h3>'+esc(c.title)+'</h3>'+c.html; }
+    else if(b && b.kind==='pdf' && b.textCache){ pane.innerHTML='<span class="badge">'+esc(b.title)+'</span><h3>Page '+b.page+'</h3><p>'+esc((b.textCache[b.page]||'Open the PDF in the reader once so its text is ready here.').slice(0,2200))+'</p>'; }
+    else pane.innerHTML='<h3>Nothing to read yet</h3><p>Open or import a book and it will appear here beside your notebook.</p>';
+  }
+}
+
+/* ============ exports ============ */
+function exportPagePNG(){ let nb=curNb(); if(!nb) return; saveEditorToModel(); let c=composePage(curPageObj(), nb.template); c.toBlob(b=>{ download(nb.title.replace(/[^\w\- ]+/g,'')+' — page '+(nb.cur+1)+'.png', b); toast('PNG exported'); }); }
+function exportNotebookPDF(){
+  let nb=curNb(); if(!nb) return; saveEditorToModel();
+  if(!window.jspdf){ toast('PDF export library could not load — check connection'); return; }
+  let doc=new window.jspdf.jsPDF({unit:'px', format:[CW,CH], orientation:'landscape'});
+  nb.pages.forEach((p,i)=>{ if(i>0) doc.addPage([CW,CH],'landscape'); let c=composePage(p, nb.template); doc.addImage(c.toDataURL('image/jpeg',0.92),'JPEG',0,0,CW,CH); });
+  doc.save(nb.title.replace(/[^\w\- ]+/g,'')+'.pdf'); toast('Notebook exported as PDF');
+}
+function exportBackup(){
+  saveEditorToModel();
+  let data={app:'inkwell', version:2, exported:new Date().toISOString(),
+    notebooks:S.items.filter(i=>i.kind==='notebook').map(nb=>({title:nb.title,color:nb.color,template:nb.template,cur:nb.cur,
+      pages:nb.pages.map(p=>({ink:p.ink,hi:p.hi,text:p.text,stickies:p.stickies,table:p.table,board:p.board?{color:p.board.color,strokes:p.board.strokes}:null, bgPdf:p.bgPdf?{bookTitle:p.bgPdf.bookTitle,page:p.bgPdf.page}:null}))})),
+    bookNotes:S.items.filter(i=>i.kind!=='notebook').map(b=>({title:b.title,kind:b.kind,bookmarks:b.bookmarks,annotations:b.annotations,page:b.page,ch:b.ch,parallelNotes:b.parallelNotes}))};
+  download('inkwell-backup.json', new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+  toast('Backup downloaded — notebooks in full, book marks & annotations included');
+}
+async function relinkPdfBackgrounds(){
+  for(let nb of S.items){ if(nb.kind!=='notebook') continue;
+    for(let p of nb.pages){ if(!p.bgPdf || p.bgPdf.img) continue;
+      let book=S.items.find(i=>i.kind==='pdf' && i.title===p.bgPdf.bookTitle);
+      if(!book) continue;
+      try{ let page=await book.doc.getPage(p.bgPdf.page); let v0=page.getViewport({scale:1}); let vp=page.getViewport({scale:Math.min(CW/v0.width,CH/v0.height)});
+        let cv=document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
+        await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+        p.bgPdf.img=cv;
+      }catch(e){}
+    }
+  }
+  if(S.view==='editor' && curNb()){ drawBackground(); renderPages(); }
+}
+function importBackup(e){
+  let f=e.target.files[0]; e.target.value=''; if(!f) return;
+  let r=new FileReader();
+  r.onload=()=>{
+    try{
+      let data=JSON.parse(String(r.result));
+      if(data.app!=='inkwell' || !Array.isArray(data.notebooks)) throw new Error('not an Inkwell backup');
+      data.notebooks.forEach(nb=>{
+        let item={id:uid(), kind:'notebook', title:nb.title||'Restored notebook', color:nb.color||'#234f35', template:nb.template||'lined', cur:nb.cur||0, updated:'Restored', annotations:[],
+          pages:(nb.pages&&nb.pages.length?nb.pages:[{}]).map(p=>({ink:p.ink||[],hi:p.hi||[],text:p.text||'',stickies:p.stickies||[],table:p.table||null,board:p.board?{color:p.board.color,strokes:p.board.strokes,view:{x:0,y:0,k:1}}:null,audio:null,bgPdf:p.bgPdf?{img:null,page:p.bgPdf.page,bookTitle:p.bgPdf.bookTitle}:null}))};
+        S.items.unshift(item);
+      });
+      (data.bookNotes||[]).forEach(bn=>{ let b=S.items.find(i=>i.title===bn.title && i.kind===bn.kind); if(b){ b.bookmarks=bn.bookmarks||b.bookmarks; b.annotations=bn.annotations||b.annotations; b.parallelNotes=bn.parallelNotes||{}; } });
+      relinkPdfBackgrounds();
+      renderLibrary(); toast('Backup restored — '+data.notebooks.length+' notebook(s)');
+    }catch(err){ toast('That file is not a readable Inkwell backup'); }
+  };
+  r.readAsText(f);
+}
+
+/* ============ import: PDF / EPUB / TXT ============ */
+function handleImport(e){
+  let f=e.target.files[0]; e.target.value=''; if(!f) return;
+  let name=f.name.toLowerCase();
+  if(name.endsWith('.pdf')){ importPdf(f); return; }
+  if(name.endsWith('.epub')){ importEpub(f); return; }
+  if(name.endsWith('.txt')){ let r=new FileReader(); r.onload=()=>{ let text=String(r.result);
+    let book={id:uid(),kind:'epub',title:f.name.replace(/\.[^.]+$/,''),color:'#234f35',updated:'Imported just now',ch:0,mode:'scroll',bookmarks:[],annotations:[],parallelNotes:{},
+      chapters:[{title:f.name.replace(/\.[^.]+$/,''), html:text.split(/\n\s*\n/).map(p=>'<p>'+esc(p)+'</p>').join(''), text:text}]};
+    S.items.unshift(book); renderLibrary(); openBook(book.id); toast('Text file opened in the reader'); }; r.readAsText(f); return; }
+  toast('That file type is not supported — PDF, EPUB or TXT');
+}
+async function importPdf(f){
+  if(!window.pdfjsLib){ toast('PDF engine could not load — check connection and try again'); return; }
+  toast('Loading PDF…');
+  try{
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    let buf=await f.arrayBuffer();
+    let doc=await pdfjsLib.getDocument({data:buf}).promise;
+    let book={id:uid(),kind:'pdf',title:f.name.replace(/\.[^.]+$/,''),color:'#191c19',updated:'Imported just now',doc:doc,numPages:doc.numPages,page:1,mode:'scroll',bookmarks:[],annotations:[],textCache:{},parallelNotes:{},fileName:f.name};
+    S.items.unshift(book); renderLibrary(); openBook(book.id);
+  }catch(err){ toast('That PDF could not be opened'+(err&&err.message? ' ('+err.message+')':'')+' — password-protected or damaged files will not open'); }
+}
+
+/* EPUB: real parsing with JSZip */
+function resolvePath(base,rel){
+  let parts=(base+rel).split('/'), out=[];
+  parts.forEach(p=>{ if(p==='.'||p==='')return; if(p==='..')out.pop(); else out.push(p); });
+  return out.join('/');
+}
+function sanitizeHtml(doc){
+  doc.querySelectorAll('script,style,iframe,object,form,input,button,link,meta,title').forEach(el=>el.remove());
+  doc.querySelectorAll('*').forEach(el=>{
+    [...el.attributes].forEach(a=>{ if(/^on/i.test(a.name) || (a.name==='href' && /^\s*javascript:/i.test(a.value))) el.removeAttribute(a.name); });
+  });
+  return doc;
+}
+async function importEpub(f){
+  if(!window.JSZip){ toast('EPUB engine could not load — check connection and try again'); return; }
+  toast('Unpacking EPUB…');
+  try{
+    let zip=await JSZip.loadAsync(f);
+    let contFile=zip.file('META-INF/container.xml'); if(!contFile) throw new Error('no container.xml');
+    let cont=new DOMParser().parseFromString(await contFile.async('text'),'text/xml');
+    let rootPath=cont.querySelector('rootfile').getAttribute('full-path');
+    let base=rootPath.includes('/')? rootPath.slice(0,rootPath.lastIndexOf('/')+1):'';
+    let opf=new DOMParser().parseFromString(await zip.file(rootPath).async('text'),'text/xml');
+    let manifest={};
+    opf.querySelectorAll('manifest item').forEach(it=>{ manifest[it.getAttribute('id')]={href:it.getAttribute('href'), type:it.getAttribute('media-type'), props:it.getAttribute('properties')||''}; });
+    let titleEl=opf.querySelector('metadata title, dc\\:title, title');
+    let bookTitle=(titleEl&&titleEl.textContent.trim())||f.name.replace(/\.[^.]+$/,'');
+    // TOC titles from NCX or nav
+    let tocTitles={};
+    let ncxItem=Object.values(manifest).find(m=>m.type==='application/x-dtbncx+xml');
+    if(ncxItem){ try{ let ncx=new DOMParser().parseFromString(await zip.file(resolvePath(base,ncxItem.href)).async('text'),'text/xml');
+      ncx.querySelectorAll('navPoint').forEach(np=>{ let src=np.querySelector('content')&&np.querySelector('content').getAttribute('src'); let lab=np.querySelector('navLabel text')&&np.querySelector('navLabel text').textContent.trim(); if(src&&lab) tocTitles[src.split('#')[0]]=lab; }); }catch(e){} }
+    let spineIds=[...opf.querySelectorAll('spine itemref')].map(r=>r.getAttribute('idref'));
+    let chapters=[];
+    for(let id of spineIds){
+      let item=manifest[id]; if(!item) continue;
+      if(!/xhtml|html/.test(item.type)) continue;
+      let path=resolvePath(base,item.href);
+      let file=zip.file(path); if(!file) continue;
+      let raw=await file.async('text');
+      let doc=new DOMParser().parseFromString(raw,'text/html');
+      // images -> blob URLs
+      let chBase=path.includes('/')? path.slice(0,path.lastIndexOf('/')+1):'';
+      let imgs=doc.querySelectorAll('img, image');
+      for(let img of imgs){
+        let src=img.getAttribute('src')||img.getAttribute('xlink:href')||img.getAttribute('href'); if(!src||/^https?:|^data:/.test(src)) continue;
+        let ipath=resolvePath(chBase, decodeURIComponent(src.split('#')[0]));
+        let ifile=zip.file(ipath);
+        if(ifile){ let blob=await ifile.async('blob'); img.setAttribute('src', URL.createObjectURL(blob)); }
+      }
+      sanitizeHtml(doc);
+      let body=doc.body; if(!body) continue;
+      let h=body.querySelector('h1,h2,h3');
+      let title=(h&&h.textContent.trim())||tocTitles[item.href]||('Section '+(chapters.length+1));
+      let text=body.textContent.replace(/\s+/g,' ').trim();
+      if(!text && !body.querySelector('img')) continue;
+      chapters.push({title:title.slice(0,90), html:body.innerHTML, text:text});
+    }
+    if(!chapters.length) throw new Error('no readable chapters found');
+    let book={id:uid(),kind:'epub',title:bookTitle,color:'#234f35',updated:'Imported just now',ch:0,mode:'scroll',bookmarks:[],annotations:[],chapters:chapters,parallelNotes:{}};
+    S.items.unshift(book); renderLibrary(); openBook(book.id);
+    toast('EPUB opened — '+chapters.length+' chapters, in reading mode');
+  }catch(err){ toast('That EPUB could not be read ('+(err&&err.message?err.message:'unknown error')+')'); }
+}
+
+/* ============ reader ============ */
+function openBook(id){
+  let b=S.items.find(i=>i.id===id); if(!b||b.kind==='notebook') return;
+  S.curBookId=id;
+  $('dictBox').classList.add('hidden'); $('ocrBox').classList.add('hidden'); $('parallelBox').classList.add('hidden');
+  if(b.kind==='pdf'){ showPdfChrome(); renderPdfBook(); }
+  else { showEpubChrome(); renderEpubBook(); }
+  showView('reader'); renderReaderSide();
+}
+function showEpubChrome(){ $('pdfView').classList.add('hidden'); $('readerArticle').classList.remove('hidden'); $('ttsBar').classList.remove('hidden'); }
+function showPdfChrome(){ $('pdfView').classList.remove('hidden'); $('readerArticle').classList.add('hidden'); $('ttsBar').classList.remove('hidden'); $('parallelBox').classList.add('hidden'); }
+function closePdf(){ let b=curBook(); if(b) b.mode='scroll'; showView('library'); }
+function setReaderMode(m){
+  $('modeScrollBtn').classList.toggle('active',m==='scroll'); $('modePageBtn').classList.toggle('active',m==='page');
+  let b=curBook(); if(b){ b.mode=m; if(b.kind==='pdf') renderPdfBook(); else renderEpubBook(); }
+  toast(m==='scroll'?'Scroll view':'Page view — one at a time, use Prev / Next');
+}
+function setReaderTheme(v){ $('readerArticle').className='reader '+v; let pv=$('pdfView'); pv.style.filter= v==='dark'? 'invert(0.92) hue-rotate(180deg)':''; }
+function readerFont(d){ let cur=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--reader-fs'))||19; let next=Math.max(15,Math.min(26,cur+d*1.5)); document.documentElement.style.setProperty('--reader-fs',next+'px'); }
+function toggleReaderSide(){ $('readerSide').classList.toggle('open'); }
+function updateResume(){
+  let b=curBook(); if(!b) return;
+  if(b.kind==='pdf'){ $('pageLabel').textContent='Page '+b.page+' / '+b.numPages; $('resumeLabel').textContent='Reading • '+b.title+' • Page '+b.page+' of '+b.numPages+' • '+Math.round(b.page/b.numPages*100)+'% — resumes here'; S.stats.pagesRead['pdf:'+b.id+':'+b.page]=1; }
+  else { $('pageLabel').textContent='Chapter '+(b.ch+1)+' / '+b.chapters.length; $('resumeLabel').textContent='Reading • '+b.title+' • Chapter '+(b.ch+1)+' of '+b.chapters.length+' — resumes here'; S.stats.pagesRead['epub:'+b.id+':'+b.ch]=1; }
+}
+
+/* --- EPUB rendering --- */
+function renderEpubBook(){
+  let b=curBook(); if(!b||b.kind!=='epub') return;
+  $('readerBadge').textContent=(b.sample?'Sample book':'EPUB')+' • '+b.chapters.length+' chapters';
+  $('readerTitle').textContent=b.title;
+  let body=$('readerBody');
+  if(b.mode==='page'){ let c=b.chapters[b.ch]; body.innerHTML='<h3 style="font-family:Newsreader,serif;font-size:24px;margin:14px 0 6px">'+esc(c.title)+'</h3>'+c.html; }
+  else { body.innerHTML=b.chapters.map((c,i)=>'<div data-ch="'+i+'"><h3 style="font-family:Newsreader,serif;font-size:24px;margin:22px 0 6px">'+esc(c.title)+'</h3>'+c.html+'</div>').join(''); }
+  updateResume();
+}
+function jumpToChapter(i){ let b=curBook(); if(!b||b.kind!=='epub') return; b.ch=Math.max(0,Math.min(b.chapters.length-1,i));
+  if(b.mode==='page') renderEpubBook(); else { let el=document.querySelector('[data-ch="'+b.ch+'"]'); if(el) el.scrollIntoView({behavior:'smooth'}); updateResume(); }
+  renderReaderSide(); }
+
+/* --- PDF rendering with real text layer --- */
+let pdfToken=0, pdfObserver=null;
+function pdfPageWidth(){ let host=$('pdfPages'); return Math.max(260,(host&&host.clientWidth)||document.documentElement.clientWidth-32); }
+async function renderPdfTextLayer(page,vp,holder,book,pageNum){
+  try{
+    let tc=await page.getTextContent();
+    let layer=document.createElement('div'); layer.className='textLayer'; holder.appendChild(layer);
+    let scale=vp.scale/(Math.min(window.devicePixelRatio||1,2));
+    let full='';
+    tc.items.forEach(item=>{
+      if(!item.str) return;
+      let tx=pdfjsLib.Util.transform(vp.transform,item.transform);
+      let fontSize=Math.hypot(tx[2],tx[3]);
+      let span=document.createElement('span');
+      span.textContent=item.str;
+      span.style.left=tx[4]+'px'; span.style.top=(tx[5]-fontSize)+'px'; span.style.fontSize=fontSize+'px';
+      span.dataset.pg=pageNum;
+      layer.appendChild(span);
+      full+=item.str+' ';
+      requestAnimationFrame(()=>{ let w=item.width*scale; let ow=span.offsetWidth; if(ow>2 && w>2) span.style.transform='scaleX('+(w/ow)+')'; });
+    });
+    book.textCache[pageNum]=full.trim();
+  }catch(e){ /* text layer is best-effort; page image still reads */ }
+}
+async function renderPdfPageInto(num,host,book){
+  let page=await book.doc.getPage(num);
+  let wrap=document.createElement('div'); wrap.className='pdfPage'; wrap.dataset.page=num;
+  let label=document.createElement('div'); label.className='pdfPageNum'; label.textContent='Page '+num+' of '+book.numPages; wrap.appendChild(label);
+  let holder=document.createElement('div'); holder.className='pageHolder'; wrap.appendChild(holder);
+  let canvas=document.createElement('canvas'); holder.appendChild(canvas); host.appendChild(wrap);
+  let base=page.getViewport({scale:1}); let scale=pdfPageWidth()/base.width;
+  let dpr=Math.min(window.devicePixelRatio||1,2); let vp=page.getViewport({scale:scale*dpr});
+  canvas.width=Math.floor(vp.width); canvas.height=Math.floor(vp.height);
+  await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+  renderPdfTextLayer(page,vp,holder,book,num);
+}
+async function renderPdfBook(){
+  let b=curBook(); if(!b||b.kind!=='pdf') return;
+  let token=++pdfToken; let host=$('pdfPages'); host.innerHTML='';
+  if(pdfObserver){ pdfObserver.disconnect(); pdfObserver=null; }
+  $('pdfName').textContent=b.fileName||b.title;
+  $('pdfMeta').textContent=b.numPages+' page'+(b.numPages===1?'':'s')+' • Fit to width • Text is selectable';
+  let st=$('pdfStatus'); st.classList.remove('hidden'); st.textContent='Rendering pages…';
+  if(b.mode==='page'){ try{ await renderPdfPageInto(b.page,host,b); }catch(e){} if(token!==pdfToken) return; st.classList.add('hidden'); updateResume(); renderReaderSide(); return; }
+  for(let n=1;n<=b.numPages;n++){ if(token!==pdfToken) return; try{ await renderPdfPageInto(n,host,b); }catch(e){} if(n===1) st.classList.add('hidden'); }
+  if(token!==pdfToken) return;
+  updateResume(); renderReaderSide();
+  let target=document.querySelector('.pdfPage[data-page="'+b.page+'"]'); if(target && b.page>1) target.scrollIntoView();
+  pdfObserver=new IntersectionObserver(es=>{ es.forEach(en=>{ if(en.isIntersecting){ b.page=+en.target.dataset.page; updateResume(); } }); },{rootMargin:'-35% 0px -55% 0px'});
+  host.querySelectorAll('.pdfPage').forEach(el=>pdfObserver.observe(el));
+}
+function jumpToPdfPage(n){
+  let b=curBook(); if(!b||b.kind!=='pdf') return;
+  b.page=Math.max(1,Math.min(b.numPages,n));
+  if(b.mode==='page'){ renderPdfBook(); window.scrollTo({top:0}); }
+  else { let el=document.querySelector('.pdfPage[data-page="'+b.page+'"]'); if(el) el.scrollIntoView({behavior:'smooth'}); updateResume(); }
+}
+let pdfResizeT=null;
+window.addEventListener('resize',()=>{ let b=curBook(); if(!b||b.kind!=='pdf'||S.view!=='reader') return; clearTimeout(pdfResizeT); pdfResizeT=setTimeout(()=>renderPdfBook(),400); });
+
+/* --- reader sidebar: TOC, bookmarks, annotations, thumbnails --- */
+async function renderReaderSide(){
+  let b=curBook(); let toc=$('tocList'), bm=$('bookmarkList'), an=$('annoList'), th=$('thumbList');
+  if(!b){ toc.innerHTML='<p class="kbd">Open a book to see its contents.</p>'; return; }
+  bm.innerHTML= b.bookmarks.length? b.bookmarks.map(x=>'<div class="listRow"><span>'+esc(x.label)+'</span><button class="btn small" onclick="jumpBookmark('+x.at+')">Go</button></div>').join('') : '<p class="kbd">No bookmarks yet</p>';
+  an.innerHTML= b.annotations.length? b.annotations.map(a=>'<div class="listRow"><span style="font-size:13px;line-height:1.45">“'+esc(a.text.slice(0,90))+'”<br/><span class="kbd">'+esc(a.where)+'</span></span></div>').join('')+'<button class="btn small" style="margin-top:8px" onclick="exportAnnotations()">Export annotations</button>' : '<p class="kbd">Select text → Highlight selection</p>';
+  if(b.kind==='epub'){
+    toc.innerHTML=b.chapters.map((c,i)=>'<div class="tocItem" onclick="jumpToChapter('+i+')">'+(i+1)+'. '+esc(c.title)+'</div>').join('');
+    th.innerHTML=b.chapters.map((c,i)=>'<div class="thumbItem '+(i===b.ch?'active':'')+'" onclick="jumpToChapter('+i+')"><b style="font-size:12px">Ch. '+(i+1)+'</b><br/><span class="kbd">'+esc(c.text.slice(0,70))+'…</span></div>').join('');
+  } else {
+    toc.innerHTML='<p class="kbd">Loading outline…</p>'; th.innerHTML='<p class="kbd">Rendering thumbnails…</p>';
+    try{ let outline=await b.doc.getOutline();
+      if(outline&&outline.length){ toc.innerHTML=''; let walk=(items,depth)=>{ items.forEach(o=>{ let d=document.createElement('div'); d.className='tocItem'; d.style.paddingLeft=(6+depth*14)+'px'; d.textContent=o.title||'Section';
+        d.onclick=async()=>{ try{ let dest=typeof o.dest==='string'? await b.doc.getDestination(o.dest):o.dest; let idx=await b.doc.getPageIndex(dest[0]); jumpToPdfPage(idx+1); }catch(e){ toast('That outline entry has no page'); } };
+        toc.appendChild(d); if(o.items&&o.items.length) walk(o.items,depth+1); }); }; walk(outline,0); }
+      else toc.innerHTML='<p class="kbd">This PDF has no outline.</p>';
+    }catch(e){ toc.innerHTML='<p class="kbd">Outline unavailable.</p>'; }
+    th.innerHTML='';
+    for(let n=1;n<=b.numPages;n++){
+      if(curBook()!==b) return;
+      let item=document.createElement('div'); item.className='thumbItem'+(n===b.page?' active':''); item.innerHTML='<span class="kbd">Page '+n+'</span>';
+      item.onclick=()=>jumpToPdfPage(n); th.appendChild(item);
+      try{ let pg=await b.doc.getPage(n); let v0=pg.getViewport({scale:1}); let vp=pg.getViewport({scale:130/v0.width});
+        let cv=document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
+        await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+        item.insertBefore(cv,item.firstChild);
+      }catch(e){}
+      if(n%4===0) await new Promise(r=>setTimeout(r,10));
+    }
+    return;
+  }
+}
+function jumpBookmark(at){ let b=curBook(); if(!b) return; if(b.kind==='pdf') jumpToPdfPage(at); else jumpToChapter(at); }
+function toggleBookmark(){
+  let b=curBook(); if(!b){ toast('Open a book first'); return; }
+  let at= b.kind==='pdf'? b.page : b.ch;
+  let label= b.kind==='pdf'? 'Page '+at : 'Chapter '+(at+1)+' — '+b.chapters[at].title;
+  if(b.bookmarks.some(x=>x.at===at)){ b.bookmarks=b.bookmarks.filter(x=>x.at!==at); toast('Bookmark removed'); }
+  else { b.bookmarks.push({at:at,label:label}); toast('Bookmarked — '+label); }
+  renderReaderSide();
+}
+function changePage(d){
+  let b=curBook(); if(!b){ toast('Open a book first'); return; }
+  if(b.kind==='pdf') jumpToPdfPage(b.page+d);
+  else jumpToChapter(b.ch+d);
+}
+
+/* --- highlights & annotations --- */
+function highlightSelection(){
+  let b=curBook(); if(!b){ toast('Open a book first'); return; }
+  let sel=window.getSelection(); let text=sel.toString().trim();
+  if(!text){ toast('Select some text in the book first'); return; }
+  let where='';
+  try{
+    let range=sel.getRangeAt(0);
+    let node=range.commonAncestorContainer.nodeType===1? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+    let pgEl=node.closest? node.closest('[data-pg]') : null;
+    let holder=node.closest? node.closest('.pdfPage') : null;
+    let chEl=node.closest? node.closest('[data-ch]') : null;
+    if(b.kind==='pdf') where='PDF page '+(holder? holder.dataset.page : b.page);
+    else where='Chapter '+( (chEl? +chEl.dataset.ch : b.ch) +1)+' — '+b.chapters[chEl? +chEl.dataset.ch : b.ch].title;
+    let mark=document.createElement('mark'); range.surroundContents(mark);
+  }catch(e){ toast('Select a clean stretch inside one paragraph'); return; }
+  b.annotations.push({text:text, where:where});
+  sel.removeAllRanges();
+  renderReaderSide(); renderLibrary();
+  toast('Highlighted & saved to annotations');
+}
+function exportAnnotations(){
+  let b=curBook(); if(!b||!b.annotations.length){ toast('No annotations to export'); return; }
+  let txt=b.title+' — annotations\n\n'+b.annotations.map(a=>'• '+a.text+'\n  ('+a.where+')').join('\n\n');
+  download('annotations-'+b.title.replace(/[^\w\- ]+/g,'')+'.txt', new Blob([txt],{type:'text/plain'}));
+}
+
+/* --- dictionary / Wikipedia: live lookup --- */
+async function lookupSelection(){
+  let w=(window.getSelection().toString().trim().split(/\s+/)[0]||'').replace(/[^A-Za-z'-]/g,'');
+  let box=$('dictBox');
+  if(!w){ toast('Select a word in the text first'); return; }
+  box.classList.remove('hidden'); box.innerHTML='<b>'+esc(w)+'</b><p class="kbd">Looking it up…</p>'; box.scrollIntoView({behavior:'smooth',block:'nearest'});
+  let html='<b style="font-size:18px">'+esc(w)+'</b>';
+  try{
+    let r=await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(w.toLowerCase()));
+    if(r.ok){ let data=await r.json(); let e0=data[0];
+      if(e0.phonetic) html+=' <span class="kbd">'+esc(e0.phonetic)+'</span>';
+      e0.meanings.slice(0,2).forEach(m=>{ html+='<p style="line-height:1.6;font-family:Newsreader,serif"><i>'+esc(m.partOfSpeech)+'</i> — '+esc(m.definitions[0].definition)+'</p>'; });
+    } else html+='<p class="kbd">No dictionary entry for this word.</p>';
+  }catch(e){ html+='<p class="kbd">Dictionary needs a connection — try again.</p>'; }
+  try{
+    let r2=await fetch('https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(w));
+    if(r2.ok){ let s=await r2.json(); if(s.extract) html+='<p style="line-height:1.6;font-family:Newsreader,serif"><b>Wikipedia:</b> '+esc(s.extract.slice(0,420))+'…</p>'; }
+  }catch(e){}
+  html+='<p><a href=https://en.wiktionary.org/wiki/'+encodeURIComponent(w.toLowerCase())+' target=_blank rel=noopener>Wiktionary</a> · <a href=https://en.wikipedia.org/wiki/'+encodeURIComponent(w)+' target=_blank rel=noopener>Wikipedia</a></p>';
+  box.innerHTML=html;
+}
+
+/* --- OCR: Tesseract.js on-device --- */
+let lastOcrText='';
+function openOcrPanel(){ $('ocrBox').classList.remove('hidden'); $('ocrBox').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+async function ocrSourceCanvas(){
+  let b=curBook();
+  if(S.view==='reader' && b && b.kind==='epub'){ toast('This book already has real text — OCR is for scanned PDF pages and images'); return null; }
+  if(b && b.kind==='pdf'){
+    let page=await b.doc.getPage(b.page);
+    let v0=page.getViewport({scale:1}); let vp=page.getViewport({scale:Math.min(2.2, 1600/v0.width)});
+    let c=document.createElement('canvas'); c.width=vp.width; c.height=vp.height;
+    let x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height);
+    await page.render({canvasContext:x,viewport:vp}).promise;
+    return c;
+  }
+  let nb=curNb(); if(nb){ return composePage(curPageObj(), 'blank'); }
+  return null;
+}
+async function runOcrOn(source,label){
+  if(!window.Tesseract){ toast('OCR engine could not load — check connection'); return; }
+  let st=$('ocrStatus'), pr=$('ocrProgress'), btn=$('ocrRunBtn');
+  pr.classList.remove('hidden'); pr.value=0; btn.disabled=true; st.textContent='Starting OCR ('+label+')…';
+  try{
+    let res=await Tesseract.recognize(source, $('ocrLang').value, { logger:m=>{ if(m.status==='recognizing text'){ pr.value=m.progress; st.textContent='Recognising… '+Math.round(m.progress*100)+'%'; } else if(m.status) st.textContent=m.status+'…'; } });
+    lastOcrText=(res.data.text||'').trim();
+    $('ocrText').textContent= lastOcrText || 'No print text was recognised on this page.';
+    $('ocrCopyBtn').classList.toggle('hidden', !lastOcrText);
+    $('ocrNoteBtn').classList.toggle('hidden', !lastOcrText);
+    st.textContent= lastOcrText? 'Done — '+lastOcrText.split(/\s+/).length+' words recognised.' : 'Nothing recognised.';
+  }catch(err){ st.textContent='OCR failed ('+(err&&err.message?err.message:'error')+'). Language data downloads on first use — check the connection and retry.'; }
+  pr.classList.add('hidden'); btn.disabled=false;
+}
+async function runOCR(){ let src=await ocrSourceCanvas(); if(!src){ toast('Open a PDF page (or a notebook page) to OCR'); return; } runOcrOn(src,'this page'); }
+function ocrImageFile(e){ let f=e.target.files[0]; e.target.value=''; if(!f) return; let img=new Image(); img.onload=()=>runOcrOn(img,'image'); img.src=URL.createObjectURL(f); }
+function copyOcrText(){ if(navigator.clipboard) navigator.clipboard.writeText(lastOcrText).then(()=>toast('OCR text copied')); }
+function ocrToNote(){
+  let nb=curNb()||S.items.find(i=>i.kind==='notebook');
+  if(!nb){ nb=createNotebookSilent('OCR notes','#7c2d12','blank'); }
+  let p=nb.pages[nb.cur]; p.text=(p.text? p.text+'\n\n':'')+'[OCR] '+lastOcrText;
+  if(curNb()===nb){ $('noteText').value=p.text; updateWordCount(); }
+  toast('OCR text added to “'+nb.title+'”');
+}
+
+/* --- handwriting to text: Tesseract over the ink canvas --- */
+async function handwritingToText(){
+  let p=curPageObj(); if(!p){ toast('Open a notebook first'); return; }
+  if(!p.ink.length){ toast('Write something on the page first'); return; }
+  if(!window.Tesseract){ toast('Recognition engine could not load — check connection'); return; }
+  let btn=$('hwBtn'); btn.disabled=true; btn.textContent='Recognising…';
+  try{
+    let comp=composePage(p,'blank');
+    let res=await Tesseract.recognize(comp,'eng');
+    let text=(res.data.text||'').replace(/\s+\n/g,'\n').trim();
+    if(text){ $('noteText').value=($('noteText').value? $('noteText').value+'\n':'')+text; saveEditorToModel(); updateWordCount(); toast('Handwriting recognised and added below'); }
+    else toast('No text recognised — try larger, clearer letters');
+  }catch(e){ toast('Recognition failed — check connection and retry'); }
+  btn.disabled=false; btn.textContent='Handwriting → Text';
+}
+
+/* --- TTS --- */
 let voicesCache=[];
 function detectGender(v){ let n=(v.name||'').toLowerCase(); if(/\bfemale\b|woman/.test(n)) return 'female'; if(/\bmale\b|\bman\b/.test(n)) return 'male'; let knownF=['zira','samantha','victoria','karen','moira','tessa','fiona','veena','lekha','google uk english female','microsoft aria','microsoft jenny']; let knownM=['david','alex','daniel','fred','thomas','oliver','rishi','google uk english male','microsoft guy','microsoft christopher']; if(knownF.some(k=>n.includes(k))) return 'female'; if(knownM.some(k=>n.includes(k))) return 'male'; let m=n.match(/[-_ ]([fm])\d?\b/); if(m) return m[1]==='f'?'female':'male'; return ''; }
 function accentName(lang){ let map={'en-US':'American','en-GB':'British','en-AU':'Australian','en-IN':'Indian','en-CA':'Canadian','en-IE':'Irish','en-ZA':'South African','bn':'Bengali','ur':'Urdu','hi':'Hindi','ja':'Japanese','ko':'Korean','fr':'French','de':'German','es':'Spanish','ar':'Arabic'}; return map[lang]||map[lang.split('-')[0]]||lang; }
 function buildVoiceList(){
-  let all=speechSynthesis?speechSynthesis.getVoices():[]; voicesCache=all.filter(v=>v.localService); if(!voicesCache.length) voicesCache=all.slice(0,12);
-  let groups={}; voicesCache.forEach(v=>{ let key=v.lang; let g=detectGender(v); let id=key+'|'+g; if(!groups[id]) groups[id]={lang:key,gender:g,voice:v,count:0}; groups[id].count++; });
+  if(!('speechSynthesis' in window)) return;
+  let all=speechSynthesis.getVoices(); voicesCache=all.filter(v=>v.localService); if(!voicesCache.length) voicesCache=all.slice(0,12);
+  let groups={}; voicesCache.forEach(v=>{ let g=detectGender(v); let id=v.lang+'|'+g; if(!groups[id]) groups[id]={lang:v.lang,gender:g,voice:v}; });
   let list=Object.values(groups).sort((a,b)=>accentName(a.lang).localeCompare(accentName(b.lang)));
-  let sel=$('accentSel'); sel.innerHTML=''; if(!list.length){ sel.innerHTML='<option>No on-device voice found</option>'; $('voiceHint').textContent='No on-device voice on this device — network voices are hidden so nothing silently fails.'; return; }
-  list.slice(0,18).forEach((g,i)=>{ let o=document.createElement('option'); o.value=g.lang+'|'+g.gender; o.textContent=accentName(g.lang)+(g.gender? ' · '+(g.gender==='female'?'Female':'Male'):''); o.dataset.voiceName=g.voice.name; sel.appendChild(o); });
+  let sel=$('accentSel'); sel.innerHTML='';
+  if(!list.length){ sel.innerHTML='<option>No on-device voice found</option>'; $('voiceHint').textContent='No on-device voice on this device — network voices are hidden so nothing silently fails.'; return; }
+  list.slice(0,18).forEach(g=>{ let o=document.createElement('option'); o.value=g.lang+'|'+g.gender; o.textContent=accentName(g.lang)+(g.gender? ' · '+(g.gender==='female'?'Female':'Male'):''); sel.appendChild(o); });
   $('voiceHint').textContent=list.length+' working accent(s) — duplicates collapsed, network-only hidden.';
 }
 if('speechSynthesis' in window){ speechSynthesis.onvoiceschanged=buildVoiceList; buildVoiceList(); setTimeout(buildVoiceList,600); }
-let speaking=false, utter=null;
+let speaking=false;
+function currentReadableText(){
+  let b=curBook(); if(!b) return '';
+  if(b.kind==='epub') return b.chapters[b.ch].text;
+  if(b.kind==='pdf') return b.textCache[b.page]||'';
+  return '';
+}
 function toggleTTS(){
   if(!('speechSynthesis' in window)){ toast('Speech not supported in this browser'); return; }
   if(speaking){ speechSynthesis.cancel(); speaking=false; $('ttsBtn').textContent='▶ Play'; return; }
-  let text=$('readableText').innerText;
-  utter=new SpeechSynthesisUtterance(text); utter.rate=+$('ttsRate').value;
-  let val=$('accentSel').value||''; let [lang,gender]=val.split('|'); let genderPref=$('genderSel').value;
-  let candidates=voicesCache.filter(v=>v.lang===lang || v.lang.startsWith(lang.split('-')[0]));
+  let text=currentReadableText();
+  if(!text){ toast('No readable text here yet — for PDFs, let the page finish rendering first'); return; }
+  let val=$('accentSel').value||''; let parts=val.split('|'); let lang=parts[0], gender=parts[1];
+  let genderPref=$('genderSel').value;
+  let candidates=voicesCache.filter(v=>v.lang===lang || v.lang.startsWith((lang||'').split('-')[0]));
   let pick=candidates.find(v=> (genderPref||gender) && detectGender(v)===(genderPref||gender)) || candidates[0];
-  if(pick) utter.voice=pick;
-  if(lang) utter.lang=lang;
-  utter.onend=()=>{speaking=false; $('ttsBtn').textContent='▶ Play'};
-  speechSynthesis.speak(utter); speaking=true; $('ttsBtn').textContent='■ Stop';
+  let chunks=text.match(/[^.!?]+[.!?]+["']?\s*/g)||[text];
+  let queue=chunks.map(s=>s.trim()).filter(Boolean);
+  let i=0; speaking=true; $('ttsBtn').textContent='■ Stop';
+  let speakNext=()=>{ if(!speaking) return; if(i>=queue.length){ speaking=false; $('ttsBtn').textContent='▶ Play'; return; }
+    let u=new SpeechSynthesisUtterance(queue[i++]); u.rate=+$('ttsRate').value; if(pick) u.voice=pick; if(lang) u.lang=lang;
+    u.onend=speakNext; u.onerror=speakNext; speechSynthesis.speak(u); };
+  speakNext();
 }
-setInterval(()=>{ let mins=Math.floor((Date.now()-state.start)/60000); $('statWrite').textContent=mins+'m'; },30000);
-renderPages(); renderLibrary();
+
+/* --- Parallel Read: original + live translation + notes --- */
+function toggleParallel(){
+  let box=$('parallelBox'); let show=box.classList.contains('hidden');
+  box.classList.toggle('hidden',!show);
+  if(show){ let t=currentReadableText(); $('parallelOrig').textContent=t? t.slice(0,1600) : 'Open a book page first.'; let b=curBook(); if(b) $('parallelNotes').value=(b.parallelNotes&&b.parallelNotes[parallelKey()])||''; }
+}
+function parallelKey(){ let b=curBook(); if(!b) return 'x'; return b.kind==='pdf'? 'p'+b.page : 'c'+b.ch; }
+function saveParallelNotes(){ let b=curBook(); if(!b) return; if(!b.parallelNotes) b.parallelNotes={}; b.parallelNotes[parallelKey()]=$('parallelNotes').value; }
+async function translateParallel(){
+  let text=currentReadableText().slice(0,1400);
+  if(!text){ toast('Nothing to translate on this page yet'); return; }
+  let out=$('parallelTrans'); out.textContent='Translating…';
+  let lang=$('parLang').value;
+  let chunks=[]; let rest=text;
+  while(rest.length>400){ let cut=rest.lastIndexOf('. ',400); if(cut<120) cut=400; chunks.push(rest.slice(0,cut+1)); rest=rest.slice(cut+1); }
+  if(rest.trim()) chunks.push(rest);
+  try{
+    let done=[];
+    for(let c of chunks){
+      let r=await fetch('https://api.mymemory.translated.net/get?q='+encodeURIComponent(c)+'&langpair=en|'+lang);
+      let j=await r.json();
+      let t=j&&j.responseData&&j.responseData.translatedText;
+      if(!t) throw new Error('no translation returned');
+      done.push(t);
+    }
+    out.textContent=done.join(' ');
+    let b=curBook(); if(b) $('parallelNotes').value=(b.parallelNotes&&b.parallelNotes[parallelKey()])||'';
+  }catch(e){ out.textContent='Translation needs a connection and the free service has a daily limit — try again in a moment.'; }
+}
+
+/* --- PDF annotation: open the PDF in the editor, ink over its pages --- */
+async function annotatePdf(id){
+  let b=S.items.find(i=>i.id===id); if(!b||b.kind!=='pdf') return;
+  let existing=S.items.find(i=>i.kind==='notebook' && i.pdfBookId===id);
+  if(existing){ openNotebook(existing.id); toast('Opened your annotation notebook for this PDF'); return; }
+  toast('Preparing annotation pages…');
+  let nb={id:uid(),kind:'notebook',title:'Annotations — '+b.title,color:'#1e3a5f',template:'blank',cur:0,updated:'Just now',annotations:[],pdfBookId:id,pages:[]};
+  for(let n=1;n<=b.numPages;n++){
+    let pg=blankPage();
+    try{ let page=await b.doc.getPage(n); let v0=page.getViewport({scale:1}); let vp=page.getViewport({scale:Math.min(CW/v0.width,CH/v0.height)});
+      let cv=document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
+      await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+      pg.bgPdf={img:cv,page:n,bookTitle:b.title};
+    }catch(e){}
+    nb.pages.push(pg);
+  }
+  S.items.unshift(nb); openNotebook(nb.id);
+  toast('Annotate freely — ink stays in this notebook, the PDF file is untouched');
+}
+function annotateCurrentPdf(){ let b=curBook(); if(b) annotatePdf(b.id); }
+
+/* ============ focus timer ============ */
+let timerSec=25*60, timerInt=null;
+function openTimer(){
+  if(timerInt){ clearInterval(timerInt); timerInt=null; timerSec=25*60; $('timerLabel').textContent='Focus 25:00'; toast('Focus timer stopped'); return; }
+  toast('Focus timer started — 25 minutes');
+  timerInt=setInterval(()=>{ timerSec--; let m=Math.floor(timerSec/60),s=timerSec%60; $('timerLabel').textContent='Focus '+m+':'+String(s).padStart(2,'0');
+    if(timerSec<=0){ clearInterval(timerInt); timerInt=null; timerSec=25*60; $('timerLabel').textContent='Focus 25:00'; S.stats.focusDone++; updateStatsPanel(); toast('Focus session done — nice work'); } },1000);
+}
+
+/* ============ session stats ticker ============ */
+setInterval(()=>{ if(S.view==='editor') S.stats.writeSec++; if(S.view==='reader') S.stats.readSec++; if(S.stats.writeSec%15===0||S.stats.readSec%15===0) updateStatsPanel(); },1000);
+
+/* ============ init ============ */
+S.items.push(sampleBook());
+renderLibrary();
+showView('library');
 </script>
 </body>
 </html>
