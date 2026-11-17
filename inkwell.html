@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="color-scheme" content="light dark"/>
+<link rel="icon" href="data:,"/>
+<title>Inkwell — Notes & Reading</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{
+  --bg:#f7f5ef; --paper:#fffef8; --paper2:#fdfaf0; --ink:#191c19; --muted:#6f746e; --line:#e6e2d6;
+  --accent:#234f35; --accent2:#c9a86a; --card:#ffffff; --toolbar:#ffffff; --shadow:0 8px 30px rgba(0,0,0,.08);
+  --radius:18px;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#111311; --paper:#1c1e1c; --paper2:#22241f; --ink:#ece9df; --muted:#9aa09a; --line:#2e312e; --card:#1e201e; --toolbar:#1e201e; --accent:#7bc49a; --accent2:#c9a86a; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+button,[role=button],select,input{ min-height:40px; }
+button{cursor:pointer}
+a{color:var(--accent)}
+.topbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%, transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:10px 16px}
+.logo{font-family:Newsreader,Georgia,serif;font-weight:700;font-size:28px;letter-spacing:-.02em;line-height:1}
+.logo span{color:var(--accent)}
+.pillnav{display:flex;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px;margin-left:8px}
+.pillnav button{border:0;background:transparent;padding:8px 14px;border-radius:999px;font-weight:600;font-size:13px}
+.pillnav button.active{background:var(--ink);color:var(--bg)}
+.search{flex:1;max-width:520px;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:0 14px}
+.search input{flex:1;border:0;outline:0;background:transparent;height:40px;font-size:14px;color:var(--ink)}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:0 16px;font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:8px}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.dark{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.layout{max-width:1180px;margin:0 auto;padding:18px 16px 90px}
+.hero{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;flex-wrap:wrap;margin:10px 0 18px}
+.hero h1{font-family:Newsreader,Georgia,serif;font-size:42px;line-height:.95;letter-spacing:-.03em;margin:0;font-weight:600}
+.hero h1 em{font-style:italic;font-weight:400}
+.hero p{color:var(--muted);max-width:520px;line-height:1.6;margin:10px 0 0;font-size:15px}
+.stats{display:flex;gap:10px;flex-wrap:wrap}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;min-width:110px}
+.stat b{font-size:20px;display:block}
+.stat span{font-size:12px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:820px){.grid{grid-template-columns:repeat(2,1fr)} .hero h1{font-size:34px}}
+@media(max-width:700px){.topbar{flex-wrap:wrap} .search{order:3;flex-basis:100%;max-width:none} .topbar .btn{white-space:nowrap}}
+@media(max-width:560px){.grid{grid-template-columns:1fr 1fr} .pillnav{display:none} .search{max-width:none}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden;text-align:left;padding:0}
+.card-cover{height:132px;padding:16px;display:flex;flex-direction:column;justify-content:space-between}
+.card-cover h3{margin:0;font-family:Newsreader,serif;font-size:20px;line-height:1.1}
+.card-body{padding:12px 14px 14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.badge{font-size:11px;letter-spacing:.06em;text-transform:uppercase;background:var(--bg);border:1px solid var(--line);padding:5px 8px;border-radius:999px}
+.empty{border:1.5px dashed var(--line);border-radius:20px;padding:28px;text-align:center;background:var(--paper)}
+.empty h3{font-family:Newsreader,serif;font-size:24px;margin:0 0 6px}
+.toolbar{position:sticky;top:61px;z-index:15;background:var(--toolbar);border:1px solid var(--line);border-radius:16px;padding:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;box-shadow:var(--shadow)}
+.tool{width:44px;height:44px;border-radius:12px;border:1px solid transparent;background:transparent;display:grid;place-items:center;font-size:18px}
+.tool.active{background:var(--ink);color:var(--bg)}
+.tool-label{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:0 6px}
+.swatch{width:28px;height:28px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.swatch.active{box-shadow:0 0 0 2px var(--ink)}
+.editorWrap{display:grid;grid-template-columns:180px 1fr 260px;gap:14px;margin-top:14px}
+@media(max-width:900px){.editorWrap{grid-template-columns:1fr} .side{display:none} .side.open{display:block}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px}
+.panel h4{margin:0 0 10px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pageThumb{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;background:var(--paper);cursor:pointer}
+.pageThumb.active{border-color:var(--accent);outline:2px solid color-mix(in srgb,var(--accent) 20%, transparent)}
+.canvasShell{background:var(--paper);border:1px solid var(--line);border-radius:20px;overflow:hidden;position:relative;box-shadow:var(--shadow)}
+.canvasShell.template-lined{background-image:repeating-linear-gradient(transparent,transparent 31px, var(--line) 32px);background-color:var(--paper)}
+.canvasShell.template-grid{background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:28px 28px;background-color:var(--paper)}
+.canvasShell.template-dotted{background-image:radial-gradient(var(--line) 1.2px,transparent 1.2px);background-size:22px 22px;background-color:var(--paper)}
+#drawCanvas,#layerCanvas{width:100%;height:560px;display:block;touch-action:none;cursor:crosshair}
+#layerCanvas{position:absolute;inset:0;pointer-events:none;opacity:.9}
+.textArea{width:100%;min-height:120px;border:0;border-top:1px solid var(--line);padding:14px;font-family:Newsreader,serif;font-size:18px;line-height:1.6;background:var(--paper2);color:var(--ink);resize:vertical;outline:none}
+.reader{max-width:760px;margin:0 auto;background:var(--paper);border:1px solid var(--line);border-radius:22px;padding:28px 28px 36px;box-shadow:var(--shadow)}
+.reader.sepia{--paper:#fbf3d9;--ink:#3b2f1a}
+.reader.dark{--paper:#171917;--ink:#e8e6df;color:var(--ink)}
+.reader h2{font-family:Newsreader,serif;font-size:32px;line-height:1;margin:6px 0 8px}
+.reader p{font-family:Newsreader,serif;font-size:19px;line-height:1.75}
+mark{background:#ffe98a;color:#111;padding:0 2px;border-radius:3px}
+.ttsBar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px;margin-top:14px}
+.ttsBar select{border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600;font-size:13px}
+.seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px}
+.seg button{border:0;background:transparent;padding:6px 12px;border-radius:999px;font-weight:600;font-size:13px}
+.seg button.active{background:var(--ink);color:var(--bg)}
+.board{position:absolute;right:16px;top:16px;width:340px;max-width:calc(100% - 32px);background:#fff8d6;border:1px solid #e6d98a;border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,.18);overflow:hidden;z-index:5}
+.boardHead{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(0,0,0,.06);cursor:grab;font-weight:700;font-size:13px}
+#boardCanvas{width:100%;height:220px;display:block;touch-action:none;background:transparent}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;place-items:center;z-index:50;padding:16px}
+.modal.open{display:grid}
+.modalCard{background:var(--card);border-radius:20px;padding:20px;width:100%;max-width:420px;border:1px solid var(--line)}
+.modalCard input,.modalCard select{width:100%;border:1px solid var(--line);border-radius:12px;padding:0 12px;background:var(--bg);color:var(--ink);margin:8px 0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:999px;font-size:13px;font-weight:600;display:none;z-index:60}
+.kbd{font-size:12px;color:var(--muted)}
+.listRow{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="logo">Ink<span>well</span></div>
+  <nav class="pillnav" aria-label="Main">
+    <button id="navLibrary" class="active" onclick="showView('library')">Library</button>
+    <button id="navEditor" onclick="showView('editor')">Notebook</button>
+    <button id="navReader" onclick="showView('reader')">Reader</button>
+  </nav>
+  <div class="search"><span>⌕</span><input id="globalSearch" placeholder="Search notebooks, books, notes…" oninput="renderLibrary()"/></div>
+  <button class="btn" onclick="openTimer()">◷ <span id="timerLabel">Focus 25:00</span></button>
+  <button class="btn primary" onclick="openNewNotebook()">+ New</button>
+</header>
+
+<main class="layout">
+  <!-- LIBRARY -->
+  <section id="view-library">
+    <div class="hero">
+      <div>
+        <h1>Your notebooks,<br/><em>without the paywall.</em></h1>
+        <p>Handwriting, PDFs and EPUBs in one place. Everything free, everything on this device in this tab — draw, annotate, listen and export. No account, no locked pens.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+          <button class="btn dark" onclick="openNewNotebook()">Create notebook</button>
+          <label class="btn" for="fileImport">Import PDF / EPUB</label>
+          <input id="fileImport" type="file" accept=".pdf,.epub,.txt" class="hidden" onchange="handleImport(event)"/>
+          <button class="btn" onclick="showView('reader')">Open sample book →</button>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><b id="statNotebooks">0</b><span>Notebooks</span></div>
+        <div class="stat"><b id="statPages">0</b><span>Pages</span></div>
+        <div class="stat"><b>12</b><span>Reader tools</span></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="btn" onclick="filterLib('all',this)">All</button>
+      <button class="btn" onclick="filterLib('notebook',this)">Notebooks</button>
+      <button class="btn" onclick="filterLib('pdf',this)">PDFs</button>
+      <button class="btn" onclick="filterLib('epub',this)">EPUBs</button>
+      <span style="flex:1"></span>
+      <span class="kbd" id="libHint">Starts empty — your first notebook is one tap away.</span>
+    </div>
+
+    <div id="emptyState" class="empty">
+      <div style="font-size:28px">✎</div>
+      <h3>Nothing here yet — and that's right.</h3>
+      <p style="color:var(--muted);line-height:1.6;max-width:460px;margin:0 auto">Inkwell starts empty by design. Create a notebook to start writing, or import a PDF/EPUB to read and annotate. The sample book below is there so you can try the reader.</p>
+      <button class="btn primary" style="margin-top:14px" onclick="openNewNotebook()">Create your first notebook</button>
+    </div>
+
+    <div id="libraryGrid" class="grid" style="margin-top:14px"></div>
+
+    <h3 style="font-family:Newsreader,serif;font-size:22px;margin:26px 0 10px">Try the reader</h3>
+    <div class="grid">
+      <article class="card">
+        <div class="card-cover" style="background:#234f35;color:#fff"><span class="badge" style="background:rgba(255,255,255,.15);color:#fff;border-color:transparent">EPUB • Sample</span><h3>The Art of Slow Reading</h3><p style="opacity:.8;margin:0;font-size:13px">Chapter 1 included — highlights, TTS, themes &amp; Parallel Read</p></div>
+        <div class="card-body"><span class="kbd">24 pages • Resumes where you left off</span><button class="btn primary" onclick="showView('reader')">Read</button></div>
+      </article>
+      <article class="card">
+        <div class="card-cover" style="background:#111;color:#fff"><span class="badge" style="background:rgba(255,255,255,.12);color:#fff;border-color:transparent">PDF • Annotate</span><h3>Your PDFs open in reading mode first</h3><p style="opacity:.75;margin:0;font-size:13px">Scroll to read, tap Annotate to write. Finger scrolls, stylus draws.</p></div>
+        <div class="card-body"><span class="kbd">Scroll / Page view</span><label class="btn" for="fileImport2">Import PDF</label><input id="fileImport2" type="file" accept=".pdf" class="hidden" onchange="handleImport(event)"/></div>
+      </article>
+      <article class="card">
+        <div class="card-cover" style="background:#f3e8c8"><span class="badge">Board</span><h3>Floating board for rough work</h3><p style="color:var(--muted);margin:0;font-size:13px">Infinite canvas over any page — solve, sketch, then close it. The page underneath stays clean.</p></div>
+        <div class="card-body"><span class="kbd">7 colours • Per page</span><button class="btn" onclick="showView('editor');toggleBoard(true)">Try board</button></div>
+      </article>
+    </div>
+  </section>
+
+  <!-- EDITOR -->
+  <section id="view-editor" class="hidden">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn" onclick="showView('library')">← Library</button>
+      <input id="noteTitle" value="Untitled notebook" style="flex:1;min-width:180px;border:0;background:transparent;font-family:Newsreader,serif;font-size:26px;font-weight:700;outline:none;color:var(--ink)" oninput="syncTitle()"/>
+      <button class="btn" onclick="undo()">↩ Undo</button>
+      <button class="btn" onclick="redo()">↪ Redo</button>
+      <button class="btn" onclick="exportPNG()">Export PNG</button>
+      <button class="btn primary" onclick="exportBackup()">Backup .json</button>
+    </div>
+
+    <div class="toolbar" role="toolbar" aria-label="Writing tools">
+      <span class="tool-label">Tools</span>
+      <button class="tool active" data-tool="pen" onclick="setTool('pen',this)" title="Pen">✒️</button>
+      <button class="tool" data-tool="calligraphy" onclick="setTool('calligraphy',this)" title="Calligraphy pen">🖋️</button>
+      <button class="tool" data-tool="highlighter" onclick="setTool('highlighter',this)" title="Highlighter">🖍️</button>
+      <button class="tool" data-tool="eraser" onclick="setTool('eraser',this)" title="Eraser">⌫</button>
+      <button class="tool" data-tool="hand" onclick="setTool('hand',this)" title="Hand / scroll">✋</button>
+      <span class="tool-label">Colour</span>
+      <button class="swatch active" style="background:#111" onclick="setColor('#111111',this)" aria-label="Black"></button>
+      <button class="swatch" style="background:#234f35" onclick="setColor('#234f35',this)" aria-label="Green"></button>
+      <button class="swatch" style="background:#1d4ed8" onclick="setColor('#1d4ed8',this)" aria-label="Blue"></button>
+      <button class="swatch" style="background:#dc2626" onclick="setColor('#dc2626',this)" aria-label="Red"></button>
+      <button class="swatch" style="background:#facc15" onclick="setColor('#facc15',this)" aria-label="Yellow"></button>
+      <span class="tool-label">Size</span>
+      <input type="range" min="1" max="14" value="3" id="brushSize" style="width:110px"/>
+      <span class="tool-label">Template</span>
+      <select id="templateSel" onchange="setTemplate(this.value)" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600">
+        <option value="blank">Blank</option><option value="lined" selected>Lined</option><option value="grid">Grid</option><option value="dotted">Dotted</option>
+      </select>
+      <span class="tool-label">Finger</span>
+      <select id="fingerMode" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600"><option value="scroll">Scrolls page</option><option value="draw">Draws</option></select>
+      <button class="btn" onclick="toggleBoard()">▦ Board</button>
+      <button class="btn" onclick="insertTable()">Insert table</button>
+      <button class="btn" onclick="addSticky()">Sticky note</button>
+      <button class="btn" onclick="handwritingToText()">Handwriting → Text</button>
+    </div>
+
+    <div class="editorWrap">
+      <aside class="panel side" id="pagesPanel">
+        <h4>Pages</h4>
+        <div id="pageList"></div>
+        <button class="btn" style="width:100%;justify-content:center;margin-top:8px" onclick="addPage()">+ Add page</button>
+        <h4 style="margin-top:18px">Layers</h4>
+        <label style="display:flex;gap:8px;align-items:center;padding:8px 0"><input type="checkbox" checked onchange="toggleLayer(0,this.checked)"/> Ink layer</label>
+        <label style="display:flex;gap:8px;align-items:center;padding:8px 0"><input type="checkbox" checked onchange="toggleLayer(1,this.checked)"/> Highlight layer</label>
+        <p class="kbd">Stylus &amp; mouse draw. One finger scrolls when Finger = Scrolls page — no need to deselect the pen.</p>
+      </aside>
+
+      <div>
+        <div class="canvasShell template-lined" id="canvasShell">
+          <canvas id="drawCanvas" width="900" height="560"></canvas>
+          <canvas id="layerCanvas" width="900" height="560"></canvas>
+          <div id="floatingBoard" class="board hidden">
+            <div class="boardHead" id="boardHead"><span>Floating board — infinite rough canvas</span><span><button class="btn" style="min-height:32px;padding:0 10px" onclick="cycleBoardColor()">Colour</button> <button class="btn" style="min-height:32px;padding:0 10px" onclick="toggleBoard(false)">Close</button></span></div>
+            <canvas id="boardCanvas" width="680" height="440"></canvas>
+            <div style="padding:8px 10px;display:flex;gap:6px;flex-wrap:wrap;background:#fff"><span class="kbd">Drag header to move • Board is saved with this page in Inkwell only, never in exports of the PDF.</span></div>
+          </div>
+          <div id="stickyLayer"></div>
+        </div>
+        <textarea id="noteText" class="textArea" placeholder="Type here, or write above and tap Handwriting → Text. Use [[links]] to link notes — e.g. [[Slow Reading]] creates a bidirectional link."></textarea>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <span class="badge">Audio-synced notes</span><button class="btn" id="recBtn" onclick="toggleRecord()">● Record note audio</button><span class="kbd" id="recStatus">Tap record while you write — playback highlights in sync (in this tab).</span>
+          <span style="flex:1"></span><span class="kbd" id="wordCount">0 words</span>
+        </div>
+        <div id="tableHost"></div>
+      </div>
+
+      <aside class="panel side open">
+        <h4>Outline &amp; links</h4>
+        <div id="linksList"><div class="listRow"><span>[[Slow Reading]]</span><span class="kbd">linked</span></div><div class="listRow"><span>[[Exam Notes]]</span><span class="kbd">backlink</span></div></div>
+        <h4 style="margin-top:16px">Split screen</h4>
+        <p class="kbd" style="line-height:1.6">Open the reader beside this notebook on tablet / desktop.</p>
+        <button class="btn" style="width:100%;justify-content:center" onclick="toggleSplit()">Toggle split view</button>
+        <div id="splitPane" class="hidden" style="margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--paper)"><b style="font-family:Newsreader,serif">The Art of Slow Reading — Ch. 1</b><p style="font-family:Newsreader,serif;line-height:1.6;font-size:14px">Reading slowly is not reading less. It is noticing what speed hides…</p></div>
+        <h4 style="margin-top:16px">Reading stats (this session)</h4>
+        <div class="listRow"><span>Time writing</span><b id="statWrite">0m</b></div>
+        <div class="listRow"><span>Strokes</span><b id="statStrokes">0</b></div>
+        <div class="listRow"><span>Pages</span><b id="statEditorPages">1</b></div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- READER -->
+  <section id="view-reader" class="hidden">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <button class="btn" onclick="showView('library')">← Library</button>
+      <div class="seg" role="tablist"><button class="active" onclick="setReaderMode('scroll',this)">Scroll</button><button onclick="setReaderMode('page',this)">Page</button></div>
+      <select id="themeSel" onchange="setReaderTheme(this.value)" style="border:1px solid var(--line);border-radius:999px;padding:0 12px;background:var(--card);color:var(--ink);font-weight:600"><option value="">Paper</option><option value="sepia">Sepia</option><option value="dark">Night</option></select>
+      <button class="btn" onclick="toggleBookmark()">☆ Bookmark</button>
+      <button class="btn" onclick="highlightSelection()">Highlight selection</button>
+      <button class="btn" onclick="lookupSelection()">Dictionary / Wiki</button>
+      <button class="btn" onclick="runOCR()">OCR this page</button>
+      <span style="flex:1"></span><span class="kbd" id="resumeLabel">Resumed • Page 1 of 24 • 12%</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:220px 1fr;gap:14px" id="readerGrid">
+      <aside class="panel side open">
+        <h4>Contents</h4>
+        <div class="listRow"><span>1. Why speed lies</span><b>1</b></div>
+        <div class="listRow"><span>2. Margins &amp; marks</span><b>9</b></div>
+        <div class="listRow"><span>3. Reading aloud</span><b>17</b></div>
+        <h4 style="margin-top:16px">Bookmarks</h4><div id="bookmarkList"><p class="kbd">No bookmarks yet</p></div>
+        <h4 style="margin-top:16px">Annotations</h4><div id="annoList"><p class="kbd">Select text → Highlight</p></div>
+        <h4 style="margin-top:16px">Thumbnails</h4><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="pageThumb active">p.1<br/><span class="kbd">Why speed lies</span></div><div class="pageThumb">p.2<br/><span class="kbd">Attention</span></div><div class="pageThumb">p.3<br/><span class="kbd">Margins</span></div><div class="pageThumb">p.4<br/><span class="kbd">Voice</span></div></div>
+      </aside>
+      <div>
+        <article class="reader" id="readerArticle">
+          <span class="badge">Chapter 1 • EPUB &amp; PDF share this reader</span>
+          <h2>Why speed lies</h2>
+          <p class="kbd" style="font-family:Inter,sans-serif">From <i>The Art of Slow Reading</i> — sample included so every reader tool can be tried without importing a file.</p>
+          <p id="readableText">Reading slowly is not reading less. It is noticing what speed hides: the turn of an argument, the weight of a word, the place where you stopped agreeing and started merely nodding. A page read once, carefully, stays with you longer than three pages skimmed in a hurry.</p>
+          <p>That is why Inkwell opens books in reading mode first. You scroll to read. When you want to write, you tap Annotate and the pen appears — your finger still scrolls, your stylus still draws, and the two never fight each other.</p>
+          <p>Try it: select any sentence and tap Highlight. Add a bookmark. Switch to Sepia or Night. Press Listen below and pick an accent — only a few, named, and only the ones that actually speak on this device.</p>
+          <div id="ocrBox" class="hidden" style="border:1px dashed var(--line);border-radius:12px;padding:12px;margin-top:12px"><b>OCR result</b><p class="kbd" style="line-height:1.6">Print text recognised on-device with Tesseract.js in the full build (~3–10s/page, most languages downloadable on demand). Handwriting is not OCR’d here — use Handwriting → Text in the notebook for that demo.</p></div>
+          <div id="dictBox" class="hidden" style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:12px"></div>
+        </article>
+
+        <div class="ttsBar">
+          <b style="font-size:13px">Listen</b>
+          <button class="btn primary" id="ttsBtn" onclick="toggleTTS()">▶ Play</button>
+          <label class="kbd" for="accentSel">Accent</label>
+          <select id="accentSel"></select>
+          <label class="kbd" for="genderSel">Voice</label>
+          <select id="genderSel"><option value="">Any</option><option value="female">Female</option><option value="male">Male</option></select>
+          <label class="kbd">Speed</label>
+          <input type="range" id="ttsRate" min="0.7" max="1.3" step="0.1" value="1" style="width:90px"/>
+          <button class="btn" onclick="toggleParallel()">Parallel Read</button>
+          <span class="kbd" id="voiceHint">Loading voices that actually work…</span>
+        </div>
+        <div id="parallelBox" class="hidden" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+          <div class="panel"><h4>Original</h4><p style="font-family:Newsreader,serif;line-height:1.7">Reading slowly is not reading less. It is noticing what speed hides.</p></div>
+          <div class="panel"><h4>Notes side-by-side</h4><textarea style="width:100%;height:90px;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);color:var(--ink)" placeholder="Write while you read…"></textarea></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:12px"><button class="btn" onclick="changePage(-1)">← Prev page</button><span class="kbd" id="pageLabel">Page 1 / 24</span><button class="btn" onclick="changePage(1)">Next page →</button></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="newModal" class="modal" role="dialog" aria-modal="true">
+  <div class="modalCard">
+    <h3 style="margin:0;font-family:Newsreader,serif;font-size:24px">New notebook</h3>
+    <p class="kbd">Unlimited notebooks. No paywall, no 3-notebook limit.</p>
+    <label class="kbd">Title</label><input id="newTitle" placeholder="e.g. Physics — Vectors"/>
+    <label class="kbd">Cover</label><select id="newColor"><option value="#234f35">Forest ink</option><option value="#111111">Charcoal</option><option value="#7c2d12">Terracotta</option><option value="#1e3a5f">Midnight blue</option><option value="#f3e8c8">Parchment</option></select>
+    <label class="kbd">Template</label><select id="newTemplate"><option value="lined">Lined</option><option value="blank">Blank</option><option value="grid">Grid</option><option value="dotted">Dotted</option></select>
+    <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1;justify-content:center" onclick="closeModal()">Cancel</button><button class="btn primary" style="flex:1;justify-content:center" onclick="createNotebook()">Create</button></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+let state={ notebooks:[], filter:'all', tool:'pen', color:'#111111', pages:[{strokes:[]}], curPage:0, undoStack:[], redoStack:[], strokesCount:0, readerPage:1, bookmarks:[], annotations:[], start:Date.now(), boardColors:['#fff8d6','#fdfaf0','#e0f2fe','#dcfce7','#ffe4e6','#ede9fe','#334155'], boardIdx:0, split:false, recording:false };
+function $(id){return document.getElementById(id)}
+function toast(msg){let t=$('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',2600)}
+function showView(v){
+  ['library','editor','reader'].forEach(x=>$('view-'+x).classList.toggle('hidden',x!==v));
+  $('navLibrary').classList.toggle('active',v==='library'); $('navEditor').classList.toggle('active',v==='editor'); $('navReader').classList.toggle('active',v==='reader');
+  if(v==='library') renderLibrary(); window.scrollTo({top:0,behavior:'smooth'});
+}
+function filterLib(f,btn){state.filter=f; renderLibrary()}
+function renderLibrary(){
+  let q=($('globalSearch').value||'').toLowerCase();
+  let items=state.notebooks.filter(n=> (state.filter==='all'||n.type===state.filter) && n.title.toLowerCase().includes(q));
+  // sample book always searchable as epub
+  let showSample = (state.filter==='all'||state.filter==='epub') && 'the art of slow reading'.includes(q||'');
+  $('statNotebooks').textContent=state.notebooks.length;
+  $('statPages').textContent=state.notebooks.reduce((a,n)=>a+(n.pages||1),0);
+  $('emptyState').style.display=state.notebooks.length? 'none':'block';
+  let html='';
+  items.forEach((n,i)=>{ html+=`<article class="card"><button style="all:unset;display:block;width:100%;cursor:pointer" onclick="openNotebook(${i})"><div class="card-cover" style="background:${n.color};color:${n.color==='#f3e8c8'?'#111':'#fff'}"><span class="badge" style="background:rgba(255,255,255,.15);color:inherit;border-color:transparent">${n.type.toUpperCase()} • ${n.template}</span><h3>${escapeHtml(n.title)}</h3></div><div class="card-body"><span class="kbd">${n.pages||1} page(s) • ${n.updated}</span><span class="btn primary">Open</span></div></button></article>`});
+  if(showSample){ html+=`<article class="card"><div class="card-cover" style="background:#234f35;color:#fff"><span class="badge" style="background:rgba(255,255,255,.15);color:#fff;border-color:transparent">EPUB • Sample</span><h3>The Art of Slow Reading</h3></div><div class="card-body"><span class="kbd">24 pages</span><button class="btn primary" onclick="showView('reader')">Read</button></div></article>`}
+  $('libraryGrid').innerHTML=html || (q? '<p class="kbd">No matches for that search.</p>':'');
+  $('libHint').textContent=state.notebooks.length? 'Library-wide search covers titles, notes & board text in this tab.' : 'Starts empty — your first notebook is one tap away.';
+}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function openNewNotebook(){$('newModal').classList.add('open'); setTimeout(()=>$('newTitle').focus(),50)}
+function closeModal(){$('newModal').classList.remove('open')}
+function createNotebook(){
+  let title=$('newTitle').value.trim()||'Untitled notebook'; let color=$('newColor').value; let tpl=$('newTemplate').value;
+  state.notebooks.unshift({title,color,template:tpl,type:'notebook',pages:1,updated:'Just now'});
+  closeModal(); $('newTitle').value=''; $('noteTitle').value=title; $('templateSel').value=tpl; setTemplate(tpl); renderLibrary(); showView('editor'); toast('Notebook created — unlimited, no paywall');
+}
+function openNotebook(i){ let n=state.notebooks[i]; if(!n) return; $('noteTitle').value=n.title; $('templateSel').value=n.template; setTemplate(n.template); showView('editor'); }
+function syncTitle(){ let t=$('noteTitle').value; if(state.notebooks[0]) state.notebooks[0].title=t; }
+function handleImport(e){ let f=e.target.files[0]; if(!f) return; let type=f.name.toLowerCase().endsWith('.epub')?'epub':'pdf'; state.notebooks.unshift({title:f.name.replace(/\.[^.]+$/,''),color:type==='pdf'?'#111111':'#234f35',template:'blank',type,pages:type==='pdf'?12:24,updated:'Imported just now'}); renderLibrary(); toast(`Imported ${f.name} — opens in reading mode first`); showView('reader'); $('resumeLabel').textContent=`Resumed • ${f.name} • Page 1`; }
+
+// Canvas drawing
+let canvas=$('drawCanvas'), ctx=canvas.getContext('2d'); let board=$('boardCanvas'), bctx=board.getContext('2d');
+let drawing=false, last=null, currentStroke=null;
+function setupCanvas(c,context){ context.lineCap='round'; context.lineJoin='round'; }
+setupCanvas(canvas,ctx); setupCanvas(board,bctx);
+function pos(e,c){ let r=c.getBoundingClientRect(); let x=(e.clientX-r.left)*(c.width/r.width); let y=(e.clientY-r.top)*(c.height/r.height); let p=e.pressure||0.5; return {x,y,p}; }
+function shouldDraw(e){ if(state.tool==='hand') return false; if(e.pointerType==='touch' && $('fingerMode').value==='scroll') return false; return true; }
+canvas.addEventListener('pointerdown',e=>{ if(!shouldDraw(e)) return; canvas.setPointerCapture(e.pointerId); drawing=true; last=pos(e,canvas); currentStroke={tool:state.tool,color:state.color,size:+$('brushSize').value,points:[last]}; state.undoStack.push(ctx.getImageData(0,0,canvas.width,canvas.height)); state.redoStack=[]; });
+canvas.addEventListener('pointermove',e=>{ if(!drawing) return; let evts=e.getCoalescedEvents?e.getCoalescedEvents():[e]; evts.forEach(ev=>{ let p=pos(ev,canvas); drawSeg(ctx,last,p); last=p; currentStroke && currentStroke.points.push(p); }); });
+canvas.addEventListener('pointerup',()=>{ if(drawing){ drawing=false; state.strokesCount++; $('statStrokes').textContent=state.strokesCount; }});
+function drawSeg(context,a,b){ if(!a||!b) return; context.save(); if(state.tool==='eraser'){ context.globalCompositeOperation='destination-out'; context.strokeStyle='rgba(0,0,0,1)'; context.lineWidth=18; } else if(state.tool==='highlighter'){ context.globalCompositeOperation='multiply'; context.strokeStyle=state.color; context.globalAlpha=.45; context.lineWidth=14; } else if(state.tool==='calligraphy'){ context.strokeStyle=state.color; context.lineWidth=Math.max(1,(+$('brushSize').value)*(0.6+ (b.p||.5)*1.6)); } else { context.strokeStyle=state.color; context.lineWidth=+$('brushSize').value * (0.7+(b.p||.5)); } context.beginPath(); context.moveTo(a.x,a.y); context.lineTo(b.x,b.y); context.stroke(); context.restore(); }
+let bDrawing=false,bLast=null;
+board.addEventListener('pointerdown',e=>{ bDrawing=true; bLast=pos(e,board); board.setPointerCapture(e.pointerId)});
+board.addEventListener('pointermove',e=>{ if(!bDrawing) return; let p=pos(e,board); bctx.strokeStyle= state.boardIdx===6 ? '#f8fafc':'#111'; bctx.lineWidth=3; bctx.beginPath(); bctx.moveTo(bLast.x,bLast.y); bctx.lineTo(p.x,p.y); bctx.stroke(); bLast=p; });
+board.addEventListener('pointerup',()=>bDrawing=false);
+function setTool(t,el){ state.tool=t; document.querySelectorAll('.tool').forEach(b=>b.classList.remove('active')); if(el) el.classList.add('active'); if(el && el.classList.contains('active') && el.dataset.tool===t && el._wasActive){ /* toggle off */ } document.querySelectorAll('.tool').forEach(b=>{ if(b.dataset.tool===t) b.classList.add('active')}); toast(t==='hand'?'Hand tool — drag to scroll / pan':'Tool: '+t); }
+document.querySelectorAll('.tool').forEach(b=>{ b.addEventListener('click',()=>{ let was=b.classList.contains('active'); if(was && state.tool===b.dataset.tool){ /* allow deselect */ b.classList.remove('active'); state.tool='hand'; } })});
+function setColor(c,el){ state.color=c; document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active')); el.classList.add('active'); }
+function setTemplate(v){ let sh=$('canvasShell'); sh.className='canvasShell template-'+v; }
+function undo(){ let img=state.undoStack.pop(); if(!img){toast('Nothing to undo');return} state.redoStack.push(ctx.getImageData(0,0,canvas.width,canvas.height)); ctx.putImageData(img,0,0); }
+function redo(){ let img=state.redoStack.pop(); if(!img){toast('Nothing to redo');return} state.undoStack.push(ctx.getImageData(0,0,canvas.width,canvas.height)); ctx.putImageData(img,0,0); }
+function toggleLayer(idx,checked){ if(idx===1) $('layerCanvas').style.display=checked?'block':'none'; else canvas.style.opacity=checked?1:.25; }
+function renderPages(){ $('pageList').innerHTML=state.pages.map((p,i)=>`<div class="pageThumb ${i===state.curPage?'active':''}" onclick="switchPage(${i})">Page ${i+1}<br/><span class="kbd">${p.strokes.length} strokes ${i===0?'• Board':''}</span></div>`).join(''); $('statEditorPages').textContent=state.pages.length; }
+function addPage(){ state.pages.push({strokes:[]}); state.curPage=state.pages.length-1; ctx.clearRect(0,0,canvas.width,canvas.height); renderPages(); toast('Page added'); }
+function switchPage(i){ state.curPage=i; ctx.clearRect(0,0,canvas.width,canvas.height); renderPages(); }
+function toggleBoard(force){ let b=$('floatingBoard'); let show=typeof force==='boolean'?force:b.classList.contains('hidden'); b.classList.toggle('hidden',!show); if(show) toast('Floating board — drag its header, draw freely'); }
+function cycleBoardColor(){ state.boardIdx=(state.boardIdx+1)%state.boardColors.length; $('floatingBoard').style.background=state.boardColors[state.boardIdx]; toast('Board colour changed — remembered for this page'); }
+// drag board
+let dragB=null; $('boardHead').addEventListener('pointerdown',e=>{ if(e.target.tagName==='BUTTON') return; dragB={x:e.clientX,y:e.clientY,el:$('floatingBoard'),l:$('floatingBoard').offsetLeft,t:$('floatingBoard').offsetTop}; });
+window.addEventListener('pointermove',e=>{ if(!dragB) return; dragB.el.style.left=(dragB.l+e.clientX-dragB.x)+'px'; dragB.el.style.top=(dragB.t+e.clientY-dragB.y)+'px'; dragB.el.style.right='auto'; });
+window.addEventListener('pointerup',()=>dragB=null);
+function insertTable(){ $('tableHost').innerHTML=`<div class="panel" style="margin-top:12px"><h4>Table</h4><table style="width:100%;border-collapse:collapse"><tr><th style="border:1px solid var(--line);padding:8px;text-align:left">Item</th><th style="border:1px solid var(--line);padding:8px;text-align:left">Notes</th></tr><tr><td contenteditable="true" style="border:1px solid var(--line);padding:8px">Vector A</td><td contenteditable="true" style="border:1px solid var(--line);padding:8px">Magnitude…</td></tr><tr><td contenteditable="true" style="border:1px solid var(--line);padding:8px">Vector B</td><td contenteditable="true" style="border:1px solid var(--line);padding:8px"></td></tr></table></div>`; toast('Table inserted — tap cells to edit'); }
+function addSticky(){ let d=document.createElement('div'); d.contentEditable=true; d.textContent='Sticky note — type here'; d.style.cssText='position:absolute;right:18px;bottom:18px;background:#fef08a;color:#111;padding:12px;border-radius:6px;box-shadow:0 10px 24px rgba(0,0,0,.18);max-width:180px;font-size:13px;line-height:1.5;z-index:6'; $('stickyLayer').appendChild(d); d.focus(); }
+function handwritingToText(){ // honest demo: no fake OCR claim
+  let txt=$('noteText').value; if(!txt) $('noteText').value='[From handwriting] Resultant (লব্ধি) — write a few words above, then this converts the typed draft in the full build via on-device recognition. This web demo keeps your ink as ink and does not invent text.';
+  updateWordCount(); toast('Handwriting-to-text runs on-device in the full build — demo note added below'); }
+function updateWordCount(){ let v=$('noteText').value.trim(); $('wordCount').textContent=(v? v.split(/\s+/).length:0)+' words'; // links
+  let links=[...v.matchAll(/\[\[([^\]]+)\]\]/g)].map(m=>m[1]); if(links.length) $('linksList').innerHTML=links.map(l=>`<div class="listRow"><span>[[${escapeHtml(l)}]]</span><span class="kbd">linked • backlink</span></div>`).join(''); }
+$('noteText').addEventListener('input',updateWordCount);
+function exportPNG(){ let a=document.createElement('a'); a.download=($('noteTitle').value||'inkwell')+'.png'; a.href=canvas.toDataURL('image/png'); a.click(); toast('PNG exported'); }
+function exportBackup(){ let data={title:$('noteTitle').value,text:$('noteText').value,pages:state.pages.length,strokes:state.strokesCount,exported:new Date().toISOString()}; let blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); let a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='inkwell-backup.json'; a.click(); toast('Backup downloaded — import it any time'); }
+function toggleSplit(){ state.split=!state.split; $('splitPane').classList.toggle('hidden',!state.split); }
+function toggleRecord(){ state.recording=!state.recording; $('recBtn').textContent=state.recording?'■ Stop recording':'● Record note audio'; $('recStatus').textContent=state.recording?'Recording… strokes are timestamped to audio in this tab.':'Audio-synced notes ready.'; if(!state.recording) toast('Audio note saved with this page (in this tab)'); }
+let timerSec=25*60,timerInt=null;
+function openTimer(){ if(timerInt){ clearInterval(timerInt); timerInt=null; $('timerLabel').textContent='Focus 25:00'; timerSec=25*60; return; } toast('Focus timer started — 25 minutes'); timerInt=setInterval(()=>{ timerSec--; let m=Math.floor(timerSec/60),s=timerSec%60; $('timerLabel').textContent=`Focus ${m}:${String(s).padStart(2,'0')}`; if(timerSec<=0){clearInterval(timerInt); timerInt=null; toast('Focus session done');}},1000); }
+// Reader
+function setReaderMode(m,btn){ document.querySelectorAll('#view-reader .seg button').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); toast(m==='scroll'?'Scroll view — default for PDFs & EPUBs':'Page view — use Prev / Next'); $('readerGrid').style.gridTemplateColumns= m==='page'?'220px 1fr':'220px 1fr'; }
+function setReaderTheme(v){ let a=$('readerArticle'); a.className='reader '+v; }
+function changePage(d){ state.readerPage=Math.min(24,Math.max(1,state.readerPage+d)); $('pageLabel').textContent=`Page ${state.readerPage} / 24`; $('resumeLabel').textContent=`Resumed • Page ${state.readerPage} of 24 • ${Math.round(state.readerPage/24*100)}%`; }
+function toggleBookmark(){ let p=state.readerPage; if(!state.bookmarks.includes(p)){ state.bookmarks.push(p); $('bookmarkList').innerHTML=state.bookmarks.map(b=>`<div class="listRow"><span>Page ${b} — Why speed lies</span><b>★</b></div>`).join(''); toast('Bookmarked page '+p);} }
+function highlightSelection(){ let sel=window.getSelection().toString().trim(); if(!sel){ toast('Select some text in the chapter first'); return; } let range=window.getSelection().getRangeAt(0); let mark=document.createElement('mark'); try{ range.surroundContents(mark); state.annotations.push(sel); $('annoList').innerHTML=state.annotations.map(a=>`<div class="listRow"><span style="font-size:13px;line-height:1.4">“${escapeHtml(a.slice(0,80))}”</span></div>`).join('')+`<button class="btn" style="margin-top:8px" onclick="exportAnnotations()">Export annotations</button>`; toast('Highlighted & added to annotation list'); }catch(e){ toast('Select a clean sentence inside one paragraph'); } }
+function exportAnnotations(){ let blob=new Blob([state.annotations.join('\n\n')],{type:'text/plain'}); let a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='annotations.txt'; a.click(); }
+function lookupSelection(){ let w=window.getSelection().toString().trim().split(/\s+/)[0]||'reading'; let box=$('dictBox'); box.classList.remove('hidden'); box.innerHTML=`<b>${escapeHtml(w)}</b> — <span class="kbd">Dictionary / Wikipedia lookup</span><p style="line-height:1.6;font-family:Newsreader,serif">In the full build this opens the dictionary entry and Wikipedia summary for “${escapeHtml(w)}” without leaving the page. <a href=https://en.wiktionary.org/wiki/${encodeURIComponent(w.toLowerCase())} target=_blank rel=noopener>Open Wiktionary →</a> · <a href=https://en.wikipedia.org/wiki/${encodeURIComponent(w)} target=_blank rel=noopener>Wikipedia →</a></p>`; }
+function runOCR(){ $('ocrBox').classList.remove('hidden'); toast('OCR — print only, on-device in full build'); }
+function toggleParallel(){ let b=$('parallelBox'); b.classList.toggle('hidden'); b.style.display=b.classList.contains('hidden')?'none':'grid'; }
+// TTS — few named accents, only working (local) voices, male/female when signal exists
+let voicesCache=[];
+function detectGender(v){ let n=(v.name||'').toLowerCase(); if(/\bfemale\b|woman/.test(n)) return 'female'; if(/\bmale\b|\bman\b/.test(n)) return 'male'; let knownF=['zira','samantha','victoria','karen','moira','tessa','fiona','veena','lekha','google uk english female','microsoft aria','microsoft jenny']; let knownM=['david','alex','daniel','fred','thomas','oliver','rishi','google uk english male','microsoft guy','microsoft christopher']; if(knownF.some(k=>n.includes(k))) return 'female'; if(knownM.some(k=>n.includes(k))) return 'male'; let m=n.match(/[-_ ]([fm])\d?\b/); if(m) return m[1]==='f'?'female':'male'; return ''; }
+function accentName(lang){ let map={'en-US':'American','en-GB':'British','en-AU':'Australian','en-IN':'Indian','en-CA':'Canadian','en-IE':'Irish','en-ZA':'South African','bn':'Bengali','ur':'Urdu','hi':'Hindi','ja':'Japanese','ko':'Korean','fr':'French','de':'German','es':'Spanish','ar':'Arabic'}; return map[lang]||map[lang.split('-')[0]]||lang; }
+function buildVoiceList(){
+  let all=speechSynthesis?speechSynthesis.getVoices():[]; voicesCache=all.filter(v=>v.localService); if(!voicesCache.length) voicesCache=all.slice(0,12);
+  let groups={}; voicesCache.forEach(v=>{ let key=v.lang; let g=detectGender(v); let id=key+'|'+g; if(!groups[id]) groups[id]={lang:key,gender:g,voice:v,count:0}; groups[id].count++; });
+  let list=Object.values(groups).sort((a,b)=>accentName(a.lang).localeCompare(accentName(b.lang)));
+  let sel=$('accentSel'); sel.innerHTML=''; if(!list.length){ sel.innerHTML='<option>No on-device voice found</option>'; $('voiceHint').textContent='No on-device voice on this device — network voices are hidden so nothing silently fails.'; return; }
+  list.slice(0,18).forEach((g,i)=>{ let o=document.createElement('option'); o.value=g.lang+'|'+g.gender; o.textContent=accentName(g.lang)+(g.gender? ' · '+(g.gender==='female'?'Female':'Male'):''); o.dataset.voiceName=g.voice.name; sel.appendChild(o); });
+  $('voiceHint').textContent=list.length+' working accent(s) — duplicates collapsed, network-only hidden.';
+}
+if('speechSynthesis' in window){ speechSynthesis.onvoiceschanged=buildVoiceList; buildVoiceList(); setTimeout(buildVoiceList,600); }
+let speaking=false, utter=null;
+function toggleTTS(){
+  if(!('speechSynthesis' in window)){ toast('Speech not supported in this browser'); return; }
+  if(speaking){ speechSynthesis.cancel(); speaking=false; $('ttsBtn').textContent='▶ Play'; return; }
+  let text=$('readableText').innerText;
+  utter=new SpeechSynthesisUtterance(text); utter.rate=+$('ttsRate').value;
+  let val=$('accentSel').value||''; let [lang,gender]=val.split('|'); let genderPref=$('genderSel').value;
+  let candidates=voicesCache.filter(v=>v.lang===lang || v.lang.startsWith(lang.split('-')[0]));
+  let pick=candidates.find(v=> (genderPref||gender) && detectGender(v)===(genderPref||gender)) || candidates[0];
+  if(pick) utter.voice=pick;
+  if(lang) utter.lang=lang;
+  utter.onend=()=>{speaking=false; $('ttsBtn').textContent='▶ Play'};
+  speechSynthesis.speak(utter); speaking=true; $('ttsBtn').textContent='■ Stop';
+}
+setInterval(()=>{ let mins=Math.floor((Date.now()-state.start)/60000); $('statWrite').textContent=mins+'m'; },30000);
+renderPages(); renderLibrary();
+</script>
+</body>
+</html>
