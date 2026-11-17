@@ -6,69 +6,77 @@
 <meta name="color-scheme" content="light dark"/>
 <link rel="icon" href="data:,"/>
 <title>Inkwell — Notes & Reading</title>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{
-  --bg:#f7f5ef; --paper:#fffef8; --paper2:#fdfaf0; --ink:#191c19; --muted:#6f746e; --line:#e6e2d6;
-  --accent:#234f35; --accent2:#c9a86a; --card:#ffffff; --toolbar:#ffffff; --shadow:0 8px 30px rgba(0,0,0,.08);
+  --bg:#ece7db; --surface:#fffdf6; --paper:#fffdf6; --paper2:#f7f2e4; --ink:#1b2a4a; --muted:#6f7268; --line:#ddd5c2;
+  --accent:#2456c8; --accent2:#f2b33d; --card:#fffdf6; --toolbar:#fffdf6; --shadow:0 4px 14px rgba(27,42,74,.10);
+  --hand:"Caveat",cursive;
   --reader-fs:19px;
 }
 @media (prefers-color-scheme: dark){
-  :root{ --bg:#111311; --paper:#1c1e1c; --paper2:#22241f; --ink:#ece9df; --muted:#9aa09a; --line:#2e312e; --card:#1e201e; --toolbar:#1e201e; --accent:#7bc49a; }
+  :root{ --bg:#171a21; --surface:#232833; --paper:#232833; --paper2:#1d212b; --ink:#ece9df; --muted:#9aa0ab; --line:#39404e; --card:#232833; --toolbar:#232833; --accent:#7ea4f2; --shadow:0 4px 14px rgba(0,0,0,.35); }
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 button,[role=button],select,input{ min-height:40px; }
 button{cursor:pointer;font-family:inherit}
 a{color:var(--accent)}
-.topbar{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--bg) 88%, transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:10px 16px}
-.logo{font-family:Newsreader,Georgia,serif;font-weight:700;font-size:28px;letter-spacing:-.02em;line-height:1}
-.logo span{color:var(--accent)}
-.pillnav{display:flex;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px;margin-left:8px}
-.pillnav button{border:0;background:transparent;padding:8px 14px;border-radius:999px;font-weight:600;font-size:13px;color:var(--ink)}
-.pillnav button.active{background:var(--ink);color:var(--bg)}
-.searchWrap{flex:1;max-width:520px;position:relative}
-.search{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:0 14px}
-.search input{flex:1;border:0;outline:0;background:transparent;height:40px;font-size:14px;color:var(--ink);min-height:40px}
+.searchRow{display:flex;gap:8px;align-items:flex-start}
+.searchWrap{flex:1;position:relative;min-width:0}
+.search{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:0 16px}
+.search input{flex:1;border:0;outline:0;background:transparent;height:44px;font-size:14px;color:var(--ink);min-height:44px;min-width:0}
+.searchBtn{flex:0 0 auto;width:44px;height:44px;min-height:44px;border:0;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center}
+.searchBtn svg{width:20px;height:20px}
+.chipRow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:16px 0 4px}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:8px 14px;font-size:14px;min-height:38px}
+.chip.active{background:var(--ink);color:var(--surface);border-color:var(--ink);font-weight:500}
+.chip.dashed{border-style:dashed;background:transparent;color:var(--muted)}
+.bottomBar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line)}
+.bottomBarInner{max-width:768px;margin:0 auto;display:flex;gap:8px;padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
+.bottomBar .btn{white-space:nowrap}
+.btn.newMain{flex:1;justify-content:center;background:var(--accent);color:#fff;border-color:var(--accent);font-size:14px;min-height:46px}
+.btn.outlineBlue{color:var(--accent);border-color:var(--accent);background:var(--surface);font-size:14px;min-height:46px}
 .searchResults{position:absolute;top:calc(100% + 8px);left:0;right:0;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);max-height:56vh;overflow:auto;z-index:45}
 .srItem{padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer}
 .srItem:last-child{border-bottom:0}
 .srItem:hover{background:var(--paper2)}
 .srItem b{font-size:13px;display:block}
 .srItem span{font-size:12px;color:var(--muted);line-height:1.45;display:block}
-.btn{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:0 16px;font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:8px;color:var(--ink);min-height:40px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:0 16px;font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:8px;color:var(--ink);min-height:40px}
 .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
-.btn.dark{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.dark{background:var(--ink);color:var(--surface);border-color:var(--ink)}
 .btn.small{min-height:32px;padding:0 10px;font-size:12px}
 .btn.danger{color:#b3261e;border-color:#e5b4b0}
 .btn:disabled{opacity:.45;cursor:default}
 .layout{max-width:1180px;margin:0 auto;padding:18px 16px 90px}
-.hero{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;flex-wrap:wrap;margin:10px 0 18px}
-.hero h1{font-family:Newsreader,Georgia,serif;font-size:42px;line-height:.95;letter-spacing:-.03em;margin:0;font-weight:600}
-.hero h1 em{font-style:italic;font-weight:400}
-.hero p{color:var(--muted);max-width:520px;line-height:1.6;margin:10px 0 0;font-size:15px}
-.stats{display:flex;gap:10px;flex-wrap:wrap}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;min-width:104px}
-.stat b{font-size:20px;display:block}
-.stat span{font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-@media(max-width:820px){.grid{grid-template-columns:repeat(2,1fr)} .hero h1{font-size:34px}}
-@media(max-width:700px){.topbar{flex-wrap:wrap} .searchWrap{order:3;flex-basis:100%;max-width:none} .topbar .btn{white-space:nowrap}}
-@media(max-width:560px){.grid{grid-template-columns:1fr 1fr} .pillnav{display:none}}
-.card{background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden;text-align:left;padding:0;display:flex;flex-direction:column}
-.card-cover{height:132px;padding:16px;display:flex;flex-direction:column;justify-content:space-between}
-.card-cover h3{margin:0;font-family:Newsreader,serif;font-size:20px;line-height:1.1}
-.card-body{padding:12px 14px 14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.layout.shelf{max-width:768px;padding:16px 16px 120px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+@media(min-width:640px){.grid{grid-template-columns:repeat(3,1fr)}}
+.bookCard{position:relative}
+.book{display:flex;width:100%;min-height:160px;border:0;padding:0;text-align:left;border-radius:4px 14px 14px 4px;overflow:hidden;box-shadow:0 4px 10px rgba(27,42,74,.18);cursor:pointer}
+.bookSpine{width:10px;flex:0 0 auto}
+.bookFace{flex:1;display:flex;flex-direction:column;padding:12px 40px 12px 12px;min-width:0}
+.bookFace h3{margin:0;font-family:var(--hand);font-size:26px;font-weight:600;line-height:1.15;overflow-wrap:anywhere}
+.bookMeta{margin-top:auto;padding-top:10px;font-size:11px;line-height:1.5;opacity:.88}
+.bookMenu{position:absolute;top:6px;right:6px;width:36px;height:36px;min-height:36px;border:0;border-radius:50%;background:rgba(0,0,0,.25);color:#fff;font-size:16px;display:grid;place-items:center;z-index:2}
+.bookActions{position:absolute;left:0;right:0;bottom:0;z-index:3;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:8px;display:none;flex-direction:column;gap:2px}
+.bookCard.menuOpen .bookActions{display:flex}
+.bookActions button{border:0;background:transparent;text-align:left;padding:10px;border-radius:9px;font-size:14px;color:var(--ink);min-height:40px;width:100%}
+.bookActions button:hover{background:var(--paper2)}
+.bookActions button.danger{color:#b3261e}
 .badge{font-size:11px;letter-spacing:.06em;text-transform:uppercase;background:var(--bg);border:1px solid var(--line);padding:5px 8px;border-radius:999px;display:inline-block}
-.empty{border:1.5px dashed var(--line);border-radius:20px;padding:28px;text-align:center;background:var(--paper)}
-.empty h3{font-family:Newsreader,serif;font-size:24px;margin:0 0 6px}
-.toolbar{position:sticky;top:61px;z-index:15;background:var(--toolbar);border:1px solid var(--line);border-radius:16px;padding:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;box-shadow:var(--shadow)}
-.tool{width:44px;height:44px;border-radius:12px;border:1px solid transparent;background:transparent;display:grid;place-items:center;font-size:18px;color:var(--ink)}
-.tool.active{background:var(--ink);color:var(--bg)}
+.empty{padding:48px 16px;text-align:center}
+.emptyIcon{width:96px;height:96px;margin:0 auto 16px;border-radius:50%;background:var(--surface);box-shadow:var(--shadow);display:grid;place-items:center;color:var(--accent)}
+.emptyIcon svg{width:44px;height:44px}
+.empty h3{font-family:var(--hand);font-size:30px;font-weight:600;margin:0 0 6px;color:var(--ink)}
+.toolbar{position:sticky;top:8px;z-index:15;background:var(--toolbar);border:1px solid var(--line);border-radius:16px;padding:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;box-shadow:var(--shadow)}
+.tool{width:44px;height:44px;border-radius:50%;border:1px solid transparent;background:transparent;display:grid;place-items:center;font-size:19px;color:var(--ink)}
+.tool.active{background:var(--accent);color:#fff}
 .tool-label{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:0 6px}
 .swatch{width:28px;height:28px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line);min-height:28px}
 .swatch.active{box-shadow:0 0 0 2px var(--ink)}
@@ -133,8 +141,8 @@ mark{background:#ffe98a;color:#111;padding:0 2px;border-radius:3px}
 .ttsBar select{border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600;font-size:13px}
 .seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px}
 .seg button{border:0;background:transparent;padding:6px 12px;border-radius:999px;font-weight:600;font-size:13px;color:var(--ink);min-height:34px}
-.seg button.active{background:var(--ink);color:var(--bg)}
-.board{position:absolute;right:16px;top:16px;width:360px;max-width:calc(100% - 32px);border:1px solid #d8cf9a;border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,.22);overflow:hidden;z-index:8;color:#191c19}
+.seg button.active{background:var(--ink);color:var(--surface)}
+.board{position:absolute;right:16px;top:16px;width:360px;max-width:calc(100% - 32px);border:1px solid var(--line);border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,.22);overflow:hidden;z-index:8;color:#1b2a4a}
 .boardHead{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:6px 8px;background:rgba(0,0,0,.07);cursor:grab;font-weight:700;font-size:12px;flex-wrap:wrap}
 .boardTools{display:flex;gap:6px;align-items:center;padding:6px 8px;background:rgba(255,255,255,.55);flex-wrap:wrap}
 #boardCanvas{width:100%;height:230px;display:block;touch-action:none;background:transparent;cursor:crosshair}
@@ -143,12 +151,12 @@ mark{background:#ffe98a;color:#111;padding:0 2px;border-radius:3px}
 .sticky{position:absolute;width:176px;border-radius:4px 4px 10px 4px;box-shadow:0 10px 24px rgba(0,0,0,.2);z-index:7;padding:0;overflow:hidden}
 .stickyHead{display:flex;justify-content:space-between;align-items:center;padding:2px 6px;background:rgba(0,0,0,.08);cursor:grab}
 .stickyHead button{border:0;background:transparent;min-height:24px;min-width:24px;font-size:13px;color:#111}
-.sticky textarea{width:100%;height:96px;border:0;background:transparent;resize:none;padding:8px;font-size:13px;line-height:1.5;color:#111;outline:none;font-family:Inter,sans-serif}
+.sticky textarea{width:100%;height:96px;border:0;background:transparent;resize:none;padding:8px;font-size:13px;line-height:1.5;color:#111;outline:none;font-family:system-ui,sans-serif}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;place-items:center;z-index:50;padding:16px}
 .modal.open{display:grid}
 .modalCard{background:var(--card);border-radius:20px;padding:20px;width:100%;max-width:430px;border:1px solid var(--line);max-height:88vh;overflow:auto}
 .modalCard input,.modalCard select{width:100%;border:1px solid var(--line);border-radius:12px;padding:0 12px;background:var(--bg);color:var(--ink);margin:8px 0}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:999px;font-size:13px;font-weight:600;display:none;z-index:60;max-width:92vw;text-align:center}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:96px;background:var(--ink);color:var(--surface);padding:10px 14px;border-radius:999px;font-size:13px;font-weight:600;display:none;z-index:60;max-width:92vw;text-align:center}
 .kbd{font-size:12px;color:var(--muted)}
 .listRow{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);align-items:flex-start}
 .hidden{display:none!important}
@@ -163,65 +171,45 @@ progress{width:100%;height:8px;accent-color:var(--accent)}
 </style>
 </head>
 <body>
-<header class="topbar">
-  <div class="logo">Ink<span>well</span></div>
-  <nav class="pillnav" aria-label="Main">
-    <button id="navLibrary" class="active" onclick="showView('library')">Library</button>
-    <button id="navEditor" onclick="showView('editor')">Notebook</button>
-    <button id="navReader" onclick="showView('reader')">Reader</button>
-  </nav>
-  <div class="searchWrap">
-    <div class="search"><span>⌕</span><input id="globalSearch" placeholder="Search notebooks, books, notes, annotations…" oninput="onSearchInput()" autocomplete="off"/></div>
-    <div id="searchResults" class="searchResults hidden"></div>
-  </div>
-  <button class="btn" onclick="openTimer()">◷ <span id="timerLabel">Focus 25:00</span></button>
-  <button class="btn primary" onclick="openNewNotebook()">+ New</button>
-</header>
-
-<main class="layout">
-  <!-- LIBRARY -->
+<main class="layout" id="mainLayout">
+  <!-- LIBRARY — same shelf as the app: search, filter chips, book covers, bottom action bar -->
   <section id="view-library">
-    <div class="hero">
-      <div>
-        <h1>Your notebooks,<br/><em>without the paywall.</em></h1>
-        <p>Handwriting, PDFs and EPUBs in one place. Every feature below actually works — draw with pressure, annotate real PDFs, read real EPUBs, run OCR, listen, translate side-by-side and export. Notes live in this tab; back them up any time.</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
-          <button class="btn dark" onclick="openNewNotebook()">Create notebook</button>
-          <label class="btn" for="fileImport">Import PDF / EPUB</label>
-          <input id="fileImport" type="file" accept=".pdf,.epub,.txt" class="hidden" onchange="handleImport(event)"/>
-          <label class="btn" for="backupImport">Restore backup</label>
-          <input id="backupImport" type="file" accept=".json" class="hidden" onchange="importBackup(event)"/>
-          <button class="btn" onclick="openBook(SAMPLE_ID)">Open sample book →</button>
-        </div>
+    <div class="searchRow">
+      <div class="searchWrap">
+        <div class="search"><input id="globalSearch" placeholder="Search notes…" aria-label="Search notebooks and notes" oninput="onSearchInput()" autocomplete="off"/></div>
+        <div id="searchResults" class="searchResults hidden"></div>
       </div>
-      <div class="stats">
-        <div class="stat"><b id="statNotebooks">0</b><span>Notebooks</span></div>
-        <div class="stat"><b id="statBooks">0</b><span>Books</span></div>
-        <div class="stat"><b id="statPages">0</b><span>Pages</span></div>
-        <div class="stat"><b id="statAnnos">0</b><span>Annotations</span></div>
-      </div>
+      <button class="searchBtn" type="button" aria-label="Search" onclick="document.getElementById('globalSearch').focus();onSearchInput()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.8-3.8"/></svg></button>
     </div>
 
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-      <button class="btn small" onclick="filterLib('all',this)">All</button>
-      <button class="btn small" onclick="filterLib('notebook',this)">Notebooks</button>
-      <button class="btn small" onclick="filterLib('pdf',this)">PDFs</button>
-      <button class="btn small" onclick="filterLib('epub',this)">EPUBs</button>
-      <span style="flex:1"></span>
-      <span class="kbd" id="libHint"></span>
+    <div class="chipRow" role="group" aria-label="Filter the shelf">
+      <button class="chip active" data-filter="all" onclick="filterLib('all',this)">All notebooks</button>
+      <button class="chip" data-filter="notebook" onclick="filterLib('notebook',this)">Notebooks</button>
+      <button class="chip" data-filter="pdf" onclick="filterLib('pdf',this)">PDFs</button>
+      <button class="chip" data-filter="epub" onclick="filterLib('epub',this)">EPUBs</button>
+      <button class="chip dashed" type="button" onclick="openBook(SAMPLE_ID)">Sample book</button>
     </div>
+    <p class="kbd" id="libHint" style="margin:2px 0 10px"></p>
 
     <div id="emptyState" class="empty hidden">
-      <div style="font-size:28px">✎</div>
-      <h3>Nothing here yet.</h3>
-      <p style="color:var(--muted);line-height:1.6;max-width:460px;margin:0 auto">Create a notebook to start writing, or import a PDF/EPUB to read and annotate. The sample book is in the library so every reader tool can be tried straight away.</p>
-      <button class="btn primary" style="margin-top:14px" onclick="openNewNotebook()">Create your first notebook</button>
+      <div class="emptyIcon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4a1 1 0 0 0-1-1H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg></div>
+      <h3>A fresh, empty shelf</h3>
+      <p style="color:var(--muted);line-height:1.6;max-width:340px;margin:0 auto;font-size:14px">Tap <strong>+ New notebook</strong> below to start your first notebook, or import a PDF or EPUB to read.</p>
     </div>
 
-    <div id="libraryGrid" class="grid" style="margin-top:14px"></div>
+    <div id="libraryGrid" class="grid"></div>
 
-    <div class="panel" style="margin-top:22px">
-      <h4>Reading &amp; writing stats — this session</h4>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:28px">
+      <button class="btn" onclick="exportBackup()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 21h16"/></svg> Backup</button>
+      <label class="btn" for="backupImport"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="M7 7l5-5 5 5"/><path d="M4 21h16"/></svg> Restore</label>
+      <input id="backupImport" type="file" accept=".json" class="hidden" onchange="importBackup(event)"/>
+      <button class="btn" onclick="toggleAbout()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg> About</button>
+      <button class="btn" onclick="openTimer()">◷ <span id="timerLabel">Focus 25:00</span></button>
+    </div>
+
+    <div id="aboutPanel" class="panel hidden" style="margin-top:14px">
+      <h4>About this shelf</h4>
+      <p class="kbd" style="line-height:1.7;margin:0 0 10px">Inkwell — handwriting notebooks, PDFs and EPUBs in one place, every feature free. Notes live in this tab only; use Backup to keep them. This session: <b id="statNotebooks">0</b> notebooks · <b id="statBooks">0</b> books · <b id="statPages">0</b> pages · <b id="statAnnos">0</b> annotations.</p>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
         <div class="listRow"><span>Time writing</span><b id="statWrite">0m</b></div>
         <div class="listRow"><span>Time reading</span><b id="statRead">0m</b></div>
@@ -231,18 +219,32 @@ progress{width:100%;height:8px;accent-color:var(--accent)}
         <div class="listRow"><span>Words typed</span><b id="statWords">0</b></div>
       </div>
     </div>
+
+    <div class="bottomBar" id="libraryBar">
+      <div class="bottomBarInner">
+        <button class="btn newMain" onclick="openNewNotebook()"><span style="font-size:18px;line-height:1">+</span> New notebook</button>
+        <label class="btn outlineBlue" for="pdfImport"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg> PDF</label>
+        <input id="pdfImport" type="file" accept=".pdf" class="hidden" onchange="handleImport(event)"/>
+        <label class="btn outlineBlue" for="epubImport"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4a1 1 0 0 0-1-1H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg> EPUB</label>
+        <input id="epubImport" type="file" accept=".epub,.txt" class="hidden" onchange="handleImport(event)"/>
+      </div>
+    </div>
   </section>
 
   <!-- EDITOR -->
   <section id="view-editor" class="hidden">
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <button class="btn" onclick="showView('library')">← Library</button>
-      <input id="noteTitle" value="Untitled notebook" style="flex:1;min-width:180px;border:0;background:transparent;font-family:Newsreader,serif;font-size:26px;font-weight:700;outline:none;color:var(--ink)" oninput="syncTitle()"/>
-      <button class="btn" onclick="undoStroke()">↩ Undo</button>
-      <button class="btn" onclick="redoStroke()">↪ Redo</button>
-      <button class="btn" onclick="exportPagePNG()">Export PNG</button>
-      <button class="btn" onclick="exportNotebookPDF()">Export PDF</button>
-      <button class="btn primary" onclick="exportBackup()">Backup .json</button>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:6px 8px">
+      <button class="btn small" style="border:0;min-height:40px;min-width:40px;padding:0;border-radius:50%;font-size:17px" onclick="showView('library')" aria-label="Back to library">←</button>
+      <div style="flex:1;min-width:150px">
+        <input id="noteTitle" value="Untitled notebook" aria-label="Notebook title" style="width:100%;border:0;background:transparent;font-size:14px;font-weight:600;outline:none;color:var(--ink);min-height:22px;padding:0" oninput="syncTitle()"/>
+        <div class="kbd" style="font-size:11px">Notebook</div>
+      </div>
+      <button class="btn small" style="border:0;min-height:40px;min-width:40px;padding:0;border-radius:50%;font-size:16px" onclick="undoStroke()" aria-label="Undo">↩</button>
+      <button class="btn small" style="border:0;min-height:40px;min-width:40px;padding:0;border-radius:50%;font-size:16px" onclick="redoStroke()" aria-label="Redo">↪</button>
+      <button class="btn small" onclick="openTimer()">◷ Focus</button>
+      <button class="btn small" onclick="exportPagePNG()">PNG</button>
+      <button class="btn small" onclick="exportNotebookPDF()">PDF</button>
+      <button class="btn small" onclick="exportBackup()">Backup</button>
     </div>
 
     <div class="toolbar" role="toolbar" aria-label="Writing tools">
@@ -253,11 +255,14 @@ progress{width:100%;height:8px;accent-color:var(--accent)}
       <button class="tool" data-tool="eraser" onclick="setTool('eraser',this)" title="Stroke eraser">⌫</button>
       <button class="tool" data-tool="hand" onclick="setTool('hand',this)" title="Hand — scroll without drawing">✋</button>
       <span class="tool-label">Colour</span>
-      <button class="swatch active" style="background:#191c19" onclick="setColor('#191c19',this)" aria-label="Black"></button>
-      <button class="swatch" style="background:#234f35" onclick="setColor('#234f35',this)" aria-label="Green"></button>
-      <button class="swatch" style="background:#1d4ed8" onclick="setColor('#1d4ed8',this)" aria-label="Blue"></button>
-      <button class="swatch" style="background:#dc2626" onclick="setColor('#dc2626',this)" aria-label="Red"></button>
-      <button class="swatch" style="background:#eab308" onclick="setColor('#eab308',this)" aria-label="Yellow"></button>
+      <button class="swatch active" style="background:#1b2a4a" onclick="setColor('#1b2a4a',this)" aria-label="Navy ink"></button>
+      <button class="swatch" style="background:#2456c8" onclick="setColor('#2456c8',this)" aria-label="Blue"></button>
+      <button class="swatch" style="background:#b23a2e" onclick="setColor('#b23a2e',this)" aria-label="Red"></button>
+      <button class="swatch" style="background:#2e7d46" onclick="setColor('#2e7d46',this)" aria-label="Green"></button>
+      <button class="swatch" style="background:#7b4ba8" onclick="setColor('#7b4ba8',this)" aria-label="Purple"></button>
+      <button class="swatch" style="background:#c26d1e" onclick="setColor('#c26d1e',this)" aria-label="Orange"></button>
+      <button class="swatch" style="background:#0e7d86" onclick="setColor('#0e7d86',this)" aria-label="Teal"></button>
+      <button class="swatch" style="background:#d1497a" onclick="setColor('#d1497a',this)" aria-label="Pink"></button>
       <span class="tool-label">Size</span>
       <input type="range" min="1" max="16" value="4" id="brushSize" style="width:100px"/>
       <span class="tool-label">Template</span>
@@ -335,8 +340,8 @@ progress{width:100%;height:8px;accent-color:var(--accent)}
 
   <!-- READER -->
   <section id="view-reader" class="hidden">
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
-      <button class="btn" onclick="showView('library')">← Library</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:6px 8px">
+      <button class="btn" style="border:0;min-height:40px;min-width:40px;padding:0;border-radius:50%;font-size:17px" onclick="showView('library')" aria-label="Back to library">←</button>
       <div class="seg" role="tablist"><button class="active" id="modeScrollBtn" onclick="setReaderMode('scroll')">Scroll</button><button id="modePageBtn" onclick="setReaderMode('page')">Page</button></div>
       <select id="themeSel" onchange="setReaderTheme(this.value)" style="border:1px solid var(--line);border-radius:999px;padding:0 12px;background:var(--card);color:var(--ink);font-weight:600"><option value="">Paper</option><option value="sepia">Sepia</option><option value="dark">Night</option></select>
       <button class="btn small" onclick="readerFont(-1)">A−</button>
@@ -428,10 +433,9 @@ progress{width:100%;height:8px;accent-color:var(--accent)}
 
 <div id="newModal" class="modal" role="dialog" aria-modal="true">
   <div class="modalCard">
-    <h3 style="margin:0;font-family:Newsreader,serif;font-size:24px">New notebook</h3>
-    <p class="kbd">Unlimited notebooks. No paywall, no 3-notebook limit.</p>
-    <label class="kbd">Title</label><input id="newTitle" placeholder="e.g. Physics — Vectors"/>
-    <label class="kbd">Cover</label><select id="newColor"><option value="#234f35">Forest ink</option><option value="#191c19">Charcoal</option><option value="#7c2d12">Terracotta</option><option value="#1e3a5f">Midnight blue</option><option value="#f3e8c8">Parchment</option></select>
+    <h3 style="margin:0;font-size:16px;font-weight:600">New notebook</h3>
+    <label class="kbd">Title</label><input id="newTitle" placeholder="e.g. Biology — Semester 2"/>
+    <label class="kbd">Cover</label><select id="newColor"><option value="#b4552d">Rust</option><option value="#7d8c6f">Sage</option><option value="#4a5a74">Slate</option><option value="#6d4a63">Plum</option><option value="#c1922e">Ochre</option><option value="#2e6f6a">Teal</option><option value="#232c42">Ink</option><option value="#c08552">Rose</option></select>
     <label class="kbd">Template</label><select id="newTemplate"><option value="lined">Lined</option><option value="blank">Blank</option><option value="grid">Grid</option><option value="dotted">Dotted</option></select>
     <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1;justify-content:center" onclick="closeModal('newModal')">Cancel</button><button class="btn primary" style="flex:1;justify-content:center" onclick="createNotebook()">Create</button></div>
   </div>
@@ -439,7 +443,7 @@ progress{width:100%;height:8px;accent-color:var(--accent)}
 
 <div id="confirmModal" class="modal" role="dialog" aria-modal="true">
   <div class="modalCard">
-    <h3 style="margin:0;font-family:Newsreader,serif;font-size:22px" id="confirmTitle">Delete?</h3>
+    <h3 style="margin:0;font-size:16px;font-weight:600" id="confirmTitle">Delete?</h3>
     <p class="kbd" id="confirmText" style="line-height:1.6;margin-top:8px"></p>
     <div style="display:flex;gap:8px;margin-top:14px"><button class="btn" style="flex:1;justify-content:center" onclick="closeModal('confirmModal')">Cancel</button><button class="btn danger" style="flex:1;justify-content:center" onclick="doConfirm()">Delete</button></div>
   </div>
@@ -465,11 +469,11 @@ const CW=1200, CH=800;
 const SAMPLE_ID='sample-book';
 function blankPage(){return {ink:[],hi:[],text:'',stickies:[],table:null,board:null,audio:null,bgPdf:null}}
 function blankBoard(){return {color:0,strokes:[],view:{x:0,y:0,k:1}}}
-const BOARD_COLORS=['#fff8d6','#fdfaf0','#e0f2fe','#dcfce7','#ffe4e6','#ede9fe','#334155'];
+const BOARD_COLORS=['#fffdf6','#f6e8c8','#d9e9f7','#dcf0dd','#f8e0e0','#e6def6','#39404e'];
 let S={
   items:[], filter:'all',
   curNbId:null, curBookId:null,
-  tool:'pen', color:'#191c19',
+  tool:'pen', color:'#1b2a4a',
   undoStack:[], redoStack:[],
   view:'library',
   stats:{writeSec:0, readSec:0, strokes:0, pagesRead:{}, focusDone:0},
@@ -509,18 +513,17 @@ function sampleBook(){
 function showView(v){
   S.view=v;
   ['library','editor','reader'].forEach(x=>$('view-'+x).classList.toggle('hidden',x!==v));
-  $('navLibrary').classList.toggle('active',v==='library');
-  $('navEditor').classList.toggle('active',v==='editor');
-  $('navReader').classList.toggle('active',v==='reader');
-  $('searchResults').classList.add('hidden');
+  $('mainLayout').classList.toggle('shelf',v==='library');
+  let sr=$('searchResults'); if(sr) sr.classList.add('hidden');
   if(v==='library') renderLibrary();
   if(v==='editor' && !curNb()){ // guarantee an editable notebook exists
     let nb=S.items.find(i=>i.kind==='notebook');
-    if(nb) openNotebook(nb.id); else { createNotebookSilent('Untitled notebook','#234f35','lined'); }
+    if(nb) openNotebook(nb.id); else { createNotebookSilent('Untitled notebook','#b4552d','lined'); }
   }
   window.scrollTo({top:0});
 }
-function filterLib(f,btn){S.filter=f;renderLibrary()}
+function filterLib(f,btn){ S.filter=f; document.querySelectorAll('.chip[data-filter]').forEach(c=>c.classList.toggle('active',c.getAttribute('data-filter')===f)); renderLibrary(); }
+function toggleAbout(){ $('aboutPanel').classList.toggle('hidden'); }
 
 /* ============ library ============ */
 function itemPages(it){ if(it.kind==='notebook') return it.pages.length; if(it.kind==='pdf') return it.numPages||0; if(it.kind==='epub') return it.chapters?it.chapters.length:0; return 1 }
@@ -537,19 +540,51 @@ function renderLibrary(){
   $('statAnnos').textContent=S.items.reduce((a,n)=>a+((n.annotations||[]).length),0);
   let userItems=S.items.filter(i=>!i.sample);
   $('emptyState').classList.toggle('hidden', userItems.length>0);
-  $('libHint').textContent=q? items.length+' match(es) — search above also looks inside notes, books and annotations.' : S.items.length+' item(s) in this tab.';
+  $('libHint').textContent=q? items.length+' on the shelf — search also looks inside notes, books and annotations.' : '';
   $('libraryGrid').innerHTML=items.map(n=>{
-    let kindLabel=n.kind==='notebook'?'Notebook':n.kind.toUpperCase();
-    let meta=n.kind==='notebook'? itemPages(n)+' page(s)' : n.kind==='pdf'? (n.numPages||'?')+' pages' : (n.chapters?n.chapters.length:0)+' chapters';
-    let darkCover=n.color!=='#f3e8c8';
-    let actions = n.kind==='notebook'
-      ? '<button class="btn primary small" onclick="openNotebook(\''+n.id+'\')">Open</button>'
-      : '<button class="btn primary small" onclick="openBook(\''+n.id+'\')">Read</button>' + (n.kind==='pdf'? ' <button class="btn small" onclick="annotatePdf(\''+n.id+'\')">Annotate</button>':'');
-    return '<article class="card"><div class="card-cover" style="background:'+n.color+';color:'+(darkCover?'#fff':'#191c19')+'"><span class="badge" style="background:rgba(255,255,255,.15);color:inherit;border-color:transparent">'+kindLabel+(n.sample?' • Sample':'')+(n.kind==='notebook'?' • '+esc(n.template):'')+'</span><h3>'+esc(n.title)+'</h3></div>'
-      +'<div class="card-body"><span class="kbd">'+meta+' • '+esc(n.updated||'')+'</span><span style="display:flex;gap:6px;flex-wrap:wrap">'+actions+'<button class="btn small danger" onclick="askDeleteItem(\''+n.id+'\')">Delete</button></span></div></article>';
+    let cov=coverFor(n);
+    let meta;
+    if(n.kind==='notebook') meta='Notebook · '+itemPages(n)+(itemPages(n)===1?' page':' pages');
+    else if(n.kind==='pdf') meta='PDF · tap to read · '+(n.numPages||'?')+(n.numPages===1?' page':' pages');
+    else meta='EPUB'+(n.sample?' · Sample':'')+' · tap to read · '+(n.chapters?n.chapters.length:0)+' chapters';
+    let openAct= n.kind==='notebook'? 'openNotebook(\''+n.id+'\')' : 'openBook(\''+n.id+'\')';
+    let menu='<button type="button" onclick="event.stopPropagation();'+openAct+'">'+(n.kind==='notebook'?'Open':'Read')+'</button>'
+      + (n.kind==='pdf'? '<button type="button" onclick="event.stopPropagation();annotatePdf(\''+n.id+'\')">Annotate</button>':'')
+      + '<button type="button" class="danger" onclick="event.stopPropagation();askDeleteItem(\''+n.id+'\')">Delete…</button>';
+    return '<article class="bookCard"><button type="button" class="book" style="background:'+cov.bg+';color:'+cov.ink+'" onclick="'+openAct+'" aria-label="Open '+esc(n.title)+'"><span class="bookSpine" style="background:'+cov.spine+'"></span><span class="bookFace"><h3>'+esc(n.title)+'</h3><span class="bookMeta">'+esc(meta)+'<br/>'+(n.sample?'Built-in sample':'Edited '+esc(n.updated||'just now'))+'</span></span></button>'
+      +'<button type="button" class="bookMenu" aria-label="Options for '+esc(n.title)+'" onclick="toggleCardMenu(this)">•••</button>'
+      +'<div class="bookActions">'+menu+'</div></article>';
   }).join('') || '<p class="kbd">Nothing matches this filter.</p>';
   updateStatsPanel();
 }
+/* Notebook covers — the same eight as the app, plus the old website colours mapped onto them. */
+const COVERS={
+  '#b4552d':{bg:'#b4552d',spine:'#8a3d1f',ink:'#fdf3e7'},
+  '#7d8c6f':{bg:'#7d8c6f',spine:'#5d6c50',ink:'#f4f7ee'},
+  '#4a5a74':{bg:'#4a5a74',spine:'#35445c',ink:'#eef2f8'},
+  '#6d4a63':{bg:'#6d4a63',spine:'#523549',ink:'#f8eef4'},
+  '#c1922e':{bg:'#c1922e',spine:'#99721f',ink:'#fdf6e0'},
+  '#2e6f6a':{bg:'#2e6f6a',spine:'#205550',ink:'#e8f5f2'},
+  '#232c42':{bg:'#232c42',spine:'#161d2e',ink:'#e8ecf6'},
+  '#c08552':{bg:'#c08552',spine:'#9c683c',ink:'#fdf1e4'},
+  '#234f35':{bg:'#2e6f6a',spine:'#205550',ink:'#e8f5f2'},
+  '#191c19':{bg:'#232c42',spine:'#161d2e',ink:'#e8ecf6'},
+  '#7c2d12':{bg:'#b4552d',spine:'#8a3d1f',ink:'#fdf3e7'},
+  '#1e3a5f':{bg:'#4a5a74',spine:'#35445c',ink:'#eef2f8'},
+  '#f3e8c8':{bg:'#f6e8c8',spine:'#d9c48f',ink:'#5a4632'}
+};
+function coverFor(n){
+  if(n.color && COVERS[n.color]) return COVERS[n.color];
+  if(n.kind==='pdf') return COVERS['#4a5a74'];
+  if(n.kind==='epub') return COVERS['#2e6f6a'];
+  return COVERS['#b4552d'];
+}
+function toggleCardMenu(btn){
+  let card=btn.closest('.bookCard'); let was=card.classList.contains('menuOpen');
+  document.querySelectorAll('.bookCard.menuOpen').forEach(c=>c.classList.remove('menuOpen'));
+  if(!was) card.classList.add('menuOpen');
+}
+document.addEventListener('click',e=>{ if(!e.target.closest('.bookCard')) document.querySelectorAll('.bookCard.menuOpen').forEach(c=>c.classList.remove('menuOpen')); });
 function askDeleteItem(id){
   let it=S.items.find(i=>i.id===id); if(!it) return;
   askConfirm('Delete “'+it.title+'”?','This removes it from this tab. Export a backup first if you want to keep it.',()=>{
@@ -608,7 +643,7 @@ function createNotebook(){
   let title=$('newTitle').value.trim()||'Untitled notebook';
   createNotebookSilent(title,$('newColor').value,$('newTemplate').value);
   closeModal('newModal'); $('newTitle').value='';
-  toast('Notebook created — unlimited, no paywall');
+  toast('Notebook created');
 }
 function createNotebookSilent(title,color,template){
   let nb={id:uid(), kind:'notebook', title:title, color:color, template:template, pages:[blankPage()], cur:0, updated:'Just now', annotations:[]};
@@ -640,19 +675,18 @@ const bgX=bgC.getContext('2d'), hiX=hiC.getContext('2d'), inkX=inkC.getContext('
 function drawBackground(){
   let nb=curNb(); if(!nb) return;
   let p=curPageObj();
-  let dark=window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   bgX.clearRect(0,0,CW,CH);
-  bgX.fillStyle= dark? '#1c1e1c':'#fffef8'; bgX.fillRect(0,0,CW,CH);
+  bgX.fillStyle='#fffdf6'; bgX.fillRect(0,0,CW,CH);
   if(p && p.bgPdf && p.bgPdf.img){
     let img=p.bgPdf.img, s=Math.min(CW/img.width, CH/img.height), w=img.width*s, h=img.height*s;
     bgX.fillStyle='#ffffff'; bgX.fillRect((CW-w)/2,(CH-h)/2,w,h);
     bgX.drawImage(img,(CW-w)/2,(CH-h)/2,w,h);
     return;
   }
-  let line= dark? 'rgba(255,255,255,.10)':'rgba(25,28,25,.10)';
+  let line='rgba(27,42,74,.16)';
   bgX.strokeStyle=line; bgX.fillStyle=line; bgX.lineWidth=1;
   let tpl=nb.template;
-  if(tpl==='lined'){ bgX.beginPath(); for(let y=64;y<CH;y+=42){ bgX.moveTo(28,y); bgX.lineTo(CW-28,y);} bgX.stroke(); }
+  if(tpl==='lined'){ bgX.beginPath(); for(let y=64;y<CH;y+=42){ bgX.moveTo(28,y); bgX.lineTo(CW-28,y);} bgX.stroke(); bgX.strokeStyle='rgba(178,64,54,.4)'; bgX.beginPath(); bgX.moveTo(84,0); bgX.lineTo(84,CH); bgX.stroke(); bgX.strokeStyle=line; }
   if(tpl==='grid'){ bgX.beginPath(); for(let x=28;x<CW;x+=36){ bgX.moveTo(x,0); bgX.lineTo(x,CH);} for(let y=28;y<CH;y+=36){ bgX.moveTo(0,y); bgX.lineTo(CW,y);} bgX.stroke(); }
   if(tpl==='dotted'){ for(let x=34;x<CW;x+=36) for(let y=34;y<CH;y+=36){ bgX.beginPath(); bgX.arc(x,y,1.6,0,7); bgX.fill(); } }
 }
@@ -693,11 +727,10 @@ function redrawLayer(which){
 function redrawAll(){ drawBackground(); redrawLayer('ink'); redrawLayer('hi'); }
 function composePage(p, template, out){
   let c=out||document.createElement('canvas'); c.width=CW; c.height=CH; let x=c.getContext('2d');
-  let dark=window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  x.fillStyle= dark? '#1c1e1c':'#fffef8'; x.fillRect(0,0,CW,CH);
+  x.fillStyle='#fffdf6'; x.fillRect(0,0,CW,CH);
   if(p.bgPdf && p.bgPdf.img){ let img=p.bgPdf.img, s=Math.min(CW/img.width,CH/img.height), w=img.width*s,h=img.height*s; x.fillStyle='#fff'; x.fillRect((CW-w)/2,(CH-h)/2,w,h); x.drawImage(img,(CW-w)/2,(CH-h)/2,w,h); }
-  else { let line=dark?'rgba(255,255,255,.10)':'rgba(25,28,25,.10)'; x.strokeStyle=line; x.fillStyle=line; x.lineWidth=1;
-    if(template==='lined'){ x.beginPath(); for(let y=64;y<CH;y+=42){x.moveTo(28,y);x.lineTo(CW-28,y);} x.stroke(); }
+  else { let line='rgba(27,42,74,.16)'; x.strokeStyle=line; x.fillStyle=line; x.lineWidth=1;
+    if(template==='lined'){ x.beginPath(); for(let y=64;y<CH;y+=42){x.moveTo(28,y);x.lineTo(CW-28,y);} x.stroke(); x.strokeStyle='rgba(178,64,54,.4)'; x.beginPath(); x.moveTo(84,0); x.lineTo(84,CH); x.stroke(); x.strokeStyle=line; }
     if(template==='grid'){ x.beginPath(); for(let xx=28;xx<CW;xx+=36){x.moveTo(xx,0);x.lineTo(xx,CH);} for(let y=28;y<CH;y+=36){x.moveTo(0,y);x.lineTo(CW,y);} x.stroke(); }
     if(template==='dotted'){ for(let xx=34;xx<CW;xx+=36) for(let y=34;y<CH;y+=36){ x.beginPath(); x.arc(xx,y,1.6,0,7); x.fill(); } } }
   p.hi.forEach(st=>drawStroke(x,st));
@@ -834,7 +867,7 @@ function toggleBoard(force){
 function loadBoard(){
   let bd=pageBoard(); if(!bd) return;
   $('floatingBoard').style.background=BOARD_COLORS[bd.color];
-  if(bd.color===6){ $('floatingBoard').style.color='#f8fafc'; } else { $('floatingBoard').style.color='#191c19'; }
+  if(bd.color===6){ $('floatingBoard').style.color='#f8fafc'; } else { $('floatingBoard').style.color='#1b2a4a'; }
   sizeBoardCanvas(); redrawBoard();
 }
 function sizeBoardCanvas(){
@@ -862,7 +895,7 @@ boardC.addEventListener('pointerdown',e=>{
   let w=boardWorld(e);
   if(boardTool==='pan'){ bLast={x:e.clientX,y:e.clientY}; bDrawing=true; return; }
   bDrawing=true; let bd=pageBoard();
-  bStroke={color: bd.color===6? '#f8fafc':'#191c19', size:3/bd.view.k*1.6, points:[{x:w.x,y:w.y}]};
+  bStroke={color: bd.color===6? '#f8fafc':'#1b2a4a', size:3/bd.view.k*1.6, points:[{x:w.x,y:w.y}]};
   bLast=w;
 });
 boardC.addEventListener('pointermove',e=>{
@@ -1037,7 +1070,7 @@ function importBackup(e){
       let data=JSON.parse(String(r.result));
       if(data.app!=='inkwell' || !Array.isArray(data.notebooks)) throw new Error('not an Inkwell backup');
       data.notebooks.forEach(nb=>{
-        let item={id:uid(), kind:'notebook', title:nb.title||'Restored notebook', color:nb.color||'#234f35', template:nb.template||'lined', cur:nb.cur||0, updated:'Restored', annotations:[],
+        let item={id:uid(), kind:'notebook', title:nb.title||'Restored notebook', color:nb.color||'#b4552d', template:nb.template||'lined', cur:nb.cur||0, updated:'Restored', annotations:[],
           pages:(nb.pages&&nb.pages.length?nb.pages:[{}]).map(p=>({ink:p.ink||[],hi:p.hi||[],text:p.text||'',stickies:p.stickies||[],table:p.table||null,board:p.board?{color:p.board.color,strokes:p.board.strokes,view:{x:0,y:0,k:1}}:null,audio:null,bgPdf:p.bgPdf?{img:null,page:p.bgPdf.page,bookTitle:p.bgPdf.bookTitle}:null}))};
         S.items.unshift(item);
       });
@@ -1056,7 +1089,7 @@ function handleImport(e){
   if(name.endsWith('.pdf')){ importPdf(f); return; }
   if(name.endsWith('.epub')){ importEpub(f); return; }
   if(name.endsWith('.txt')){ let r=new FileReader(); r.onload=()=>{ let text=String(r.result);
-    let book={id:uid(),kind:'epub',title:f.name.replace(/\.[^.]+$/,''),color:'#234f35',updated:'Imported just now',ch:0,mode:'scroll',bookmarks:[],annotations:[],parallelNotes:{},
+    let book={id:uid(),kind:'epub',title:f.name.replace(/\.[^.]+$/,''),color:'#2e6f6a',updated:'Imported just now',ch:0,mode:'scroll',bookmarks:[],annotations:[],parallelNotes:{},
       chapters:[{title:f.name.replace(/\.[^.]+$/,''), html:text.split(/\n\s*\n/).map(p=>'<p>'+esc(p)+'</p>').join(''), text:text}]};
     S.items.unshift(book); renderLibrary(); openBook(book.id); toast('Text file opened in the reader'); }; r.readAsText(f); return; }
   toast('That file type is not supported — PDF, EPUB or TXT');
@@ -1068,7 +1101,7 @@ async function importPdf(f){
     pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     let buf=await f.arrayBuffer();
     let doc=await pdfjsLib.getDocument({data:buf}).promise;
-    let book={id:uid(),kind:'pdf',title:f.name.replace(/\.[^.]+$/,''),color:'#191c19',updated:'Imported just now',doc:doc,numPages:doc.numPages,page:1,mode:'scroll',bookmarks:[],annotations:[],textCache:{},parallelNotes:{},fileName:f.name};
+    let book={id:uid(),kind:'pdf',title:f.name.replace(/\.[^.]+$/,''),color:'#4a5a74',updated:'Imported just now',doc:doc,numPages:doc.numPages,page:1,mode:'scroll',bookmarks:[],annotations:[],textCache:{},parallelNotes:{},fileName:f.name};
     S.items.unshift(book); renderLibrary(); openBook(book.id);
   }catch(err){ toast('That PDF could not be opened'+(err&&err.message? ' ('+err.message+')':'')+' — password-protected or damaged files will not open'); }
 }
@@ -1132,7 +1165,7 @@ async function importEpub(f){
       chapters.push({title:title.slice(0,90), html:body.innerHTML, text:text});
     }
     if(!chapters.length) throw new Error('no readable chapters found');
-    let book={id:uid(),kind:'epub',title:bookTitle,color:'#234f35',updated:'Imported just now',ch:0,mode:'scroll',bookmarks:[],annotations:[],chapters:chapters,parallelNotes:{}};
+    let book={id:uid(),kind:'epub',title:bookTitle,color:'#2e6f6a',updated:'Imported just now',ch:0,mode:'scroll',bookmarks:[],annotations:[],chapters:chapters,parallelNotes:{}};
     S.items.unshift(book); renderLibrary(); openBook(book.id);
     toast('EPUB opened — '+chapters.length+' chapters, in reading mode');
   }catch(err){ toast('That EPUB could not be read ('+(err&&err.message?err.message:'unknown error')+')'); }
