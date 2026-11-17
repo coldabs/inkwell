@@ -34,6 +34,123 @@ function curNb(){return S.items.find(i=>i.id===S.curNbId)||null}
 function curBook(){return S.items.find(i=>i.id===S.curBookId)||null}
 function curPageObj(){let nb=curNb();if(!nb)return null;return nb.pages[nb.cur]||null}
 
+/* ============ persistence: the shelf lives in this browser (IndexedDB) ============
+   Everything used to live only in this tab's memory, so closing or
+   reloading the tab wiped the whole shelf. Now the library is written to
+   IndexedDB on this device: notebooks in full (ink, text, stickies,
+   boards, page images, audio blobs, PDF-page backgrounds), EPUB chapters,
+   PDF metadata + reading positions, bookmarks, annotations and stats.
+   Imported PDF files are stored as their own records ('pdf:<id>') so the
+   reader can reopen them after a reload without re-importing.
+   Saves are debounced, flushed when the tab is hidden/closed, and a
+   periodic signature check catches any edit path that forgot to ask. */
+const IDB_NAME='inkwell-db', IDB_STATE_KEY='library-v1';
+let persistReady=false, persistDirty=false, persistSaving=false, persistSaveAgain=false, inSave=false, lastSaveAt=0, saveTimer=null, restoreToken=0;
+function idbOpen(){ return new Promise((res,rej)=>{ if(!('indexedDB' in window)){ rej(new Error('IndexedDB unavailable')); return; } let rq=indexedDB.open(IDB_NAME,1); rq.onupgradeneeded=()=>{ if(!rq.result.objectStoreNames.contains('kv')) rq.result.createObjectStore('kv'); }; rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); rq.onblocked=()=>rej(new Error('IndexedDB blocked')); }); }
+let _idbP=null; function idb(){ if(!_idbP) _idbP=idbOpen(); return _idbP; }
+async function idbGet(key){ let db=await idb(); return new Promise((res,rej)=>{ let rq=db.transaction('kv','readonly').objectStore('kv').get(key); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); }); }
+async function idbPut(key,val){ let db=await idb(); return new Promise((res,rej)=>{ let tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put(val,key); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error); }); }
+async function idbDel(key){ try{ let db=await idb(); await new Promise(res=>{ let tx=db.transaction('kv','readwrite'); tx.objectStore('kv').delete(key); tx.oncomplete=()=>res(); tx.onerror=()=>res(); tx.onabort=()=>res(); }); }catch(e){} }
+function persistPdfFile(book){ if(book && book.fileData) idbPut('pdf:'+book.id, book.fileData).catch(()=>{}); }
+function deletePdfFile(id){ idbDel('pdf:'+id); }
+function updateSaveStatus(failed){
+  let el=$('saveStatus'); if(!el) return;
+  if(failed){ el.textContent='Could not save in this browser — use Backup to keep your notes safe.'; return; }
+  el.textContent= lastSaveAt? 'Saved in this browser · '+new Date(lastSaveAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}) : 'Saves automatically in this browser';
+}
+function scheduleSave(){ if(!persistReady || inSave) return; persistDirty=true; clearTimeout(saveTimer); saveTimer=setTimeout(saveNow,700); }
+function bgPdfImgData(bg){
+  if(!bg || !bg.img) return null;
+  if(bg._imgData && bg._imgDataFor===bg.img) return bg._imgData;
+  try{
+    let src=bg.img, c=document.createElement('canvas'); c.width=src.width; c.height=src.height;
+    let x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height); x.drawImage(src,0,0);
+    bg._imgData=c.toDataURL('image/jpeg',0.85); bg._imgDataFor=src; return bg._imgData;
+  }catch(e){ return null; }
+}
+function serializeLibrary(){
+  return { v:1, savedAt:Date.now(), stats:S.stats,
+    items:S.items.map(it=>{
+      if(it.kind==='notebook') return {id:it.id,kind:'notebook',title:it.title,color:it.color,template:it.template,cur:it.cur,updated:it.updated,annotations:it.annotations||[],pdfBookId:it.pdfBookId||null,
+        pages:(it.pages||[]).map(p=>({ink:p.ink||[],hi:p.hi||[],text:p.text||'',stickies:p.stickies||[],table:p.table||null,texts:p.texts||[],texs:p.texs||[],bgColor:p.bgColor||'#fffdf6',
+          images:(p.images||[]).map(im=>({id:im.id,x:im.x,y:im.y,w:im.w,h:im.h,src:im.src})),
+          board:p.board?{color:p.board.color,strokes:p.board.strokes,view:p.board.view}:null,
+          audio:(p.audio&&p.audio.blob)?{blob:p.audio.blob,dur:p.audio.dur}:null,
+          bgPdf:p.bgPdf?{page:p.bgPdf.page,bookTitle:p.bgPdf.bookTitle,imgData:bgPdfImgData(p.bgPdf)}:null }))};
+      if(it.kind==='pdf') return {id:it.id,kind:'pdf',title:it.title,color:it.color,updated:it.updated,fileName:it.fileName,numPages:it.numPages,page:it.page,mode:it.mode,bookmarks:it.bookmarks||[],annotations:it.annotations||[],textCache:it.textCache||{},parallelNotes:it.parallelNotes||{}};
+      return {id:it.id,kind:'epub',title:it.title,color:it.color,updated:it.updated,sample:!!it.sample,ch:it.ch||0,mode:it.mode||'scroll',bookmarks:it.bookmarks||[],annotations:it.annotations||[],parallelNotes:it.parallelNotes||{},chapters:it.chapters||[]};
+    })};
+}
+async function saveNow(){
+  if(!persistReady) return;
+  if(persistSaving){ persistSaveAgain=true; return; }
+  persistSaving=true; persistDirty=false; inSave=true;
+  try{
+    let nb=curNb(); if(nb){ let p=nb.pages[nb.cur]; if(p) p.text=$('noteText').value; }
+    await idbPut(IDB_STATE_KEY, serializeLibrary());
+    lastSaveAt=Date.now(); updateSaveStatus(false);
+  }catch(e){ persistDirty=true; updateSaveStatus(true); }
+  inSave=false; persistSaving=false;
+  if(persistSaveAgain){ persistSaveAgain=false; scheduleSave(); }
+}
+function dataUrlToCanvas(url){ return new Promise((res,rej)=>{ let img=new Image(); img.onload=()=>{ let c=document.createElement('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight; c.getContext('2d').drawImage(img,0,0); res(c); }; img.onerror=()=>rej(new Error('image failed')); img.src=url; }); }
+async function restoreLibrary(token){
+  let data=await idbGet(IDB_STATE_KEY);
+  if(token!==restoreToken) return false;
+  if(!data || !Array.isArray(data.items) || !data.items.length) return false;
+  if(data.stats) S.stats=data.stats;
+  let items=[];
+  for(let raw of data.items){
+    if(raw.kind==='notebook'){
+      let nb={id:raw.id,kind:'notebook',title:raw.title||'Untitled notebook',color:raw.color||'#b4552d',template:raw.template||'lined',cur:raw.cur||0,updated:raw.updated||'',annotations:raw.annotations||[],pdfBookId:raw.pdfBookId||null,pages:[]};
+      for(let rp of (raw.pages||[])){
+        let p=blankPage();
+        p.ink=rp.ink||[]; p.hi=rp.hi||[]; p.text=rp.text||''; p.stickies=rp.stickies||[]; p.table=rp.table||null;
+        p.texts=rp.texts||[]; p.texs=rp.texs||[]; p.bgColor=rp.bgColor||'#fffdf6';
+        p.images=(rp.images||[]).map(im=>({id:im.id||uid(),x:im.x,y:im.y,w:im.w,h:im.h,src:im.src}));
+        p.board=rp.board?{color:rp.board.color||0,strokes:rp.board.strokes||[],view:rp.board.view||{x:0,y:0,k:1}}:null;
+        if(rp.audio && rp.audio.blob){ try{ p.audio={blob:rp.audio.blob,dur:rp.audio.dur||0,url:URL.createObjectURL(rp.audio.blob)}; }catch(e){} }
+        if(rp.bgPdf){ p.bgPdf={page:rp.bgPdf.page,bookTitle:rp.bgPdf.bookTitle,img:null};
+          if(rp.bgPdf.imgData){ try{ p.bgPdf.img=await dataUrlToCanvas(rp.bgPdf.imgData); }catch(e){} } }
+        nb.pages.push(p);
+      }
+      if(!nb.pages.length) nb.pages.push(blankPage());
+      if(nb.cur>=nb.pages.length) nb.cur=nb.pages.length-1; if(nb.cur<0) nb.cur=0;
+      items.push(nb);
+    } else if(raw.kind==='pdf'){
+      let b={id:raw.id,kind:'pdf',title:raw.title||'PDF',color:raw.color||'#4a5a74',updated:raw.updated||'',fileName:raw.fileName||raw.title,numPages:raw.numPages||0,page:raw.page||1,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],textCache:raw.textCache||{},parallelNotes:raw.parallelNotes||{},doc:null,fileData:null};
+      try{
+        let fd=await idbGet('pdf:'+raw.id);
+        if(fd){ b.fileData=fd;
+          if(window.pdfjsLib){ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            /* parse in the background — a big PDF must not hold the whole shelf hostage */
+            pdfjsLib.getDocument({data:fd.slice(0)}).promise.then(doc=>{ b.doc=doc; b.numPages=doc.numPages; if(S.view==='library') renderLibrary(); }).catch(()=>{});
+          }
+        }
+      }catch(e){}
+      items.push(b);
+    } else if(raw.kind==='epub'){
+      items.push({id:raw.id,kind:'epub',title:raw.title||'Book',color:raw.color||'#2e6f6a',updated:raw.updated||'',sample:!!raw.sample,ch:raw.ch||0,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],parallelNotes:raw.parallelNotes||{},chapters:raw.chapters||[]});
+    }
+  }
+  if(token!==restoreToken || !items.length) return false;
+  /* merge, not replace: anything created while a slow restore was still
+     running (e.g. on the starter shelf) survives the swap */
+  let preExisting=S.items.filter(i=> items.every(r=>r.id!==i.id));
+  S.items=items.concat(preExisting);
+  return true;
+}
+function librarySignature(){
+  try{
+    return S.items.map(it=> it.kind==='notebook'
+      ? 'n:'+it.title+':'+it.cur+':'+it.pages.reduce((a,p)=>a+(p.ink||[]).length+(p.hi||[]).length+((p.text||'').length)+((p.stickies||[]).reduce((x,s)=>x+(s.text||'').length+((s.x|0)+(s.y|0)),0))+((p.table&&p.table.rows)?p.table.rows.reduce((x,r)=>x+r.join('').length,0):0)+((p.board&&p.board.strokes)?p.board.strokes.length:0)+(p.texts||[]).length+(p.texs||[]).length+(p.images||[]).length+(p.audio?1:0),0)
+      : it.kind+':'+(it.title||'')+':'+(it.annotations||[]).length+':'+(it.bookmarks||[]).length+':'+(it.page||it.ch||0)+':'+Object.keys(it.parallelNotes||{}).length
+    ).join('|')+'#'+S.stats.strokes+'#'+S.stats.focusDone;
+  }catch(e){ return ''; }
+}
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') saveNow(); });
+window.addEventListener('pagehide',()=>{ saveNow(); });
+
 /* ============ sample book (built-in, so reader tools work offline) ============ */
 function sampleBook(){
   const ch=(t,paras)=>({title:t, html:paras.map(p=>'<p>'+p+'</p>').join(''), text:paras.join('\n\n')});
@@ -44,7 +161,7 @@ function sampleBook(){
         'Reading slowly is not reading less. It is noticing what speed hides: the turn of an argument, the weight of a word, the place where you stopped agreeing and started merely nodding. A page read once, carefully, stays with you longer than three pages skimmed in a hurry.',
         'Speed feels like progress because it produces a number — pages turned, chapters finished. But a number is not understanding. The reader who races to the end of a chapter often arrives there having met none of its ideas, the way a traveller who flies over a country has visited it without ever standing in it.',
         'Slow reading begins with permission: permission to stop, to re-read a sentence, to argue in the margin. The margin is where reading becomes thinking. A mark in the margin is a small act of honesty — here I was confused, here I disagreed, here something mattered.',
-        'Try it with this book. Select any sentence and highlight it. Add a bookmark where you want to return. Switch the theme to Sepia or Night. Press Listen and hear the page read aloud. Nothing here is locked, and nothing you mark is lost while this tab is open.']),
+        'Try it with this book. Select any sentence and highlight it. Add a bookmark where you want to return. Switch the theme to Sepia or Night. Press Listen and hear the page read aloud. Nothing here is locked, and everything you mark is saved in this browser, so it is still here when you come back.']),
       ch('Margins and marks',[
         'Every serious reader develops a private shorthand: a star for what matters, a question mark for what doubts, a line beside what sings. These marks are not vandalism. They are the visible half of a conversation between the reader and the page.',
         'Annotations age well. Return to a book after a year and your old marks show you who you were — what you feared, what you hoped, what you had not yet understood. The unmarked page tells you nothing about the person who read it.',
@@ -113,6 +230,7 @@ function renderLibrary(){
       +'<div class="bookActions">'+menu+'</div></article>';
   }).join('') || '<p class="kbd">Nothing matches this filter.</p>';
   updateStatsPanel();
+  scheduleSave();
 }
 /* Notebook covers — the same eight as the app, plus the old website colours mapped onto them. */
 const COVERS={
@@ -144,7 +262,8 @@ function toggleCardMenu(btn){
 document.addEventListener('click',e=>{ if(!e.target.closest('.bookCard')) document.querySelectorAll('.bookCard.menuOpen').forEach(c=>c.classList.remove('menuOpen')); });
 function askDeleteItem(id){
   let it=S.items.find(i=>i.id===id); if(!it) return;
-  askConfirm('Delete “'+it.title+'”?','This removes it from this tab. Export a backup first if you want to keep it.',()=>{
+  askConfirm('Delete “'+it.title+'”?','This deletes it from this browser. Export a backup first if you want to keep it.',()=>{
+    if(it.kind==='pdf') deletePdfFile(id);
     S.items=S.items.filter(i=>i.id!==id);
     if(S.curNbId===id) S.curNbId=null;
     if(S.curBookId===id) S.curBookId=null;
@@ -222,13 +341,14 @@ function openNotebook(id){
   requestAnimationFrame(()=>{ renderCanvasTexts(); });
   renderLibrary();
 }
-function syncTitle(){ let nb=curNb(); if(nb){ nb.title=$('noteTitle').value; nb.updated='Just now'; } refreshLinks(); }
+function syncTitle(){ let nb=curNb(); if(nb){ nb.title=$('noteTitle').value; nb.updated='Just now'; } refreshLinks(); scheduleSave(); }
 function saveEditorToModel(){
   let nb=curNb(); if(!nb) return;
   let p=nb.pages[nb.cur]; if(!p) return;
   p.text=$('noteText').value;
+  scheduleSave();
 }
-function setTemplate(v){ let nb=curNb(); if(nb) nb.template=v; drawBackground(); }
+function setTemplate(v){ let nb=curNb(); if(nb) nb.template=v; drawBackground(); scheduleSave(); }
 
 /* ============ editor: canvas engine ============ */
 const bgC=$('bgCanvas'), hiC=$('hiCanvas'), inkC=$('inkCanvas');
@@ -961,7 +1081,7 @@ inkC.addEventListener('pointermove',e=>{
     lastPt=pt;
   });
 });
-function bumpV(p){ if(p) p._v=(p._v||0)+1; }
+function bumpV(p){ if(p) p._v=(p._v||0)+1; scheduleSave(); }
 function endStroke(){
   if(S.tool==='select'){ if(moveDrag){ moveDrag=null; let p=curPageObj(); bumpV(p); renderPages(); drawSelectionOverlay(); } if(selDrag){ selDrag=false; finishSelection(); } return; }
   if(S.tool==='lasso'){ if(lassoPts && lassoPts.length>2) finishLasso(); else { lassoPts=null; drawSelectionOverlay(); } return; }
@@ -1353,6 +1473,7 @@ function renderPages(){
     if(!p._thumb || p._thumbV!==p._v){ p._thumb=composePage(p, nb.template); p._thumbV=p._v; }
     let x=th.getContext('2d'); x.clearRect(0,0,300,200); x.fillStyle='#fff'; x.fillRect(0,0,300,200); let iw=p._thumb.width, ih=p._thumb.height, ts=Math.min(300/iw,200/ih); x.drawImage(p._thumb,(300-iw*ts)/2,(200-ih*ts)/2,iw*ts,ih*ts);
   });
+  scheduleSave();
 }
 
 /* ============ floating board: true infinite canvas ============ */
@@ -1414,7 +1535,7 @@ boardC.addEventListener('pointerup',boardEnd); boardC.addEventListener('pointerc
 boardC.addEventListener('wheel',e=>{ e.preventDefault(); let bd=pageBoard(); let f=e.deltaY<0?1.12:0.89; bd.view.k=Math.max(0.2,Math.min(6,bd.view.k*f)); redrawBoard(); },{passive:false});
 function boardZoom(f){ let bd=pageBoard(); bd.view.k=Math.max(0.2,Math.min(6,bd.view.k*f)); redrawBoard(); }
 function boardClear(){ let bd=pageBoard(); askConfirm('Clear this board?','The board on this page is emptied; the page itself is untouched.',()=>{ bd.strokes=[]; redrawBoard(); renderPages(); }); }
-function cycleBoardColor(){ let bd=pageBoard(); bd.color=(bd.color+1)%BOARD_COLORS.length; loadBoard(); toast('Board colour saved for this page'); }
+function cycleBoardColor(){ let bd=pageBoard(); bd.color=(bd.color+1)%BOARD_COLORS.length; loadBoard(); scheduleSave(); toast('Board colour saved for this page'); }
 /* drag + resize board */
 let dragB=null;
 $('boardHead').addEventListener('pointerdown',e=>{ if(e.target.tagName==='BUTTON') return; let el=$('floatingBoard'); dragB={x:e.clientX,y:e.clientY,l:el.offsetLeft,t:el.offsetTop}; });
@@ -1434,10 +1555,10 @@ function renderStickies(){
     d.innerHTML='<div class="stickyHead"><span style="font-size:11px;font-weight:700">Sticky</span><span><button title="Colour">●</button><button title="Delete">×</button></span></div><textarea placeholder="Type…">'+esc(st.text)+'</textarea>';
     let [colorBtn,delBtn]=d.querySelectorAll('.stickyHead button');
     let ta=d.querySelector('textarea');
-    ta.addEventListener('input',()=>{ st.text=ta.value; });
+    ta.addEventListener('input',()=>{ st.text=ta.value; scheduleSave(); });
     ta.addEventListener('pointerdown',e=>e.stopPropagation());
-    colorBtn.onclick=()=>{ let i=STICKY_COLORS.indexOf(st.color); st.color=STICKY_COLORS[(i+1)%STICKY_COLORS.length]; d.style.background=st.color; };
-    delBtn.onclick=()=>{ p.stickies=p.stickies.filter(s=>s!==st); renderStickies(); };
+    colorBtn.onclick=()=>{ let i=STICKY_COLORS.indexOf(st.color); st.color=STICKY_COLORS[(i+1)%STICKY_COLORS.length]; d.style.background=st.color; scheduleSave(); };
+    delBtn.onclick=()=>{ p.stickies=p.stickies.filter(s=>s!==st); renderStickies(); scheduleSave(); };
     d.querySelector('.stickyHead').addEventListener('pointerdown',e=>{
       if(e.target.tagName==='BUTTON') return;
       let shell=$('canvasShell').getBoundingClientRect(); let sx=e.clientX, sy=e.clientY, ox=st.x, oy=st.y;
@@ -1456,7 +1577,7 @@ function renderTable(){
   rows.forEach((r,ri)=>{ html+='<tr>'+r.map((c,ci)=>'<td contenteditable="true" data-r="'+ri+'" data-c="'+ci+'">'+esc(c)+'</td>').join('')+'</tr>'; });
   html+='</table><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn small" onclick="tableAddRow()">+ Row</button><button class="btn small" onclick="tableAddCol()">+ Column</button><button class="btn small danger" onclick="tableDelete()">Delete table</button></div></div>';
   host.innerHTML=html;
-  host.querySelectorAll('td').forEach(td=>td.addEventListener('input',()=>{ p.table.rows[+td.dataset.r][+td.dataset.c]=td.textContent; }));
+  host.querySelectorAll('td').forEach(td=>td.addEventListener('input',()=>{ p.table.rows[+td.dataset.r][+td.dataset.c]=td.textContent; scheduleSave(); }));
 }
 function insertTable(){ let p=curPageObj(); if(!p) return; if(p.table){ toast('This page already has a table'); return; } p.table={rows:[['Item','Notes'],['',''],['','']]}; renderTable(); toast('Table inserted — tap cells to edit'); }
 function tableAddRow(){ let p=curPageObj(); p.table.rows.push(p.table.rows[0].map(()=>'') ); renderTable(); }
@@ -1478,10 +1599,10 @@ async function toggleRecord(){
     mediaRec.onstop=()=>{
       stream.getTracks().forEach(t=>t.stop());
       let blob=new Blob(recChunks,{type:mediaRec.mimeType||'audio/webm'});
-      p.audio={url:URL.createObjectURL(blob), dur:(Date.now()-S.recStart)/1000};
+      p.audio={url:URL.createObjectURL(blob), dur:(Date.now()-S.recStart)/1000, blob:blob};
       S.recording=false; $('recBtn').textContent='● Record';
       $('recStatus').textContent='Saved — ' + Math.round(p.audio.dur) + 's of audio synced to the ink you drew while recording.';
-      updateAudioUI(); toast('Audio note saved with this page');
+      updateAudioUI(); scheduleSave(); toast('Audio note saved with this page');
     };
     S.recStart=Date.now(); mediaRec.start(); S.recording=true;
     $('recBtn').textContent='■ Stop';
@@ -1517,7 +1638,7 @@ function openLink(title){
   toast('Created linked notebook “'+title+'”');
 }
 function updateWordCount(){ let v=$('noteText').value; $('wordCount').textContent=(v.trim()? v.trim().split(/\s+/).length:0)+' words'; refreshLinks(); }
-$('noteText').addEventListener('input',()=>{ updateWordCount(); });
+$('noteText').addEventListener('input',()=>{ saveEditorToModel(); updateWordCount(); });
 function toggleSplit(){
   S.split=!S.split;
   $('stageWrap').classList.toggle('split',S.split);
@@ -1773,9 +1894,10 @@ async function importPdf(f){
   try{
     pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     let buf=await f.arrayBuffer();
-    let doc=await pdfjsLib.getDocument({data:buf}).promise;
-    let book={id:uid(),kind:'pdf',title:f.name.replace(/\.[^.]+$/,''),color:'#4a5a74',updated:'Imported just now',doc:doc,numPages:doc.numPages,page:1,mode:'scroll',bookmarks:[],annotations:[],textCache:{},parallelNotes:{},fileName:f.name};
-    S.items.unshift(book); renderLibrary(); openBook(book.id);
+    let storedBuf=buf.slice(0); /* kept so the file itself is saved in this browser and the book reopens after a reload */
+    let doc=await pdfjsLib.getDocument({data:buf.slice(0)}).promise;
+    let book={id:uid(),kind:'pdf',title:f.name.replace(/\.[^.]+$/,''),color:'#4a5a74',updated:'Imported just now',doc:doc,numPages:doc.numPages,page:1,mode:'scroll',bookmarks:[],annotations:[],textCache:{},parallelNotes:{},fileName:f.name,fileData:storedBuf};
+    S.items.unshift(book); persistPdfFile(book); renderLibrary(); openBook(book.id);
   }catch(err){ toast('That PDF could not be opened'+(err&&err.message? ' ('+err.message+')':'')+' — password-protected or damaged files will not open'); }
 }
 
@@ -1827,7 +1949,7 @@ async function importEpub(f){
         let src=img.getAttribute('src')||img.getAttribute('xlink:href')||img.getAttribute('href'); if(!src||/^https?:|^data:/.test(src)) continue;
         let ipath=resolvePath(chBase, decodeURIComponent(src.split('#')[0]));
         let ifile=zip.file(ipath);
-        if(ifile){ let blob=await ifile.async('blob'); img.setAttribute('src', URL.createObjectURL(blob)); }
+        if(ifile){ let b64=await ifile.async('base64'); let ext=(ipath.split('.').pop()||'').toLowerCase(); let mime={'png':'image/png','jpg':'image/jpeg','jpeg':'image/jpeg','gif':'image/gif','webp':'image/webp','svg':'image/svg+xml'}[ext]||'image/png'; img.setAttribute('src','data:'+mime+';base64,'+b64); /* data URL, not a blob URL, so the image survives the book being saved and restored */ }
       }
       sanitizeHtml(doc);
       let body=doc.body; if(!body) continue;
@@ -1847,6 +1969,7 @@ async function importEpub(f){
 /* ============ reader ============ */
 function openBook(id){
   let b=S.items.find(i=>i.id===id); if(!b||b.kind==='notebook') return;
+  if(b.kind==='pdf' && !b.doc){ toast('This PDF\u2019s file could not be restored from this browser — import the file again to read it. Its bookmarks and annotations are kept.'); return; }
   S.curBookId=id;
   $('modeScrollBtn').classList.toggle('active',b.mode!=='page'); $('modePageBtn').classList.toggle('active',b.mode==='page');
   $('dictBox').classList.add('hidden'); $('ocrBox').classList.add('hidden'); $('parallelBox').classList.add('hidden');
@@ -1868,6 +1991,7 @@ function readerFont(d){ let cur=parseFloat(getComputedStyle(document.documentEle
 function toggleReaderSide(){ $('readerSide').classList.toggle('open'); }
 function updateResume(){
   let b=curBook(); if(!b) return;
+  scheduleSave();
   if(b.kind==='pdf'){ $('pageLabel').textContent='Page '+b.page+' / '+b.numPages; $('resumeLabel').textContent='Reading • '+b.title+' • Page '+b.page+' of '+b.numPages+' • '+Math.round(b.page/b.numPages*100)+'% — resumes here'; S.stats.pagesRead['pdf:'+b.id+':'+b.page]=1; }
   else { $('pageLabel').textContent='Chapter '+(b.ch+1)+' / '+b.chapters.length; $('resumeLabel').textContent='Reading • '+b.title+' • Chapter '+(b.ch+1)+' of '+b.chapters.length+' — resumes here'; S.stats.pagesRead['epub:'+b.id+':'+b.ch]=1; }
 }
@@ -2010,6 +2134,7 @@ window.addEventListener('resize',()=>{ if(S.view==='editor' && document.activeEl
 
 /* --- reader sidebar: TOC, bookmarks, annotations, thumbnails --- */
 async function renderReaderSide(){
+  scheduleSave();
   let b=curBook(); let toc=$('tocList'), bm=$('bookmarkList'), an=$('annoList'), th=$('thumbList');
   if(!b){ toc.innerHTML='<p class="kbd">Open a book to see its contents.</p>'; return; }
   bm.innerHTML= b.bookmarks.length? b.bookmarks.map(x=>'<div class="listRow"><span>'+esc(x.label)+'</span><button class="btn small" onclick="jumpBookmark('+x.at+')">Go</button></div>').join('') : '<p class="kbd">No bookmarks yet</p>';
@@ -2223,7 +2348,7 @@ function toggleParallel(){
   if(show){ let t=currentReadableText(); $('parallelOrig').textContent=t? t.slice(0,1600) : 'Open a book page first.'; let b=curBook(); if(b) $('parallelNotes').value=(b.parallelNotes&&b.parallelNotes[parallelKey()])||''; }
 }
 function parallelKey(){ let b=curBook(); if(!b) return 'x'; return b.kind==='pdf'? 'p'+b.page : 'c'+b.ch; }
-function saveParallelNotes(){ let b=curBook(); if(!b) return; if(!b.parallelNotes) b.parallelNotes={}; b.parallelNotes[parallelKey()]=$('parallelNotes').value; }
+function saveParallelNotes(){ let b=curBook(); if(!b) return; if(!b.parallelNotes) b.parallelNotes={}; b.parallelNotes[parallelKey()]=$('parallelNotes').value; scheduleSave(); }
 async function translateParallel(){
   let text=currentReadableText().slice(0,1400);
   if(!text){ toast('Nothing to translate on this page yet'); return; }
@@ -2250,6 +2375,7 @@ async function translateParallel(){
 /* --- PDF annotation: open the PDF in the editor, ink over its pages --- */
 async function annotatePdf(id){
   let b=S.items.find(i=>i.id===id); if(!b||b.kind!=='pdf') return;
+  if(!b.doc){ toast('This PDF\u2019s file could not be restored from this browser — import the file again to annotate it.'); return; }
   let existing=S.items.find(i=>i.kind==='notebook' && i.pdfBookId===id);
   if(existing){ openNotebook(existing.id); toast('Opened your annotation notebook for this PDF'); return; }
   toast('Preparing annotation pages…');
@@ -2303,7 +2429,35 @@ window.addEventListener('popstate',applyRoute);
 /* ============ init ============ */
 updateInkTouchAction();
 updateSizeUI();
-S.items.push(sampleBook());
-renderLibrary();
-if(/^#\/(note|book)\//.test(window.location.hash||'')){ applyRoute(); if(S.view==='library' && !S.curNbId && !S.curBookId) showView('library'); }
-else showView('library');
+initApp();
+async function initApp(){
+  /* Restore the shelf saved in this browser before first render, so a
+     reload or a closed tab brings everything back. If IndexedDB is
+     unavailable, fall back to a fresh shelf rather than a blank page.
+     If storage is merely slow, show a starter shelf WITHOUT enabling
+     saves — an empty shelf must never overwrite the saved one — and swap
+     the real shelf in when the restore lands. */
+  let myToken=++restoreToken;
+  let restorePromise=(async()=>{ try{ return await restoreLibrary(myToken); }catch(e){ return false; } })();
+  let raced=await Promise.race([ restorePromise.then(v=>({done:true,v:v})), new Promise(res=>setTimeout(()=>res({done:false}),15000)) ]);
+  if(raced.done){ finishInit(raced.v); return; }
+  if(!S.items.length) S.items.push(sampleBook());
+  renderLibrary(); showView('library');
+  toast('Your saved shelf is taking a while to open — give it a moment.',4000);
+  restorePromise.then(v=>{ if(v) finishInit(true); else { persistReady=true; updateSaveStatus(true); } });
+}
+let sigTimerStarted=false;
+function finishInit(restored){
+  if(!S.items.some(i=>i.id===SAMPLE_ID)) S.items.unshift(sampleBook());
+  persistReady=true;
+  renderLibrary();
+  if(/^#\/(note|book)\//.test(window.location.hash||'')){ applyRoute(); if(S.view==='library' && !S.curNbId && !S.curBookId) showView('library'); }
+  else showView('library');
+  updateSaveStatus(false);
+  if(navigator.storage && navigator.storage.persist){ try{ navigator.storage.persist(); }catch(e){} }
+  saveNow(); /* write the restored/fresh shelf back in the current format */
+  if(!sigTimerStarted){ sigTimerStarted=true;
+    let lastSig=librarySignature();
+    setInterval(()=>{ let sig=librarySignature(); if(sig!==lastSig){ lastSig=sig; scheduleSave(); } },4000);
+  }
+}
