@@ -789,6 +789,26 @@ function pointerPressure(e,pt){
 const SHAPE_TOOLS=['line','rect','ellipse','arrow'];
 function isShapeTool(t){ return SHAPE_TOOLS.indexOf(t)>=0; }
 function shouldDraw(e){ if(S.tool==='hand') return false; if(['select','text','lasso','vspace','spline','compass'].indexOf(S.tool)>=0 || isShapeTool(S.tool)) return true; if(e.pointerType==='touch' && $('fingerMode').value==='scroll') return false; return true; }
+/* Finger input used to fail silently: the Finger control defaulted to
+   "Scrolls page" and sat hidden inside More tools, so on a phone with no
+   stylus every pen stroke was swallowed — and touch-action:none meant the
+   drag didn't even scroll. Now Finger defaults to Draws and lives in the
+   always-visible toolbar. This keeps the canvas's touch behaviour in step
+   with the mode: drawing modes capture the gesture (touch-action:none);
+   Hand tool or Finger=Scrolls hands the gesture back to the browser so
+   the page genuinely pans instead of feeling dead. Pen/mouse input is
+   unaffected — browsers don't scroll on pen drags. */
+function updateInkTouchAction(){
+  let fm=$('fingerMode'); let fingerDraws= !fm || fm.value!=='scroll';
+  inkC.style.touchAction= (S.tool==='hand' || !fingerDraws)? 'pan-x pan-y' : 'none';
+}
+function onFingerMode(){
+  updateInkTouchAction();
+  let fm=$('fingerMode');
+  toast(fm && fm.value==='draw'
+    ? 'Finger draws on the page — tap the Hand tool when you want to drag-scroll instead.'
+    : 'Finger scrolls the page — a stylus or mouse still draws. Set Finger to “Draws” to write with your finger.');
+}
 function cloneStrokes(a){ return JSON.parse(JSON.stringify(a||[])); }
 function snapshotUndo(){ let p=curPageObj(); if(!p) return; S.undoStack.push({ink:cloneStrokes(p.ink),hi:cloneStrokes(p.hi)}); if(S.undoStack.length>60) S.undoStack.shift(); S.redoStack=[]; }
 function undoStroke(){ let p=curPageObj(); if(!p) return; let s=S.undoStack.pop(); if(!s){toast('Nothing to undo');return} S.redoStack.push({ink:cloneStrokes(p.ink),hi:cloneStrokes(p.hi)}); p.ink=s.ink; p.hi=s.hi; S.selection=[]; bumpV(p); redrawLayer('ink'); redrawLayer('hi'); drawSelectionOverlay(); renderPages(); }
@@ -818,7 +838,16 @@ inkC.addEventListener('pointerup',()=>{ if(barrelSavedTool!==null){ S.tool=barre
 inkC.addEventListener('pointercancel',()=>{ if(barrelSavedTool!==null){ S.tool=barrelSavedTool; barrelSavedTool=null; } });
 inkC.addEventListener('pointerdown',e=>{
   applyStylusButton(e);
-  if(!curPageObj() || !shouldDraw(e)) return;
+  if(!curPageObj()) return;
+  if(!shouldDraw(e)){
+    /* Never swallow a fingertip stroke silently again: if the pen family
+       is active but Finger is set to scroll, say exactly how to fix it. */
+    if(e.pointerType==='touch' && ['pen','calligraphy','highlighter','eraser'].indexOf(S.tool)>=0 && $('fingerMode').value==='scroll'){
+      let now=Date.now();
+      if(now-(inkC._hintAt||0)>6000){ inkC._hintAt=now; toast('Your finger is set to scroll, so it can’t draw. Set Finger to “Draws” in the toolbar to write with your finger — a stylus or mouse draws either way.',4600); }
+    }
+    return;
+  }
   let pt0=canvasPos(e);
   if(S.tool==='text'){ e.preventDefault(); addPageText(pt0); return; }
   if(S.tool==='select'){
@@ -1130,8 +1159,9 @@ function eraseAt(pt){
   if(changed){ eraseChanged=true; bumpV(p); redrawLayer('ink'); redrawLayer('hi'); }
 }
 function setTool(t,el){
-  if(S.tool===t && el && el.classList.contains('active')){ S.tool='hand'; document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('active',b.dataset.tool==='hand')); toast('Tool put down — hand mode'); return; }
+  if(S.tool===t && el && el.classList.contains('active')){ S.tool='hand'; document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('active',b.dataset.tool==='hand')); updateInkTouchAction(); toast('Tool put down — hand mode'); return; }
   S.tool=t; document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));
+  updateInkTouchAction();
 }
 function setColor(c,el){ S.color=c; document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active')); if(el) el.classList.add('active'); let cp=$('customColor'); if(cp && /^#[0-9a-f]{6}$/i.test(c)) cp.value=c; }
 function toggleLayer(which,on){ (which==='ink'?inkC:hiC).style.display= on? 'block':'none'; }
@@ -2135,6 +2165,7 @@ window.addEventListener('hashchange',applyRoute);
 window.addEventListener('popstate',applyRoute);
 
 /* ============ init ============ */
+updateInkTouchAction();
 S.items.push(sampleBook());
 renderLibrary();
 if(/^#\/(note|book)\//.test(window.location.hash||'')){ applyRoute(); if(S.view==='library' && !S.curNbId && !S.curBookId) showView('library'); }

@@ -147,6 +147,8 @@
       </span>
       <span class="sizeGroup"><span class="tool-label">Size</span>
       <input type="range" min="1" max="16" value="4" id="brushSize" style="width:100px"/></span>
+      <span class="sizeGroup"><span class="tool-label">Finger</span>
+      <select id="fingerMode" onchange="onFingerMode()" title="Whether a fingertip draws on the page or scrolls it — a stylus or mouse draws either way" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600"><option value="draw" selected>Draws</option><option value="scroll">Scrolls page</option></select></span>
       <span class="moreWrap" id="moreWrapC">
       <span class="tool-label">Template</span>
       <select id="templateSel" onchange="setTemplate(this.value)" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600">
@@ -163,8 +165,6 @@
       <select id="stylusBtnSel" class="shapeSel tbExtra" title="What the stylus barrel button / eraser end does while held"><option value="eraser">Eraser</option><option value="select">Select</option><option value="none">Nothing</option></select>
       <span class="tool-label tbExtra">Toolbar</span>
       <select id="toolbarLayoutSel" class="shapeSel tbExtra" onchange="setToolbarLayout(this.value)" title="Toolbar layout"><option value="">Comfortable</option><option value="compact">Compact</option><option value="minimal">Minimal</option></select>
-      <span class="tool-label">Finger</span>
-      <select id="fingerMode" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600"><option value="scroll">Scrolls page</option><option value="draw">Draws</option></select>
       <button class="btn small" onclick="openTimer()">Focus timer</button>
       <button class="btn small" onclick="toggleBoard()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Board</button>
       <button class="btn small" onclick="insertTable()">Insert table</button>
