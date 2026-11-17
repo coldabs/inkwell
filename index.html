@@ -33,12 +33,13 @@
       <button class="chip" data-filter="pdf" onclick="filterLib('pdf',this)">PDFs</button>
       <button class="chip" data-filter="epub" onclick="filterLib('epub',this)">EPUBs</button>
       <button class="chip dashed" type="button" onclick="openBook(SAMPLE_ID)">Sample book</button>
+      <button class="chip dashed" type="button" onclick="openBook(SAMPLE_PDF_ID)">Demo PDF</button>
       <button class="chip" type="button" onclick="toggleLibUtils()">Shelf options ▾</button>
     </div>
     <p class="kbd" id="libHint" style="margin:2px 0 10px"></p>
 
     <div id="emptyState" class="empty hidden">
-      <div class="emptyIcon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4a1 1 0 0 0-1-1H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg></div>
+      <div class="emptyIcon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 20.5V6.2A1.7 1.7 0 0 1 7.2 4.5h.6a1.7 1.7 0 0 1 1.7 1.7v14.3"/><path d="M5.5 9h4"/><path d="M9.5 20.5V8.7A1.7 1.7 0 0 1 11.2 7h.6a1.7 1.7 0 0 1 1.7 1.7v11.8"/><path d="M9.5 12h4"/><path d="M14.8 20.5l1.9-11.8a1.6 1.6 0 0 1 1.9-1.3l.7.2a1.6 1.6 0 0 1 1.2 1.9l-1.9 11.2"/><path d="M3.5 20.5h17"/></svg></div>
       <h3>A fresh, empty shelf</h3>
       <p style="color:var(--muted);line-height:1.6;max-width:340px;margin:0 auto;font-size:14px">Tap <strong>+ New notebook</strong> below to start your first notebook, or import a PDF or EPUB to read.</p>
     </div>
@@ -83,11 +84,8 @@
     <div class="editorTop">
       <button class="iconBtn" style="font-size:18px" onclick="showView('library')" aria-label="Back to library">←</button>
       <div style="flex:1;min-width:0">
-        <input id="noteTitle" value="Untitled notebook" aria-label="Notebook title" style="width:100%;border:0;background:transparent;font-family:var(--hand);font-size:25px;font-weight:600;outline:none;color:var(--ink);min-height:30px;padding:0" oninput="syncTitle()"/>
-        <div class="kbd" style="font-size:11px">Notebook</div>
+        <input id="noteTitle" value="Untitled notebook" aria-label="Notebook title" style="width:100%;border:0;background:transparent;font-family:var(--hand);font-size:25px;font-weight:600;outline:none;color:var(--ink);min-height:28px;padding:0" oninput="syncTitle()"/>
       </div>
-      <button class="iconBtn" onclick="undoStroke()" aria-label="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
-      <button class="iconBtn" onclick="redoStroke()" aria-label="Redo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></button>
       <button class="btn small edFocus" onclick="openTimer()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Focus</button>
       <span class="popWrap">
         <button class="btn small" id="exportBtn" aria-haspopup="true" aria-expanded="false" onclick="toggleExportMenu(this)">Export ▾</button>
@@ -123,8 +121,15 @@
       <span class="tbDivider" aria-hidden="true"></span>
       <button type="button" class="btn small hidden" id="splineDoneBtn" onclick="finishSpline()" style="flex:0 0 auto">Finish spline</button>
       <button type="button" class="tbBoardBtn" id="boardBtn" aria-pressed="false" onclick="toggleBoard()" title="Floating board — infinite canvas for drafting"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Board</button>
+      <span class="tbDivider" aria-hidden="true"></span>
+      <button class="iconBtn" onclick="undoStroke()" aria-label="Undo" title="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
+      <button class="iconBtn" onclick="redoStroke()" aria-label="Redo" title="Redo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></button>
+      <span class="tbDivider" aria-hidden="true"></span>
+      <button type="button" class="tbMenuBtn" id="toolOptsBtn" aria-expanded="false" aria-haspopup="true" onclick="toggleToolOpts(this)">Pen options ▾</button>
+      <button type="button" class="tbMenuBtn" id="insertBtn" aria-expanded="false" aria-haspopup="true" onclick="toggleInsertMenu(this)">Insert ▾</button>
+      <button type="button" class="tbMenuBtn" id="pageOptsBtn" aria-expanded="false" aria-haspopup="true" onclick="togglePageMenu(this)">Page ▾</button>
       </div>
-      <div class="tbRow tbRowOpts" aria-label="Size, colour and menus">
+      <div class="tbRow tbRowOpts" id="tbOptsRow" aria-label="Size and colour">
       <span class="sizeGroup" id="brushSizeGroup"><span class="tool-label" style="display:block">Size</span>
       <canvas id="sizePreview" width="64" height="30" style="width:52px;height:24px" aria-hidden="true"></canvas>
       <input type="range" min="1" max="16" value="4" id="brushSize" oninput="updateSizeUI()" aria-label="Brush size"/>
@@ -140,9 +145,6 @@
       <button class="swatch" style="background:#d1497a" onclick="setColor('#d1497a',this)" aria-label="Pink"></button>
       </span>
       <input type="color" class="colorPick" id="customColor" value="#1b2a4a" title="Custom colour" oninput="setColor(this.value,null)" aria-label="Custom colour"/>
-      <button type="button" class="tbMenuBtn" id="toolOptsBtn" aria-expanded="false" aria-haspopup="true" onclick="toggleToolOpts(this)">Pen options ▾</button>
-      <button type="button" class="tbMenuBtn" id="insertBtn" aria-expanded="false" aria-haspopup="true" onclick="toggleInsertMenu(this)">Insert ▾</button>
-      <button type="button" class="tbMenuBtn" id="pageOptsBtn" aria-expanded="false" aria-haspopup="true" onclick="togglePageMenu(this)">Page ▾</button>
       </div>
       <div class="statusBar" id="editorStatus" aria-live="polite"><span>Page <b id="statusPage">1 / 1</b></span><span>Layer <b id="statusLayer">Ink</b></span><span>Zoom <b id="statusZoom">100%</b></span><span>Tool <b id="statusTool">Pen</b></span><span style="flex:1"></span><span id="statusHint">One finger draws · Two fingers scroll</span></div>
       <div class="toolPop" id="toolOptsPop" role="menu" aria-label="Tool options">
@@ -219,17 +221,26 @@
               <div class="sqBtns"><button type="button" onclick="rotateSetSquare(-15)" title="Rotate −15°">↺</button><button type="button" onclick="rotateSetSquare(15)" title="Rotate +15°">↻</button><button type="button" onclick="toggleSetSquare(false)" title="Hide set square">×</button></div>
             </div>
             <div id="floatingBoard" class="board hidden">
-              <div class="boardHead" id="boardHead"><span>Floating board — infinite canvas</span><span><button class="btn small" onclick="cycleBoardColor()">Colour</button> <button class="btn small" onclick="toggleBoard(false)">Close</button></span></div>
+              <div class="boardHead" id="boardHead"><span>Floating board — infinite canvas</span><span><button class="btn small" onclick="cycleBoardColor()">Colour</button> <button class="btn small" id="boardFsBtn" onclick="toggleBoardFullscreen()">Expand</button> <button class="btn small" onclick="toggleBoard(false)">Close</button></span></div>
               <div class="boardTools">
                 <button class="btn small" id="boardPenBtn" onclick="setBoardTool('pen')">Pen</button>
                 <button class="btn small" id="boardPanBtn" onclick="setBoardTool('pan')">Pan</button>
                 <button class="btn small" onclick="boardZoom(1.25)">＋</button>
                 <button class="btn small" onclick="boardZoom(0.8)">－</button>
                 <button class="btn small" onclick="boardClear()">Clear</button>
-                <span class="kbd" style="color:#555">Scroll to zoom • two fingers pinch</span>
+                <span class="kbd" style="color:#555">Drag edges to resize • pinch to zoom</span>
               </div>
-              <canvas id="boardCanvas" width="720" height="460"></canvas>
-              <div class="boardGrip" id="boardGrip" title="Drag to resize"></div>
+              <div class="boardCanvasWrap">
+                <canvas id="boardCanvas" width="720" height="460"></canvas>
+                <div class="boardEdge n" data-bdir="n" title="Drag to resize"></div>
+                <div class="boardEdge s" data-bdir="s" title="Drag to resize"></div>
+                <div class="boardEdge w" data-bdir="w" title="Drag to resize"></div>
+                <div class="boardEdge e" data-bdir="e" title="Drag to resize"></div>
+                <div class="boardCorner nw" data-bdir="nw" title="Drag to resize"></div>
+                <div class="boardCorner ne" data-bdir="ne" title="Drag to resize"></div>
+                <div class="boardCorner sw" data-bdir="sw" title="Drag to resize"></div>
+                <div class="boardGrip" id="boardGrip" data-bdir="se" title="Drag to resize"></div>
+              </div>
             </div>
             <div id="stickyLayer"></div>
           </div></div>

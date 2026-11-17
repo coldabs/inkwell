@@ -17,7 +17,7 @@ function pageH(p){ if(p&&p.bgPdf&&p.bgPdf.img&&p.bgPdf.img.width&&p.bgPdf.img.he
 function syncPageHeight(){ let h=pageH(curPageObj()); if(h!==PH||bgC.height!==h){ PH=h; [bgC,hiC,inkC].forEach(c=>{c.height=h}); [bgX,hiX,inkX].forEach(c=>{c.lineCap='round';c.lineJoin='round'}); } }
 const SAMPLE_ID='sample-book';
 function blankPage(){return {ink:[],hi:[],text:'',stickies:[],table:null,board:null,audio:null,bgPdf:null,texts:[],images:[],texs:[],bgColor:'#fffdf6'}}
-function blankBoard(){return {color:0,strokes:[],view:{x:0,y:0,k:1}}}
+function blankBoard(){return {color:0,strokes:[],view:{x:0,y:0,k:1},geom:null}}
 const BOARD_COLORS=['#fffdf6','#f6e8c8','#d9e9f7','#dcf0dd','#f8e0e0','#e6def6','#39404e'];
 let S={
   items:[], filter:'all',
@@ -74,10 +74,10 @@ function serializeLibrary(){
       if(it.kind==='notebook') return {id:it.id,kind:'notebook',title:it.title,color:it.color,template:it.template,cur:it.cur,updated:it.updated,annotations:it.annotations||[],pdfBookId:it.pdfBookId||null,
         pages:(it.pages||[]).map(p=>({ink:p.ink||[],hi:p.hi||[],text:p.text||'',stickies:p.stickies||[],table:p.table||null,texts:p.texts||[],texs:p.texs||[],bgColor:p.bgColor||'#fffdf6',
           images:(p.images||[]).map(im=>({id:im.id,x:im.x,y:im.y,w:im.w,h:im.h,src:im.src})),
-          board:p.board?{color:p.board.color,strokes:p.board.strokes,view:p.board.view}:null,
+          board:p.board?{color:p.board.color,strokes:p.board.strokes,view:p.board.view,geom:p.board.geom||null}:null,
           audio:(p.audio&&p.audio.blob)?{blob:p.audio.blob,dur:p.audio.dur}:null,
           bgPdf:p.bgPdf?{page:p.bgPdf.page,bookTitle:p.bgPdf.bookTitle,imgData:bgPdfImgData(p.bgPdf)}:null }))};
-      if(it.kind==='pdf') return {id:it.id,kind:'pdf',title:it.title,color:it.color,updated:it.updated,fileName:it.fileName,numPages:it.numPages,page:it.page,mode:it.mode,bookmarks:it.bookmarks||[],annotations:it.annotations||[],textCache:it.textCache||{},parallelNotes:it.parallelNotes||{}};
+      if(it.kind==='pdf') return {id:it.id,kind:'pdf',title:it.title,color:it.color,updated:it.updated,sample:!!it.sample,fileName:it.fileName,numPages:it.numPages,page:it.page,mode:it.mode,bookmarks:it.bookmarks||[],annotations:it.annotations||[],textCache:it.textCache||{},parallelNotes:it.parallelNotes||{}};
       return {id:it.id,kind:'epub',title:it.title,color:it.color,updated:it.updated,sample:!!it.sample,ch:it.ch||0,mode:it.mode||'scroll',bookmarks:it.bookmarks||[],annotations:it.annotations||[],parallelNotes:it.parallelNotes||{},chapters:it.chapters||[]};
     })};
 }
@@ -108,7 +108,7 @@ async function restoreLibrary(token){
         p.ink=rp.ink||[]; p.hi=rp.hi||[]; p.text=rp.text||''; p.stickies=rp.stickies||[]; p.table=rp.table||null;
         p.texts=rp.texts||[]; p.texs=rp.texs||[]; p.bgColor=rp.bgColor||'#fffdf6';
         p.images=(rp.images||[]).map(im=>({id:im.id||uid(),x:im.x,y:im.y,w:im.w,h:im.h,src:im.src}));
-        p.board=rp.board?{color:rp.board.color||0,strokes:rp.board.strokes||[],view:rp.board.view||{x:0,y:0,k:1}}:null;
+        p.board=rp.board?{color:rp.board.color||0,strokes:rp.board.strokes||[],view:rp.board.view||{x:0,y:0,k:1},geom:rp.board.geom||null}:null;
         if(rp.audio && rp.audio.blob){ try{ p.audio={blob:rp.audio.blob,dur:rp.audio.dur||0,url:URL.createObjectURL(rp.audio.blob)}; }catch(e){} }
         if(rp.bgPdf){ p.bgPdf={page:rp.bgPdf.page,bookTitle:rp.bgPdf.bookTitle,img:null};
           if(rp.bgPdf.imgData){ try{ p.bgPdf.img=await dataUrlToCanvas(rp.bgPdf.imgData); }catch(e){} } }
@@ -118,7 +118,7 @@ async function restoreLibrary(token){
       if(nb.cur>=nb.pages.length) nb.cur=nb.pages.length-1; if(nb.cur<0) nb.cur=0;
       items.push(nb);
     } else if(raw.kind==='pdf'){
-      let b={id:raw.id,kind:'pdf',title:raw.title||'PDF',color:raw.color||'#4a5a74',updated:raw.updated||'',fileName:raw.fileName||raw.title,numPages:raw.numPages||0,page:raw.page||1,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],textCache:raw.textCache||{},parallelNotes:raw.parallelNotes||{},doc:null,fileData:null};
+      let b={id:raw.id,kind:'pdf',title:raw.title||'PDF',color:raw.color||'#4a5a74',updated:raw.updated||'',sample:!!raw.sample,fileName:raw.fileName||raw.title,numPages:raw.numPages||0,page:raw.page||1,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],textCache:raw.textCache||{},parallelNotes:raw.parallelNotes||{},doc:null,fileData:null};
       try{
         let fd=await idbGet('pdf:'+raw.id);
         if(fd){ b.fileData=fd;
@@ -143,7 +143,7 @@ async function restoreLibrary(token){
 function librarySignature(){
   try{
     return S.items.map(it=> it.kind==='notebook'
-      ? 'n:'+it.title+':'+it.cur+':'+it.pages.reduce((a,p)=>a+(p.ink||[]).length+(p.hi||[]).length+((p.text||'').length)+((p.stickies||[]).reduce((x,s)=>x+(s.text||'').length+((s.x|0)+(s.y|0)),0))+((p.table&&p.table.rows)?p.table.rows.reduce((x,r)=>x+r.join('').length,0):0)+((p.board&&p.board.strokes)?p.board.strokes.length:0)+(p.texts||[]).length+(p.texs||[]).length+(p.images||[]).length+(p.audio?1:0),0)
+      ? 'n:'+it.title+':'+it.cur+':'+it.pages.reduce((a,p)=>a+(p.ink||[]).length+(p.hi||[]).length+((p.text||'').length)+((p.stickies||[]).reduce((x,s)=>x+(s.text||'').length+((s.x|0)+(s.y|0)),0))+((p.table&&p.table.rows)?p.table.rows.reduce((x,r)=>x+r.join('').length,0):0)+((p.board&&p.board.strokes)?p.board.strokes.length:0)+(p.texts||[]).length+(p.texs||[]).length+(p.images||[]).length+(p.audio?1:0),0)+':'+it.pages.reduce((a,p)=>a+((p.board&&p.board.geom)?((p.board.geom.x|0)+','+(p.board.geom.y|0)+','+(p.board.geom.w|0)+','+(p.board.geom.h|0)+';'):''),'')
       : it.kind+':'+(it.title||'')+':'+(it.annotations||[]).length+':'+(it.bookmarks||[]).length+':'+(it.page||it.ch||0)+':'+Object.keys(it.parallelNotes||{}).length
     ).join('|')+'#'+S.stats.strokes+'#'+S.stats.focusDone;
   }catch(e){ return ''; }
@@ -174,6 +174,127 @@ function sampleBook(){
         'Slow reading is not a technique to master but a habit to keep: one page with full attention is worth more than a chapter at a glance. Keep the book open a moment after you finish. Let the last sentence settle.',
         'Then close it, and write one line of your own. Reading that ends in writing is reading that stays.'])
     ]};
+}
+
+/* ============ sample PDF (built-in demo, generated in-app) ============
+   A real four-page PDF with real selectable text, assembled byte by
+   byte right here — nothing to fetch — then handed to the reader
+   exactly like an imported PDF: its bytes are stored in this browser
+   under the same 'pdf:<id>' record, and its bookmarks, highlights and
+   reading place persist with the rest of the shelf. */
+const SAMPLE_PDF_ID='sample-pdf';
+function samplePdfBook(){
+  return { id:SAMPLE_PDF_ID, kind:'pdf', title:'Welcome to Inkwell — Demo PDF', sample:true, color:'#4a5a74', updated:'Sample',
+    fileName:'inkwell-welcome-demo.pdf', numPages:4, page:1, mode:'scroll', bookmarks:[], annotations:[], textCache:{}, parallelNotes:{}, doc:null, fileData:null };
+}
+function buildSamplePdfBytes(){
+  const escPdf=s=>String(s).replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');
+  /* lines: [font (h=Helvetica, b=Helvetica-Bold), size, leading, text] */
+  const pages=[
+    [ ['b',27,36,'Welcome to Inkwell'],
+      ['h',13,24,'A short demo PDF, built right into the app'],
+      ['h',11.5,20,''],
+      ['h',11.5,17,'This is a real PDF with real, selectable text. Everything you can'],
+      ['h',11.5,17,'do with a PDF you import yourself, you can try here first: read'],
+      ['h',11.5,17,'it, highlight a sentence, drop a bookmark, and open it as notebook'],
+      ['h',11.5,17,'pages to write on with pen, highlighter and the floating board.'],
+      ['h',11.5,20,''],
+      ['h',11.5,17,'Nothing here needs an account. Your books, notes and marks are'],
+      ['h',11.5,17,'saved in this browser, on this device, so the shelf you build'],
+      ['h',11.5,17,'today is still here when you come back tomorrow.'],
+      ['h',11.5,24,''],
+      ['b',14,22,'Try this first'],
+      ['h',11.5,17,'1. Drag across this sentence to select it, then tap Highlight.'],
+      ['h',11.5,17,'2. Tap Bookmark in the bar above to keep this page.'],
+      ['h',11.5,17,'3. Tap Annotate this PDF to write on a copy of the page.'] ],
+    [ ['b',22,32,'Reading, your way'],
+      ['h',11.5,17,'Books open in reading mode first. Scroll mode flows page after'],
+      ['h',11.5,17,'page like a long sheet; Page mode shows one page at a time, with'],
+      ['h',11.5,17,'Prev and Next to move between them. Your place is remembered'],
+      ['h',11.5,17,'either way, so you can stop mid-chapter and pick up later.'],
+      ['h',11.5,20,''],
+      ['h',11.5,17,'The side panel keeps the table of contents, your bookmarks and'],
+      ['h',11.5,17,'page thumbnails together, plus a list of every annotation you'],
+      ['h',11.5,17,'make - a highlight you add today is one tap away next week.'],
+      ['h',11.5,20,''],
+      ['h',11.5,17,'Themes restyle the page: Paper for daylight, Sepia for a warmer'],
+      ['h',11.5,17,'sheet, Night for reading in the dark. The text size steps up and'],
+      ['h',11.5,17,'down from the same bar, and Listen reads the page aloud.'],
+      ['h',11.5,20,''],
+      ['h',11.5,17,'Select any word to look it up in the dictionary or on Wikipedia,'],
+      ['h',11.5,17,'or run OCR over a scanned page to pull its print into text you'],
+      ['h',11.5,17,'can copy straight into a notebook.'] ],
+    [ ['b',22,32,'Marking up a PDF'],
+      ['h',11.5,17,'Highlight, underline and strikethrough work on selected text in'],
+      ['h',11.5,17,'the reader. Marks are stored as annotations on the book itself,'],
+      ['h',11.5,17,'so they survive closing the tab and coming back later.'],
+      ['h',11.5,20,''],
+      ['h',11.5,17,'For handwriting, tap Annotate this PDF. Each page becomes a'],
+      ['h',11.5,17,'notebook page with the PDF as its background: write over it with'],
+      ['h',11.5,17,'the pen, circle the important parts, add sticky notes, or open'],
+      ['h',11.5,17,'the floating board beside the page when you need an endless'],
+      ['h',11.5,17,'sheet to think on.'],
+      ['h',11.5,20,''],
+      ['h',11.5,17,'The board is infinite inside and resizable outside - drag any of'],
+      ['h',11.5,17,'its edges or corners to stretch the window bigger or smaller,'],
+      ['h',11.5,17,'and it remembers the size you gave it, page by page.'] ],
+    [ ['b',22,32,'Make it yours'],
+      ['h',11.5,17,'Import your own PDFs and EPUBs from the shelf and they join this'],
+      ['h',11.5,17,'demo and the sample book. Notebooks are unlimited: one per'],
+      ['h',11.5,17,'subject, per project, per idea that refuses to sit still.'],
+      ['h',11.5,20,''],
+      ['h',11.5,17,'Everything is saved automatically in this browser. When you want'],
+      ['h',11.5,17,'a copy somewhere else, Backup downloads the whole shelf as one'],
+      ['h',11.5,17,'file, and Restore brings it back on any device.'],
+      ['h',11.5,20,''],
+      ['h',11.5,17,'That is the tour. Close this demo, open the sample book, or start'],
+      ['h',11.5,17,'a notebook of your own - the shelf is yours now.'] ]
+  ];
+  const streams=pages.map(lines=>{
+    let y=726, out=[];
+    lines.forEach(L=>{
+      if(L[3]) out.push('BT /'+(L[0]==='b'?'F2':'F1')+' '+L[1]+' Tf 56 '+y.toFixed(1)+' Td ('+escPdf(L[3])+') Tj ET');
+      y-=L[2];
+    });
+    return out.join('\n');
+  });
+  const f1=3+2*pages.length, f2=f1+1, info=f2+1;
+  let objs=[];
+  objs[1]='<< /Type /Catalog /Pages 2 0 R >>';
+  objs[2]='<< /Type /Pages /Kids ['+pages.map((_,i)=>(3+2*i)+' 0 R').join(' ')+'] /Count '+pages.length+' >>';
+  pages.forEach((_,i)=>{
+    objs[3+2*i]='<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 '+f1+' 0 R /F2 '+f2+' 0 R >> >> /Contents '+(4+2*i)+' 0 R >>';
+    objs[4+2*i]='<< /Length '+streams[i].length+' >>\nstream\n'+streams[i]+'\nendstream';
+  });
+  objs[f1]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
+  objs[f2]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+  objs[info]='<< /Title (Welcome to Inkwell - Demo PDF) /Author (Inkwell) /Creator (Inkwell) >>';
+  let pdf='%PDF-1.4\n', offsets=[0];
+  for(let n=1;n<objs.length;n++){ offsets[n]=pdf.length; pdf+=n+' 0 obj\n'+objs[n]+'\nendobj\n'; }
+  let xrefPos=pdf.length;
+  pdf+='xref\n0 '+objs.length+'\n0000000000 65535 f \n';
+  for(let n=1;n<objs.length;n++) pdf+=String(offsets[n]).padStart(10,'0')+' 00000 n \n';
+  pdf+='trailer\n<< /Size '+objs.length+' /Root 1 0 R /Info '+info+' 0 R >>\nstartxref\n'+xrefPos+'\n%%EOF';
+  let bytes=new Uint8Array(pdf.length);
+  for(let i=0;i<pdf.length;i++) bytes[i]=pdf.charCodeAt(i)&0xff;
+  return bytes;
+}
+let samplePdfBuilding=false;
+async function ensureSamplePdf(){
+  let b=S.items.find(i=>i.id===SAMPLE_PDF_ID);
+  if(!b || b.doc || samplePdfBuilding) return;
+  samplePdfBuilding=true;
+  try{
+    if(!b.fileData){ let bytes=buildSamplePdfBytes(); b.fileData=bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset+bytes.byteLength); persistPdfFile(b); }
+    if(window.pdfjsLib){
+      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      let doc=await pdfjsLib.getDocument({data:b.fileData.slice(0)}).promise;
+      b.doc=doc; b.numPages=doc.numPages;
+    }
+    if(S.view==='library') renderLibrary();
+    scheduleSave();
+  }catch(e){}
+  samplePdfBuilding=false;
 }
 
 /* ============ views ============ */
@@ -220,7 +341,7 @@ function renderLibrary(){
     let cov=coverFor(n);
     let meta;
     if(n.kind==='notebook') meta='Notebook · '+itemPages(n)+(itemPages(n)===1?' page':' pages');
-    else if(n.kind==='pdf') meta='PDF · tap to read · '+(n.numPages||'?')+(n.numPages===1?' page':' pages');
+    else if(n.kind==='pdf') meta='PDF'+(n.sample?' · Sample':'')+' · tap to read · '+(n.numPages||'?')+(n.numPages===1?' page':' pages');
     else meta='EPUB'+(n.sample?' · Sample':'')+' · tap to read · '+(n.chapters?n.chapters.length:0)+' chapters';
     let openAct= n.kind==='notebook'? 'openNotebook(\''+n.id+'\')' : 'openBook(\''+n.id+'\')';
     let menu='<button type="button" onclick="event.stopPropagation();'+openAct+'">'+(n.kind==='notebook'?'Open':'Read')+'</button>'
@@ -1419,8 +1540,14 @@ function setTool(t,el){
   /* Gap 2: tapping the already-selected tool must NOT turn it off or
      switch to Hand — it stays selected until a different tool is picked. */
   S.tool=t; document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));
-  updateInkTouchAction(); updateSizeUI(); updateToolOptsUI(); updateStatusBar();
+  updateInkTouchAction(); updateSizeUI(); updateToolOptsUI(); updateStatusBar(); updateOptsRow();
 }
+/* The Size + colours row is only up while a tool that draws (or sizes
+   what it touches) is active — Hand / Select / Lasso / Vertical space
+   collapse it so the page gets the room back. The tool menus live in
+   the tools row now, so nothing becomes unreachable. */
+const OPTS_ROW_TOOLS=['pen','calligraphy','highlighter','eraser','text','line','rect','ellipse','arrow','spline','compass'];
+function updateOptsRow(){ var row=$('tbOptsRow'); if(!row) return; row.classList.toggle('hidden', OPTS_ROW_TOOLS.indexOf(S.tool)<0); }
 function setColor(c,el){ S.color=c; document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active')); if(el) el.classList.add('active'); let cp=$('customColor'); if(cp && /^#[0-9a-f]{6}$/i.test(c)) cp.value=c; updateSizeUI(); }
 function toggleLayer(which,on){ (which==='ink'?inkC:hiC).style.display= on? 'block':'none'; updateStatusBar(); }
 document.addEventListener('keydown',e=>{
@@ -1480,20 +1607,55 @@ function renderPages(){
 
 /* ============ floating board: true infinite canvas ============ */
 let boardTool='pen', bDrawing=false, bStroke=null, bLast=null, boardPointers={}, pinchStart=null;
+let boardFull=false, boardRestoreGeom=null, boardSizeQueued=false;
+const BOARD_MIN_W=260, BOARD_MIN_H=210;
 const boardC=$('boardCanvas'), bX=boardC.getContext('2d'); bX.lineCap='round'; bX.lineJoin='round';
 function pageBoard(){ let p=curPageObj(); if(!p) return null; if(!p.board) p.board=blankBoard(); return p.board; }
 function toggleBoard(force){
   let b=$('floatingBoard'); let show= typeof force==='boolean'? force : b.classList.contains('hidden');
   if(show){ closeAllToolPops(); closeExportPop(); var t=$('toast'); if(t) t.style.display='none'; }
+  if(!show && boardFull){ boardFull=false; boardRestoreGeom=null; b.classList.remove('boardFull'); var fb0=$('boardFsBtn'); if(fb0) fb0.textContent='Expand'; }
   b.classList.toggle('hidden',!show);
   var bb=$('boardBtn'); if(bb) bb.setAttribute('aria-pressed', show?'true':'false');
-  if(show){ b.style.left='8px'; b.style.top='8px'; b.style.right='8px'; b.style.width='auto'; loadBoard(); requestAnimationFrame(()=>{ sizeBoardCanvas(); var sh=$('canvasShell'); if(sh) sh.scrollIntoView({block:'nearest'}); }); }
+  if(show){ loadBoard(); requestAnimationFrame(()=>{ sizeBoardCanvas(); var sh=$('canvasShell'); if(sh) sh.scrollIntoView({block:'nearest'}); }); }
 }
 function loadBoard(){
   let bd=pageBoard(); if(!bd) return;
+  if(boardFull){ boardFull=false; boardRestoreGeom=null; $('floatingBoard').classList.remove('boardFull'); var fb=$('boardFsBtn'); if(fb) fb.textContent='Expand'; }
   $('floatingBoard').style.background=BOARD_COLORS[bd.color];
   if(bd.color===6){ $('floatingBoard').style.color='#f8fafc'; } else { $('floatingBoard').style.color='#1b2a4a'; }
+  applyBoardGeom(bd.geom||defaultBoardGeom());
   sizeBoardCanvas(); redrawBoard();
+}
+/* --- board window geometry: position + size, remembered per page ---
+   The canvas inside stays infinite; only this window frame changes.
+   Every move/resize starts from a snapshot of the current geometry and
+   writes clamped values back, so the board never jumps or drifts, and
+   the far edge stays pinned when dragging the top or left edge. */
+function boardGeomFromEl(){ let el=$('floatingBoard'); return {x:el.offsetLeft, y:el.offsetTop, w:el.offsetWidth, h:el.offsetHeight}; }
+function boardParentSize(){ let el=$('floatingBoard'); let op=el.offsetParent; return {w: op? op.clientWidth : window.innerWidth, h: op? op.clientHeight : window.innerHeight}; }
+function clampBoardSize(g){ let ps=boardParentSize(); let maxW=Math.max(BOARD_MIN_W, Math.min(ps.w, window.innerWidth)-4); let maxH=Math.max(BOARD_MIN_H, Math.min(ps.h, window.innerHeight)-4); g.w=Math.round(Math.max(BOARD_MIN_W, Math.min(maxW, g.w))); g.h=Math.round(Math.max(BOARD_MIN_H, Math.min(maxH, g.h))); return g; }
+function clampBoardPos(g){ let ps=boardParentSize(); g.x=Math.round(Math.max(0, Math.min(Math.max(0, ps.w-56), g.x))); g.y=Math.round(Math.max(0, Math.min(Math.max(0, ps.h-44), g.y))); return g; }
+function applyBoardGeom(g){ let el=$('floatingBoard'); if(!g || el.classList.contains('hidden')) return; let c=clampBoardPos(clampBoardSize({x:+g.x||0, y:+g.y||0, w:+g.w||360, h:+g.h||316})); el.style.left=c.x+'px'; el.style.top=c.y+'px'; el.style.right='auto'; el.style.bottom='auto'; el.style.width=c.w+'px'; el.style.height=c.h+'px'; }
+function defaultBoardGeom(){ let ps=boardParentSize(); return {x:8, y:8, w:Math.max(BOARD_MIN_W, ps.w-16), h:316}; }
+function saveBoardGeom(){ let bd=pageBoard(); if(!bd || boardFull) return; bd.geom=boardGeomFromEl(); }
+function queueBoardSize(){ if(boardSizeQueued) return; boardSizeQueued=true; requestAnimationFrame(()=>{ boardSizeQueued=false; sizeBoardCanvas(); }); }
+function toggleBoardFullscreen(){
+  let el=$('floatingBoard'); if(el.classList.contains('hidden')) return;
+  if(boardFull){ exitBoardFullscreen(false); return; }
+  boardRestoreGeom=boardGeomFromEl();
+  boardFull=true; el.classList.add('boardFull');
+  var fb=$('boardFsBtn'); if(fb) fb.textContent='Restore';
+  sizeBoardCanvas();
+}
+function exitBoardFullscreen(silent){
+  let el=$('floatingBoard'); boardFull=false; el.classList.remove('boardFull');
+  let bd=pageBoard(); let g=boardRestoreGeom||(bd&&bd.geom)||defaultBoardGeom(); boardRestoreGeom=null;
+  applyBoardGeom(g);
+  if(bd) bd.geom=boardGeomFromEl();
+  var fb=$('boardFsBtn'); if(fb) fb.textContent='Expand';
+  sizeBoardCanvas();
+  if(!silent) scheduleSave();
 }
 function sizeBoardCanvas(){
   let w=boardC.clientWidth||340, h=boardC.clientHeight||230, dpr=Math.min(window.devicePixelRatio||1,2);
@@ -1514,13 +1676,18 @@ function redrawBoard(){
 }
 function boardWorld(e){ let r=boardC.getBoundingClientRect(); let bd=pageBoard(); let sx=(e.clientX-r.left)*(boardC.width/r.width), sy=(e.clientY-r.top)*(boardC.height/r.height); return { x:(sx-bd.view.x)/bd.view.k, y:(sy-bd.view.y)/bd.view.k, sx, sy }; }
 function setBoardTool(t){ boardTool=t; $('boardPenBtn').classList.toggle('primary',t==='pen'); $('boardPanBtn').classList.toggle('primary',t==='pan'); boardC.style.cursor= t==='pan'?'grab':'crosshair'; }
+/* Board strokes use the same ink colour selected in the toolbar as
+   strokes on the page itself. The one exception: on the dark Slate
+   board the untouched default navy would be invisible, so the light
+   default stays there until the user actually picks a colour. */
+function boardInkColor(bd){ let c=S.color||'#1b2a4a'; if(bd && bd.color===6 && String(c).toLowerCase()==='#1b2a4a') return '#f8fafc'; return c; }
 boardC.addEventListener('pointerdown',e=>{
   boardC.setPointerCapture(e.pointerId); boardPointers[e.pointerId]={x:e.clientX,y:e.clientY};
   if(Object.keys(boardPointers).length===2){ let ps=Object.values(boardPointers); pinchStart={d:Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y), k:pageBoard().view.k}; bDrawing=false; bStroke=null; return; }
   let w=boardWorld(e);
   if(boardTool==='pan'){ bLast={x:e.clientX,y:e.clientY}; bDrawing=true; return; }
   bDrawing=true; let bd=pageBoard();
-  bStroke={color: bd.color===6? '#f8fafc':'#1b2a4a', size:3/bd.view.k*1.6, points:[{x:w.x,y:w.y}]};
+  bStroke={color: boardInkColor(bd), size:3/bd.view.k*1.6, points:[{x:w.x,y:w.y}]};
   bLast=w;
 });
 boardC.addEventListener('pointermove',e=>{
@@ -1540,15 +1707,57 @@ boardC.addEventListener('wheel',e=>{ e.preventDefault(); let bd=pageBoard(); let
 function boardZoom(f){ let bd=pageBoard(); bd.view.k=Math.max(0.2,Math.min(6,bd.view.k*f)); redrawBoard(); }
 function boardClear(){ let bd=pageBoard(); askConfirm('Clear this board?','The board on this page is emptied; the page itself is untouched.',()=>{ bd.strokes=[]; redrawBoard(); renderPages(); }); }
 function cycleBoardColor(){ let bd=pageBoard(); bd.color=(bd.color+1)%BOARD_COLORS.length; loadBoard(); scheduleSave(); toast('Board colour saved for this page'); }
-/* drag + resize board */
-let dragB=null;
-$('boardHead').addEventListener('pointerdown',e=>{ if(e.target.tagName==='BUTTON') return; let el=$('floatingBoard'); dragB={x:e.clientX,y:e.clientY,l:el.offsetLeft,t:el.offsetTop}; });
-let gripDrag=null;
-$('boardGrip').addEventListener('pointerdown',e=>{ e.stopPropagation(); let el=$('floatingBoard'); gripDrag={x:e.clientX,y:e.clientY,w:el.offsetWidth,h:boardC.clientHeight}; $('boardGrip').setPointerCapture(e.pointerId); });
-$('boardGrip').addEventListener('pointermove',e=>{ if(!gripDrag) return; let el=$('floatingBoard'); el.style.width=Math.max(240,gripDrag.w+(e.clientX-gripDrag.x))+'px'; boardC.style.height=Math.max(140,gripDrag.h+(e.clientY-gripDrag.y))+'px'; sizeBoardCanvas(); });
-$('boardGrip').addEventListener('pointerup',()=>gripDrag=null);
-window.addEventListener('pointermove',e=>{ if(!dragB) return; let el=$('floatingBoard'); el.style.left=(dragB.l+e.clientX-dragB.x)+'px'; el.style.top=(dragB.t+e.clientY-dragB.y)+'px'; el.style.right='auto'; });
-window.addEventListener('pointerup',()=>dragB=null);
+/* drag + resize board — built for steady controls:
+   - the head captures the pointer, so a drag tracks one finger/mouse
+     exactly and never drifts or gets lost mid-move;
+   - taps on the head's buttons never start a drag;
+   - every edge and corner resizes from a snapshot of the starting
+     geometry, with the opposite edge pinned — no jumping, no shift;
+   - handles are children of the board frame, so they stay glued to
+     their edge/corner while the board moves or resizes. */
+let dragB=null, resizeB=null;
+const boardHeadEl=$('boardHead');
+boardHeadEl.addEventListener('pointerdown',e=>{
+  if(boardFull) return;
+  if(e.target.closest('button')) return;
+  dragB={x0:e.clientX, y0:e.clientY, g0:boardGeomFromEl()};
+  try{ boardHeadEl.setPointerCapture(e.pointerId); }catch(err){}
+});
+boardHeadEl.addEventListener('pointermove',e=>{
+  if(!dragB) return;
+  let g=clampBoardPos({x:dragB.g0.x+(e.clientX-dragB.x0), y:dragB.g0.y+(e.clientY-dragB.y0), w:dragB.g0.w, h:dragB.g0.h});
+  let el=$('floatingBoard'); el.style.left=g.x+'px'; el.style.top=g.y+'px'; el.style.right='auto'; el.style.bottom='auto';
+});
+function boardDragEnd(){ if(!dragB) return; dragB=null; saveBoardGeom(); scheduleSave(); }
+boardHeadEl.addEventListener('pointerup',boardDragEnd);
+boardHeadEl.addEventListener('pointercancel',boardDragEnd);
+document.querySelectorAll('#floatingBoard [data-bdir]').forEach(h=>{
+  h.addEventListener('pointerdown',e=>{
+    if(boardFull) return;
+    e.preventDefault(); e.stopPropagation();
+    let g0=boardGeomFromEl();
+    resizeB={dir:h.getAttribute('data-bdir'), x0:e.clientX, y0:e.clientY, g0:g0, right:g0.x+g0.w, bottom:g0.y+g0.h, el:h};
+    try{ h.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  h.addEventListener('pointermove',e=>{
+    if(!resizeB || resizeB.el!==h) return;
+    let dx=e.clientX-resizeB.x0, dy=e.clientY-resizeB.y0, d=resizeB.dir;
+    let g={x:resizeB.g0.x, y:resizeB.g0.y, w:resizeB.g0.w, h:resizeB.g0.h};
+    if(d.indexOf('e')>=0) g.w=resizeB.g0.w+dx;
+    if(d.indexOf('s')>=0) g.h=resizeB.g0.h+dy;
+    if(d.indexOf('w')>=0) g.w=resizeB.g0.w-dx;
+    if(d.indexOf('n')>=0) g.h=resizeB.g0.h-dy;
+    clampBoardSize(g);
+    if(d.indexOf('w')>=0) g.x=resizeB.right-g.w;
+    if(d.indexOf('n')>=0) g.y=resizeB.bottom-g.h;
+    clampBoardPos(g);
+    let el=$('floatingBoard'); el.style.left=g.x+'px'; el.style.top=g.y+'px'; el.style.right='auto'; el.style.bottom='auto'; el.style.width=g.w+'px'; el.style.height=g.h+'px';
+    queueBoardSize();
+  });
+  function resizeEnd(){ if(!resizeB || resizeB.el!==h) return; resizeB=null; saveBoardGeom(); scheduleSave(); sizeBoardCanvas(); }
+  h.addEventListener('pointerup',resizeEnd);
+  h.addEventListener('pointercancel',resizeEnd);
+});
 
 /* ============ stickies & tables ============ */
 const STICKY_COLORS=['#fef08a','#fda4af','#93c5fd','#86efac','#f3e8c8'];
@@ -1850,7 +2059,7 @@ function exportBackup(){
   saveEditorToModel();
   let data={app:'inkwell', version:2, exported:new Date().toISOString(),
     notebooks:S.items.filter(i=>i.kind==='notebook').map(nb=>({title:nb.title,color:nb.color,template:nb.template,cur:nb.cur,
-      pages:nb.pages.map(p=>({ink:p.ink,hi:p.hi,text:p.text,stickies:p.stickies,table:p.table,texts:p.texts||[],texs:p.texs||[],images:(p.images||[]).map(im=>({x:im.x,y:im.y,w:im.w,h:im.h,src:im.src})),bgColor:p.bgColor||'#fffdf6',board:p.board?{color:p.board.color,strokes:p.board.strokes}:null, bgPdf:p.bgPdf?{bookTitle:p.bgPdf.bookTitle,page:p.bgPdf.page}:null}))})),
+      pages:nb.pages.map(p=>({ink:p.ink,hi:p.hi,text:p.text,stickies:p.stickies,table:p.table,texts:p.texts||[],texs:p.texs||[],images:(p.images||[]).map(im=>({x:im.x,y:im.y,w:im.w,h:im.h,src:im.src})),bgColor:p.bgColor||'#fffdf6',board:p.board?{color:p.board.color,strokes:p.board.strokes,view:p.board.view,geom:p.board.geom||null}:null, bgPdf:p.bgPdf?{bookTitle:p.bgPdf.bookTitle,page:p.bgPdf.page}:null}))})),
     bookNotes:S.items.filter(i=>i.kind!=='notebook').map(b=>({title:b.title,kind:b.kind,bookmarks:b.bookmarks,annotations:b.annotations,page:b.page,ch:b.ch,parallelNotes:b.parallelNotes}))};
   download('inkwell-backup.json', new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
   toast('Backup downloaded — notebooks in full, book marks & annotations included');
@@ -1878,7 +2087,7 @@ function importBackup(e){
       if(data.app!=='inkwell' || !Array.isArray(data.notebooks)) throw new Error('not an Inkwell backup');
       data.notebooks.forEach(nb=>{
         let item={id:uid(), kind:'notebook', title:nb.title||'Restored notebook', color:nb.color||'#b4552d', template:nb.template||'lined', cur:nb.cur||0, updated:'Restored', annotations:[],
-          pages:(nb.pages&&nb.pages.length?nb.pages:[{}]).map(p=>({ink:p.ink||[],hi:p.hi||[],text:p.text||'',stickies:p.stickies||[],table:p.table||null,texts:p.texts||[],texs:p.texs||[],images:(p.images||[]).map(im=>({id:uid(),x:im.x,y:im.y,w:im.w,h:im.h,src:im.src})),bgColor:p.bgColor||'#fffdf6',board:p.board?{color:p.board.color,strokes:p.board.strokes,view:{x:0,y:0,k:1}}:null,audio:null,bgPdf:p.bgPdf?{img:null,page:p.bgPdf.page,bookTitle:p.bgPdf.bookTitle}:null}))};
+          pages:(nb.pages&&nb.pages.length?nb.pages:[{}]).map(p=>({ink:p.ink||[],hi:p.hi||[],text:p.text||'',stickies:p.stickies||[],table:p.table||null,texts:p.texts||[],texs:p.texs||[],images:(p.images||[]).map(im=>({id:uid(),x:im.x,y:im.y,w:im.w,h:im.h,src:im.src})),bgColor:p.bgColor||'#fffdf6',board:p.board?{color:p.board.color,strokes:p.board.strokes,view:p.board.view||{x:0,y:0,k:1},geom:p.board.geom||null}:null,audio:null,bgPdf:p.bgPdf?{img:null,page:p.bgPdf.page,bookTitle:p.bgPdf.bookTitle}:null}))};
         S.items.unshift(item);
       });
       (data.bookNotes||[]).forEach(bn=>{ let b=S.items.find(i=>i.title===bn.title && i.kind===bn.kind); if(b){ b.bookmarks=bn.bookmarks||b.bookmarks; b.annotations=bn.annotations||b.annotations; b.parallelNotes=bn.parallelNotes||{}; } });
@@ -1982,7 +2191,9 @@ async function importEpub(f){
 /* ============ reader ============ */
 function openBook(id){
   let b=S.items.find(i=>i.id===id); if(!b||b.kind==='notebook') return;
-  if(b.kind==='pdf' && !b.doc){ toast('This PDF\u2019s file could not be restored from this browser — import the file again to read it. Its bookmarks and annotations are kept.'); return; }
+  if(b.kind==='pdf' && !b.doc){
+    if(b.id===SAMPLE_PDF_ID){ ensureSamplePdf().then(()=>{ if(b.doc) openBook(id); else toast('The demo PDF could not be prepared — the PDF engine may still be loading. Try again in a moment.'); }); return; }
+    toast('This PDF\u2019s file could not be restored from this browser — import the file again to read it. Its bookmarks and annotations are kept.'); return; }
   S.curBookId=id;
   $('modeScrollBtn').classList.toggle('active',b.mode!=='page'); $('modePageBtn').classList.toggle('active',b.mode==='page');
   $('dictBox').classList.add('hidden'); $('ocrBox').classList.add('hidden'); $('parallelBox').classList.add('hidden');
@@ -2443,6 +2654,7 @@ window.addEventListener('popstate',applyRoute);
 updateInkTouchAction();
 updateSizeUI();
 updateToolOptsUI();
+updateOptsRow();
 initApp();
 async function initApp(){
   /* Restore the shelf saved in this browser before first render, so a
@@ -2455,7 +2667,7 @@ async function initApp(){
   let restorePromise=(async()=>{ try{ return await restoreLibrary(myToken); }catch(e){ return false; } })();
   let raced=await Promise.race([ restorePromise.then(v=>({done:true,v:v})), new Promise(res=>setTimeout(()=>res({done:false}),15000)) ]);
   if(raced.done){ finishInit(raced.v); return; }
-  if(!S.items.length) S.items.push(sampleBook());
+  if(!S.items.length){ S.items.push(sampleBook()); S.items.push(samplePdfBook()); ensureSamplePdf(); }
   renderLibrary(); showView('library');
   toast('Your saved shelf is taking a while to open — give it a moment.',4000);
   restorePromise.then(v=>{ if(v) finishInit(true); else { persistReady=true; updateSaveStatus(true); } });
@@ -2463,6 +2675,8 @@ async function initApp(){
 let sigTimerStarted=false;
 function finishInit(restored){
   if(!S.items.some(i=>i.id===SAMPLE_ID)) S.items.unshift(sampleBook());
+  if(!S.items.some(i=>i.id===SAMPLE_PDF_ID)){ let ix=S.items.findIndex(i=>i.id===SAMPLE_ID); S.items.splice(ix>=0? ix+1 : S.items.length, 0, samplePdfBook()); }
+  ensureSamplePdf();
   persistReady=true;
   renderLibrary();
   if(/^#\/(note|book)\//.test(window.location.hash||'')){ applyRoute(); if(S.view==='library' && !S.curNbId && !S.curBookId) showView('library'); }
