@@ -233,6 +233,9 @@ details.helpBox summary{cursor:pointer;font-size:12px;font-weight:700;letter-spa
 .sizeGroup{display:inline-flex;align-items:center;gap:2px;flex:0 0 auto;white-space:nowrap}
 .sizeRow{display:flex;align-items:center;gap:10px;margin-top:8px}
 .sizeRow input[type=range]{flex:1;width:auto!important}
+/* Brush size: plain-word label + live preview of the stroke at its real width */
+.sizeWord{font-size:12px;font-weight:700;white-space:nowrap;color:var(--ink)}
+#sizePreview{flex:0 0 auto;display:block}
 /* P7: page label never wraps; duplicate button carries a real SVG icon */
 .pageThumb .ptRow{flex-wrap:wrap}
 .pageThumb .ptRow .kbd{white-space:nowrap}

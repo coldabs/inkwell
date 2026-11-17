@@ -28,7 +28,7 @@ let S={
   stats:{writeSec:0, readSec:0, strokes:0, pagesRead:{}, focusDone:0},
   split:false, recording:false, recStart:0,
   searchResults:[], zoom:1, selection:[], selRect:null,
-  strokeStyle:'solid', eraserMode:'split', stabilize:28, snapGrid:false, clipboard:[]
+  strokeStyle:'solid', eraserMode:'stroke', stabilize:28, snapGrid:false, clipboard:[]
 };
 function curNb(){return S.items.find(i=>i.id===S.curNbId)||null}
 function curBook(){return S.items.find(i=>i.id===S.curBookId)||null}
@@ -939,6 +939,7 @@ function endStroke(){
     p[layer].push(finalStroke); S.stats.strokes++; redrawLayer(layer); bumpV(p);
   }
   curStroke=null; lastPt=null;
+  if(S.tool==='eraser'){ redrawLayer('ink'); redrawLayer('hi'); } /* clear the eraser touch ring */
   renderPages();
 }
 inkC.addEventListener('pointerup',endStroke);
@@ -1125,17 +1126,103 @@ function shapeToPolylines(st){
   if(st.shape==='arrow'){ let ang=Math.atan2(b.y-a.y,b.x-a.x), hl=18+st.size*2; let h1={x:b.x-hl*Math.cos(ang-0.42),y:b.y-hl*Math.sin(ang-0.42)}, h2={x:b.x-hl*Math.cos(ang+0.42),y:b.y-hl*Math.sin(ang+0.42)}; return [mk([{x:a.x,y:a.y},{x:b.x,y:b.y}]), mk([h1,{x:b.x,y:b.y},h2])]; }
   return [];
 }
+/* Whole-stroke eraser: the touch zone grows with the Size slider, and the
+   hit test measures the true distance from the eraser's path to the stroke
+   itself — never its bounding box — so touching a stroke deletes exactly
+   that stroke, nearby strokes survive, and a fast flick still catches the
+   strokes it sweeps across between pointer samples. */
+function eraserRadius(){ return 16 + (+$('brushSize').value)*3; }
+function distPtSeg(px,py,ax,ay,bx,by){
+  let dx=bx-ax, dy=by-ay, l2=dx*dx+dy*dy;
+  let t= l2? Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/l2)) : 0;
+  return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
+}
+function segSegDist(a,b,c,d){
+  function orient(p,q,r){ let v=(q.x-p.x)*(r.y-p.y)-(q.y-p.y)*(r.x-p.x); return v===0?0:(v>0?1:2); }
+  function onSeg(p,q,r){ return q.x<=Math.max(p.x,r.x) && q.x>=Math.min(p.x,r.x) && q.y<=Math.max(p.y,r.y) && q.y>=Math.min(p.y,r.y); }
+  let o1=orient(a,b,c), o2=orient(a,b,d), o3=orient(c,d,a), o4=orient(c,d,b);
+  if(o1!==o2 && o3!==o4) return 0;
+  if(o1===0 && onSeg(a,c,b)) return 0;
+  if(o2===0 && onSeg(a,d,b)) return 0;
+  if(o3===0 && onSeg(c,a,d)) return 0;
+  if(o4===0 && onSeg(c,b,d)) return 0;
+  return Math.min(
+    distPtSeg(a.x,a.y,c.x,c.y,d.x,d.y), distPtSeg(b.x,b.y,c.x,c.y,d.x,d.y),
+    distPtSeg(c.x,c.y,a.x,a.y,b.x,b.y), distPtSeg(d.x,d.y,a.x,a.y,b.x,b.y));
+}
+function strokeTouchedByEraser(st,a,b){
+  let tol=eraserRadius() + strokeWidthOf(st)/2;
+  if(st.tool==='shape' && st.fill){
+    /* A filled shape is solid: touching its inside deletes it too. */
+    let p0=st.points[0], p1=st.points[st.points.length-1];
+    if(p0 && p1){
+      if(st.shape==='ellipse'){
+        let cx=(p0.x+p1.x)/2, cy=(p0.y+p1.y)/2, rx=Math.abs(p1.x-p0.x)/2+tol, ry=Math.abs(p1.y-p0.y)/2+tol;
+        if(rx>0 && ry>0){ let inside=q=>((q.x-cx)*(q.x-cx))/(rx*rx)+((q.y-cy)*(q.y-cy))/(ry*ry)<=1; if(inside(a)||inside(b)) return true; }
+      } else {
+        let x1=Math.min(p0.x,p1.x)-tol, x2=Math.max(p0.x,p1.x)+tol, y1=Math.min(p0.y,p1.y)-tol, y2=Math.max(p0.y,p1.y)+tol;
+        let inside=q=> q.x>=x1 && q.x<=x2 && q.y>=y1 && q.y<=y2;
+        if(inside(a)||inside(b)||inside({x:(a.x+b.x)/2,y:(a.y+b.y)/2})) return true;
+      }
+    }
+  }
+  let polys= st.tool==='shape'? shapeToPolylines(st) : [st];
+  for(let pi=0; pi<polys.length; pi++){
+    let pts=polys[pi].points; if(!pts || !pts.length) continue;
+    if(pts.length===1){ if(distPtSeg(pts[0].x,pts[0].y,a.x,a.y,b.x,b.y)<=tol) return true; continue; }
+    for(let i=1;i<pts.length;i++){ if(segSegDist(a,b,pts[i-1],pts[i])<=tol) return true; }
+  }
+  return false;
+}
+function drawEraserCursor(pt){
+  if(S.tool!=='eraser' || S.eraserMode!=='stroke' || !pt) return;
+  inkX.save(); inkX.strokeStyle='rgba(178,38,30,.8)'; inkX.lineWidth=2;
+  inkX.beginPath(); inkX.arc(pt.x,pt.y,eraserRadius(),0,7); inkX.stroke(); inkX.restore();
+}
+/* Brush size in plain words, with a live preview drawn at the stroke's real
+   width (in page-canvas units) in the current ink colour — so how thick the
+   next stroke will be is obvious at a glance, no numbers to decode. */
+function sizeWord(v){ return v<=3? 'Thin' : v<=7? 'Medium' : v<=11? 'Thick' : 'Extra thick'; }
+function updateSizeUI(){
+  let slider=$('brushSize'); if(!slider) return;
+  let v=+slider.value;
+  let w=$('sizeWord'); if(w) w.textContent=sizeWord(v);
+  let c=$('sizePreview'); if(!c) return;
+  let x=c.getContext('2d'); x.clearRect(0,0,c.width,c.height);
+  x.lineCap='round'; x.lineJoin='round';
+  let midY=c.height/2;
+  if(S.tool==='eraser' && S.eraserMode!=='whiteout'){
+    /* Preview the eraser's touch zone instead of a stroke. */
+    x.strokeStyle='#b2261e'; x.lineWidth=1.6; x.setLineDash([4,3]);
+    x.beginPath(); x.arc(c.width/2,midY,Math.min(13,5+v*0.55),0,7); x.stroke(); x.setLineDash([]);
+    return;
+  }
+  let width, alpha=1;
+  if(S.tool==='highlighter'){ width=Math.min(26, v*4.5); alpha=0.45; }
+  else if(S.tool==='eraser'){ width=Math.min(28, Math.max(10, v*3)*1.8); } /* whiteout paints a page-coloured stroke */
+  else if(isShapeTool(S.tool) || S.tool==='compass'){ width=Math.max(1.5, v*1.4); }
+  else if(S.tool==='calligraphy'){ width=v*1.7; }
+  else { width=v*1.8; }
+  x.strokeStyle= S.tool==='eraser'? '#c9c2ae' : S.color;
+  x.globalAlpha= (S.tool==='eraser')? 1 : alpha;
+  x.lineWidth=Math.max(1,width);
+  x.beginPath(); x.moveTo(5,midY+3); x.quadraticCurveTo(c.width/2,midY-4,(c.width-5),midY+3); x.stroke();
+  x.globalAlpha=1;
+}
 function eraseAt(pt){
   let p=curPageObj(); if(!p) return;
   if(S.eraserMode==='stroke'){
-    /* Delete-stroke eraser: one touch removes any stroke the eraser square overlaps. */
-    let half=8+(+$('brushSize').value); let hit=false;
+    /* Whole-stroke eraser: touch a stroke and it's gone. The test sweeps
+       the segment from the previous sample to this one, so strokes crossed
+       mid-drag are caught too. */
+    let a=lastPt||pt, b=pt, hit=false;
     ['ink','hi'].forEach(layer=>{
       let before=p[layer].length;
-      p[layer]=p[layer].filter(st=>{ let b=strokeBBox(st); return !(b.x2>=pt.x-half && b.x1<=pt.x+half && b.y2>=pt.y-half && b.y1<=pt.y+half); });
+      p[layer]=p[layer].filter(st=>!strokeTouchedByEraser(st,a,b));
       if(p[layer].length!==before) hit=true;
     });
-    if(hit){ eraseChanged=true; bumpV(p); redrawLayer('ink'); redrawLayer('hi'); }
+    if(hit){ eraseChanged=true; bumpV(p); }
+    redrawLayer('ink'); redrawLayer('hi'); drawEraserCursor(b);
     return;
   }
   let half=8+(+$('brushSize').value); /* halfEraserSize: half the side of the eraser square */
@@ -1159,11 +1246,11 @@ function eraseAt(pt){
   if(changed){ eraseChanged=true; bumpV(p); redrawLayer('ink'); redrawLayer('hi'); }
 }
 function setTool(t,el){
-  if(S.tool===t && el && el.classList.contains('active')){ S.tool='hand'; document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('active',b.dataset.tool==='hand')); updateInkTouchAction(); toast('Tool put down — hand mode'); return; }
+  if(S.tool===t && el && el.classList.contains('active')){ S.tool='hand'; document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('active',b.dataset.tool==='hand')); updateInkTouchAction(); updateSizeUI(); toast('Tool put down — hand mode'); return; }
   S.tool=t; document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));
-  updateInkTouchAction();
+  updateInkTouchAction(); updateSizeUI();
 }
-function setColor(c,el){ S.color=c; document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active')); if(el) el.classList.add('active'); let cp=$('customColor'); if(cp && /^#[0-9a-f]{6}$/i.test(c)) cp.value=c; }
+function setColor(c,el){ S.color=c; document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active')); if(el) el.classList.add('active'); let cp=$('customColor'); if(cp && /^#[0-9a-f]{6}$/i.test(c)) cp.value=c; updateSizeUI(); }
 function toggleLayer(which,on){ (which==='ink'?inkC:hiC).style.display= on? 'block':'none'; }
 document.addEventListener('keydown',e=>{
   if(S.view!=='editor') return;
@@ -2166,6 +2253,7 @@ window.addEventListener('popstate',applyRoute);
 
 /* ============ init ============ */
 updateInkTouchAction();
+updateSizeUI();
 S.items.push(sampleBook());
 renderLibrary();
 if(/^#\/(note|book)\//.test(window.location.hash||'')){ applyRoute(); if(S.view==='library' && !S.curNbId && !S.curBookId) showView('library'); }
