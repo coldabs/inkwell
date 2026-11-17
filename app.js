@@ -42,16 +42,20 @@ function curPageObj(){let nb=curNb();if(!nb)return null;return nb.pages[nb.cur]|
    PDF metadata + reading positions, bookmarks, annotations and stats.
    Imported PDF files are stored as their own records ('pdf:<id>') so the
    reader can reopen them after a reload without re-importing.
+   Startup never waits for any of this: the shelf paints first and the
+   saved shelf swaps in when the restore lands; a PDF is parsed only when
+   its book is opened (ensurePdfDoc), and annotated-page backgrounds are
+   decoded one page at a time as they are viewed (decodeBgPdfImg).
    Saves are debounced, flushed when the tab is hidden/closed, and a
    periodic signature check catches any edit path that forgot to ask. */
 const IDB_NAME='inkwell-db', IDB_STATE_KEY='library-v1';
-let persistReady=false, persistDirty=false, persistSaving=false, persistSaveAgain=false, inSave=false, lastSaveAt=0, saveTimer=null, restoreToken=0;
+let persistReady=false, persistDirty=false, persistSaving=false, persistSaveAgain=false, inSave=false, lastSaveAt=0, saveTimer=null, restoreToken=0, startHash='';
 function idbOpen(){ return new Promise((res,rej)=>{ if(!('indexedDB' in window)){ rej(new Error('IndexedDB unavailable')); return; } let rq=indexedDB.open(IDB_NAME,1); rq.onupgradeneeded=()=>{ if(!rq.result.objectStoreNames.contains('kv')) rq.result.createObjectStore('kv'); }; rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); rq.onblocked=()=>rej(new Error('IndexedDB blocked')); }); }
 let _idbP=null; function idb(){ if(!_idbP) _idbP=idbOpen(); return _idbP; }
 async function idbGet(key){ let db=await idb(); return new Promise((res,rej)=>{ let rq=db.transaction('kv','readonly').objectStore('kv').get(key); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); }); }
 async function idbPut(key,val){ let db=await idb(); return new Promise((res,rej)=>{ let tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put(val,key); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error); }); }
 async function idbDel(key){ try{ let db=await idb(); await new Promise(res=>{ let tx=db.transaction('kv','readwrite'); tx.objectStore('kv').delete(key); tx.oncomplete=()=>res(); tx.onerror=()=>res(); tx.onabort=()=>res(); }); }catch(e){} }
-function persistPdfFile(book){ if(book && book.fileData) idbPut('pdf:'+book.id, book.fileData).catch(()=>{}); }
+function persistPdfFile(book){ if(book && book.fileData) return idbPut('pdf:'+book.id, book.fileData); return Promise.resolve(); }
 function deletePdfFile(id){ idbDel('pdf:'+id); }
 function updateSaveStatus(failed){
   let el=$('saveStatus'); if(!el) return;
@@ -60,8 +64,9 @@ function updateSaveStatus(failed){
 }
 function scheduleSave(){ if(!persistReady || inSave) return; persistDirty=true; clearTimeout(saveTimer); saveTimer=setTimeout(saveNow,700); }
 function bgPdfImgData(bg){
-  if(!bg || !bg.img) return null;
+  if(!bg) return null;
   if(bg._imgData && bg._imgDataFor===bg.img) return bg._imgData;
+  if(!bg.img) return bg.imgData||null; /* restored page whose background has not been decoded yet — its saved data URL is still the lossless form */
   try{
     let src=bg.img, c=document.createElement('canvas'); c.width=src.width; c.height=src.height;
     let x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height); x.drawImage(src,0,0);
@@ -94,6 +99,16 @@ async function saveNow(){
   if(persistSaveAgain){ persistSaveAgain=false; scheduleSave(); }
 }
 function dataUrlToCanvas(url){ return new Promise((res,rej)=>{ let img=new Image(); img.onload=()=>{ let c=document.createElement('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight; c.getContext('2d').drawImage(img,0,0); res(c); }; img.onerror=()=>rej(new Error('image failed')); img.src=url; }); }
+/* A restored notebook page keeps its PDF background as a data URL and
+   decodes it only when the page is actually viewed — decoding every
+   page of every notebook during startup was a major cause of the slow
+   first paint. Repaints if the decoded page is the one on screen. */
+function decodeBgPdfImg(p){
+  if(!p || !p.bgPdf || p.bgPdf.img || !p.bgPdf.imgData) return Promise.resolve();
+  if(p.bgPdf._decodeP) return p.bgPdf._decodeP;
+  p.bgPdf._decodeP=dataUrlToCanvas(p.bgPdf.imgData).then(c=>{ p.bgPdf.img=c; }).catch(()=>{}).then(()=>{ p.bgPdf._decodeP=null; let nb=curNb(); if(nb && nb.pages[nb.cur]===p && S.view==='editor') redrawAll(); });
+  return p.bgPdf._decodeP;
+}
 async function restoreLibrary(token){
   let data=await idbGet(IDB_STATE_KEY);
   if(token!==restoreToken) return false;
@@ -101,6 +116,7 @@ async function restoreLibrary(token){
   if(data.stats) S.stats=data.stats;
   let items=[];
   for(let raw of data.items){
+   try{
     if(raw.kind==='notebook'){
       let nb={id:raw.id,kind:'notebook',title:raw.title||'Untitled notebook',color:raw.color||'#b4552d',template:raw.template||'lined',cur:raw.cur||0,updated:raw.updated||'',annotations:raw.annotations||[],pdfBookId:raw.pdfBookId||null,pages:[]};
       for(let rp of (raw.pages||[])){
@@ -110,8 +126,8 @@ async function restoreLibrary(token){
         p.images=(rp.images||[]).map(im=>({id:im.id||uid(),x:im.x,y:im.y,w:im.w,h:im.h,src:im.src}));
         p.board=rp.board?{color:rp.board.color||0,strokes:rp.board.strokes||[],view:rp.board.view||{x:0,y:0,k:1},geom:rp.board.geom||null}:null;
         if(rp.audio && rp.audio.blob){ try{ p.audio={blob:rp.audio.blob,dur:rp.audio.dur||0,url:URL.createObjectURL(rp.audio.blob)}; }catch(e){} }
-        if(rp.bgPdf){ p.bgPdf={page:rp.bgPdf.page,bookTitle:rp.bgPdf.bookTitle,img:null};
-          if(rp.bgPdf.imgData){ try{ p.bgPdf.img=await dataUrlToCanvas(rp.bgPdf.imgData); }catch(e){} } }
+        if(rp.bgPdf){ /* keep the data URL and decode it lazily when the page is viewed — decoding every page here was a big part of the slow startup */
+          p.bgPdf={page:rp.bgPdf.page,bookTitle:rp.bgPdf.bookTitle,img:null,imgData:rp.bgPdf.imgData||null}; }
         nb.pages.push(p);
       }
       if(!nb.pages.length) nb.pages.push(blankPage());
@@ -121,17 +137,19 @@ async function restoreLibrary(token){
       let b={id:raw.id,kind:'pdf',title:raw.title||'PDF',color:raw.color||'#4a5a74',updated:raw.updated||'',sample:!!raw.sample,fileName:raw.fileName||raw.title,numPages:raw.numPages||0,page:raw.page||1,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],textCache:raw.textCache||{},parallelNotes:raw.parallelNotes||{},doc:null,fileData:null};
       try{
         let fd=await idbGet('pdf:'+raw.id);
-        if(fd){ b.fileData=fd;
-          if(window.pdfjsLib){ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-            /* parse in the background — a big PDF must not hold the whole shelf hostage */
-            pdfjsLib.getDocument({data:fd.slice(0)}).promise.then(doc=>{ b.doc=doc; b.numPages=doc.numPages; if(S.view==='library') renderLibrary(); }).catch(()=>{});
-          }
-        }
+        if(fd) b.fileData=fd;
+        /* No pdf.js parse here. Parsing every book on the shelf during
+           startup was slow, and a failed background parse (its errors
+           were swallowed) left the book unopenable even though its bytes
+           were safe in this browser. ensurePdfDoc() parses from these
+           bytes when the book is actually opened, and re-reads this
+           record first if the bytes are missing. */
       }catch(e){}
       items.push(b);
     } else if(raw.kind==='epub'){
       items.push({id:raw.id,kind:'epub',title:raw.title||'Book',color:raw.color||'#2e6f6a',updated:raw.updated||'',sample:!!raw.sample,ch:raw.ch||0,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],parallelNotes:raw.parallelNotes||{},chapters:raw.chapters||[]});
     }
+   }catch(e){ /* one damaged item must not cost the whole shelf */ }
   }
   if(token!==restoreToken || !items.length) return false;
   /* merge, not replace: anything created while a slow restore was still
@@ -139,6 +157,32 @@ async function restoreLibrary(token){
   let preExisting=S.items.filter(i=> items.every(r=>r.id!==i.id));
   S.items=items.concat(preExisting);
   return true;
+}
+/* Turn a PDF book's stored bytes into a readable pdf.js doc, on demand.
+   Tries, in order: the bytes already in memory, a fresh read of the
+   book's own 'pdf:<id>' record (the startup restore may have raced or
+   skipped it), and — for the built-in demo — freshly generated bytes.
+   Only when all of those come up empty is the file really gone. This
+   replaces the old restore-time background parse, whose failures were
+   swallowed and left restored books unopenable after a reload. */
+function ensurePdfDoc(b){
+  if(!b || b.kind!=='pdf') return Promise.resolve(false);
+  if(b.doc) return Promise.resolve(true);
+  if(b._docP) return b._docP;
+  b._docP=(async()=>{
+    try{
+      if(!b.fileData){ try{ let fd=await idbGet('pdf:'+b.id); if(fd) b.fileData=fd; }catch(e){} }
+      if(!b.fileData && b.id===SAMPLE_PDF_ID){ let bytes=buildSamplePdfBytes(); b.fileData=bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset+bytes.byteLength); persistPdfFile(b).catch(()=>{}); }
+      if(!b.fileData) return false;
+      if(!window.pdfjsLib) return false;
+      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      let doc=await pdfjsLib.getDocument({data:b.fileData.slice(0)}).promise;
+      b.doc=doc; b.numPages=doc.numPages;
+      return true;
+    }catch(e){ return false; }
+    finally{ b._docP=null; }
+  })();
+  return b._docP;
 }
 function librarySignature(){
   try{
@@ -285,12 +329,7 @@ async function ensureSamplePdf(){
   if(!b || b.doc || samplePdfBuilding) return;
   samplePdfBuilding=true;
   try{
-    if(!b.fileData){ let bytes=buildSamplePdfBytes(); b.fileData=bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset+bytes.byteLength); persistPdfFile(b); }
-    if(window.pdfjsLib){
-      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      let doc=await pdfjsLib.getDocument({data:b.fileData.slice(0)}).promise;
-      b.doc=doc; b.numPages=doc.numPages;
-    }
+    await ensurePdfDoc(b); /* generates + saves the demo bytes on first use, then parses them */
     if(S.view==='library') renderLibrary();
     scheduleSave();
   }catch(e){}
@@ -462,6 +501,9 @@ function openNotebook(id){
   showView('editor');
   requestAnimationFrame(()=>{ renderCanvasTexts(); });
   renderLibrary();
+  /* warm this notebook's remaining page backgrounds in the background,
+     one at a time, so turning a page (or exporting) finds them ready */
+  (async()=>{ for(let pg of nb.pages){ await decodeBgPdfImg(pg); } })();
 }
 function syncTitle(){ let nb=curNb(); if(nb){ nb.title=$('noteTitle').value; nb.updated='Just now'; } refreshLinks(); scheduleSave(); }
 function saveEditorToModel(){
@@ -1560,6 +1602,7 @@ document.addEventListener('keydown',e=>{
 function loadPageIntoEditor(){
   let nb=curNb(); if(!nb) return;
   let p=nb.pages[nb.cur];
+  decodeBgPdfImg(p); /* restored pages decode their PDF background on view, not at startup */
   $('templateSel').value=nb.template;
   $('noteText').value=p.text||'';
   if(!p.texts) p.texts=[]; if(!p.images) p.images=[]; if(!p.texs) p.texs=[]; if(!p.bgColor) p.bgColor='#fffdf6';
@@ -2069,6 +2112,7 @@ async function relinkPdfBackgrounds(){
     for(let p of nb.pages){ if(!p.bgPdf || p.bgPdf.img) continue;
       let book=S.items.find(i=>i.kind==='pdf' && i.title===p.bgPdf.bookTitle);
       if(!book) continue;
+      if(!book.doc && !(await ensurePdfDoc(book))) continue;
       try{ let page=await book.doc.getPage(p.bgPdf.page); let v0=page.getViewport({scale:1}); let vp=page.getViewport({scale:CW/v0.width});
         let cv=document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
         await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
@@ -2119,7 +2163,14 @@ async function importPdf(f){
     let storedBuf=buf.slice(0); /* kept so the file itself is saved in this browser and the book reopens after a reload */
     let doc=await pdfjsLib.getDocument({data:buf.slice(0)}).promise;
     let book={id:uid(),kind:'pdf',title:f.name.replace(/\.[^.]+$/,''),color:'#4a5a74',updated:'Imported just now',doc:doc,numPages:doc.numPages,page:1,mode:'scroll',bookmarks:[],annotations:[],textCache:{},parallelNotes:{},fileName:f.name,fileData:storedBuf};
-    S.items.unshift(book); persistPdfFile(book); renderLibrary(); openBook(book.id);
+    S.items.unshift(book); renderLibrary();
+    /* The file bytes ARE the book: wait until they are actually written
+       before opening, and say so if the write fails — a silent failure
+       here used to leave a book that was gone, or would not open, after
+       the next reload. */
+    try{ await persistPdfFile(book); }
+    catch(e){ toast('The PDF opened, but its file could not be saved in this browser, so it may not survive a reload. Storage may be full — export a backup to keep it safe.',6000); }
+    openBook(book.id);
   }catch(err){ toast('That PDF could not be opened'+(err&&err.message? ' ('+err.message+')':'')+' — password-protected or damaged files will not open'); }
 }
 
@@ -2192,8 +2243,16 @@ async function importEpub(f){
 function openBook(id){
   let b=S.items.find(i=>i.id===id); if(!b||b.kind==='notebook') return;
   if(b.kind==='pdf' && !b.doc){
-    if(b.id===SAMPLE_PDF_ID){ ensureSamplePdf().then(()=>{ if(b.doc) openBook(id); else toast('The demo PDF could not be prepared — the PDF engine may still be loading. Try again in a moment.'); }); return; }
-    toast('This PDF\u2019s file could not be restored from this browser — import the file again to read it. Its bookmarks and annotations are kept.'); return; }
+    /* Not parsed yet is NOT the same as lost: parse from the stored
+       bytes now (ensurePdfDoc re-reads the file record if needed) and
+       only declare the file gone when there are no bytes anywhere. */
+    toast('Opening PDF…');
+    ensurePdfDoc(b).then(ok=>{
+      if(ok){ openBook(id); return; }
+      if(b.fileData || b.id===SAMPLE_PDF_ID) toast('That PDF could not be opened — the PDF engine may still be loading. Try again in a moment.');
+      else toast('This PDF\u2019s file could not be restored from this browser — import the file again to read it. Its bookmarks and annotations are kept.');
+    });
+    return; }
   S.curBookId=id;
   $('modeScrollBtn').classList.toggle('active',b.mode!=='page'); $('modePageBtn').classList.toggle('active',b.mode==='page');
   $('dictBox').classList.add('hidden'); $('ocrBox').classList.add('hidden'); $('parallelBox').classList.add('hidden');
@@ -2599,7 +2658,7 @@ async function translateParallel(){
 /* --- PDF annotation: open the PDF in the editor, ink over its pages --- */
 async function annotatePdf(id){
   let b=S.items.find(i=>i.id===id); if(!b||b.kind!=='pdf') return;
-  if(!b.doc){ toast('This PDF\u2019s file could not be restored from this browser — import the file again to annotate it.'); return; }
+  if(!b.doc){ let ok=await ensurePdfDoc(b); if(!ok){ toast('This PDF\u2019s file could not be restored from this browser — import the file again to annotate it.'); return; } }
   let existing=S.items.find(i=>i.kind==='notebook' && i.pdfBookId===id);
   if(existing){ openNotebook(existing.id); toast('Opened your annotation notebook for this PDF'); return; }
   toast('Preparing annotation pages…');
@@ -2657,20 +2716,24 @@ updateToolOptsUI();
 updateOptsRow();
 initApp();
 async function initApp(){
-  /* Restore the shelf saved in this browser before first render, so a
-     reload or a closed tab brings everything back. If IndexedDB is
-     unavailable, fall back to a fresh shelf rather than a blank page.
-     If storage is merely slow, show a starter shelf WITHOUT enabling
-     saves — an empty shelf must never overwrite the saved one — and swap
-     the real shelf in when the restore lands. */
+  /* First paint must not wait for storage. Paint the starter shelf —
+     the two built-in demos — straight away, with saves still OFF so
+     this placeholder can never overwrite the saved shelf, then swap
+     the real shelf in when the restore lands. finishInit() re-adds the
+     demos to the restored shelf if they are missing and the restore
+     merge keeps anything created in the meantime, so the demos always
+     show and are never duplicated. If IndexedDB is unavailable, the
+     restore simply reports false and the starter shelf becomes the
+     shelf, exactly as a fast failed restore behaved before. */
+  startHash=window.location.hash||'';
   let myToken=++restoreToken;
   let restorePromise=(async()=>{ try{ return await restoreLibrary(myToken); }catch(e){ return false; } })();
-  let raced=await Promise.race([ restorePromise.then(v=>({done:true,v:v})), new Promise(res=>setTimeout(()=>res({done:false}),15000)) ]);
-  if(raced.done){ finishInit(raced.v); return; }
-  if(!S.items.length){ S.items.push(sampleBook()); S.items.push(samplePdfBook()); ensureSamplePdf(); }
+  if(!S.items.length){ S.items.push(sampleBook()); S.items.push(samplePdfBook()); }
   renderLibrary(); showView('library');
-  toast('Your saved shelf is taking a while to open — give it a moment.',4000);
-  restorePromise.then(v=>{ if(v) finishInit(true); else { persistReady=true; updateSaveStatus(true); } });
+  ensureSamplePdf();
+  let initDone=false;
+  restorePromise.then(v=>{ if(!initDone){ initDone=true; finishInit(v); } });
+  setTimeout(()=>{ if(!initDone) toast('Your saved shelf is taking a while to open — give it a moment.',4000); },15000);
 }
 let sigTimerStarted=false;
 function finishInit(restored){
@@ -2679,7 +2742,11 @@ function finishInit(restored){
   ensureSamplePdf();
   persistReady=true;
   renderLibrary();
-  if(/^#\/(note|book)\//.test(window.location.hash||'')){ applyRoute(); if(S.view==='library' && !S.curNbId && !S.curBookId) showView('library'); }
+  /* the starter render already reset the hash to the shelf, so replay
+     the address the page was actually opened with (a reload while
+     reading used to reopen the book; it still does) */
+  let routeHash=startHash||window.location.hash||'';
+  if(/^#\/(note|book)\//.test(routeHash)){ if(window.location.hash!==routeHash){ try{ history.replaceState(null,'',routeHash); }catch(e){} } applyRoute(); if(S.view==='library' && !S.curNbId && !S.curBookId) showView('library'); }
   else showView('library');
   updateSaveStatus(false);
   if(navigator.storage && navigator.storage.persist){ try{ navigator.storage.persist(); }catch(e){} }
