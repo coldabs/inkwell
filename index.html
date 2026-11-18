@@ -391,11 +391,14 @@
         <span class="prSpacer"></span>
         <button class="btn small" type="button" onclick="closeParallelRead()">Close</button>
       </div>
-      <div class="prGrid">
-        <div class="prCol"><div class="prHead"><b id="prTitleL"></b><span class="kbd" id="prPosL"></span></div><div class="prBody"><div class="prRailBox"><div class="prRail" id="prRailL" role="navigation"></div></div><div class="prPane" id="prPaneL" tabindex="0" aria-label="Left book"></div></div></div>
-        <div class="prCol"><div class="prHead"><b id="prTitleR"></b><span class="kbd" id="prPosR"></span></div><div class="prBody"><div class="prRailBox"><div class="prRail" id="prRailR" role="navigation"></div></div><div class="prPane" id="prPaneR" tabindex="0" aria-label="Right book"></div></div></div>
+      <div class="prMain">
+        <div class="prRailBox"><div class="prRailLabel" id="prRailLabel">Page</div><div class="prRailTrack"><div class="prRail" id="prRail" role="navigation"></div></div></div>
+        <div class="prGrid">
+          <div class="prCol"><div class="prHead"><b id="prTitleL"></b><span class="kbd" id="prPosL"></span></div><div class="prBody"><div class="prPane" id="prPaneL" tabindex="0" aria-label="First book"></div></div></div>
+          <div class="prCol"><div class="prHead"><b id="prTitleR"></b><span class="kbd" id="prPosR"></span></div><div class="prBody"><div class="prPane" id="prPaneR" tabindex="0" aria-label="Second book"></div></div></div>
+        </div>
       </div>
-      <p class="kbd" style="margin:0;line-height:1.5">Scroll either book — or the page numbers beside it — and the other book follows. Tap a number to jump to that page. Zoom with − / +, Ctrl + scroll, or pinch. Highlighting, Listen and OCR work in the normal reader — tap Close to get back to it.</p>
+      <p class="kbd" style="margin:0;line-height:1.5">Scroll either book and the other follows. The page numbers on the left belong to the book you are using (the one with the coloured edge) — scroll them, or tap one, to move through it. Zoom the book under the pointer with Ctrl + scroll or a pinch, or the book in use with − / +. Highlighting, Listen and OCR work in the normal reader — tap Close to get back to it.</p>
     </div>
   </section>
 </main>

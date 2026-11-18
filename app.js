@@ -2929,19 +2929,14 @@ setInterval(()=>{ if(S.view==='editor') S.stats.writeSec++; if(S.view==='reader'
    Echo guard: when a pane (or a page-number rail) is moved by code, the
    position it was moved to is remembered (expect / railExpect). The scroll
    event that move produces is recognised and ignored, so nothing bounces.
-   Page-number rail: a narrow column of page (or chapter) numbers beside
-   each pane, with a reading line across its middle. Rail position p
-   (in units) = rail.scrollTop / PR_RAIL_H, and p = page index + fraction
-   into that page — the same position the pane reports. So scrolling the
-   rail scrolls its book (and the partner follows by the sync mode),
-   scrolling the book scrolls the rail, and tapping a number jumps there.
-   Zoom: +/- buttons, Ctrl + mouse wheel / trackpad pinch, or a two-finger
-   pinch on touch screens. PDF pages are re-laid-out at the new width and
-   then redrawn sharp at that size (never just stretched); EPUB text is
-   scaled. Both books keep their place.
-   Each book's reading place, its partner, sync mode, offset and zoom are
-   saved on the left book with the rest of the shelf. */
-const PR={on:false, token:0, panes:{}, raf:0, driver:null, posT:null, resizeT:null, suspend:false, lastW:0, zoom:1, zoomT:null, railRaf:0, railDriver:null};
+   Page-number rail: ONE column of page (or chapter) numbers on the left,
+   for the book the reader is using right now (see "one page-number rail"
+   below).
+   Zoom: each book has its own — the book under the pointer / fingers
+   zooms (see "zoom" below).
+   Each book's reading place and zoom, and the left book's partner, sync
+   mode and offset, are saved with the rest of the shelf. */
+const PR={on:false, token:0, panes:{}, raf:0, driver:null, posT:null, resizeT:null, suspend:false, lastW:0, railRaf:0, active:'L', railBook:null, railExpect:null, railActive:-1};
 const PR_RAIL_H=36, PR_ZOOM_MIN=0.6, PR_ZOOM_MAX=3;
 let prPinch=null;
 function prOtherBooks(leftId){ return S.items.filter(i=>(i.kind==='pdf'||i.kind==='epub') && i.id!==leftId); }
@@ -2956,7 +2951,7 @@ async function openParallelRead(){
   if(!others.some(o=>o.id===L.parallelWith)) L.parallelWith=others[0].id;
   if(['unit','percent','off'].indexOf(L.parallelSync)<0) L.parallelSync='unit';
   if(typeof L.parallelOffset!=='number' || !isFinite(L.parallelOffset)) L.parallelOffset=0;
-  PR.zoom=prClampZoom(L.parallelZoom||1);
+  PR.active='L';
   closeReaderCards(); $('parallelBox').classList.add('hidden');
   PR.on=true; PR.lastW=window.innerWidth; document.body.classList.add('prOn');
   $('readerGrid').classList.add('hidden'); $('annotateFab').classList.add('hidden');
@@ -2964,7 +2959,6 @@ async function openParallelRead(){
   let btn=$('parallelBtn'); btn.setAttribute('aria-pressed','true');
   $('prSync').value=L.parallelSync; $('prOffset').value=L.parallelOffset;
   $('prOffsetWrap').classList.toggle('hidden', L.parallelSync!=='unit');
-  $('prZoomLabel').textContent=Math.round(PR.zoom*100)+'%';
   prFillPicker(L);
   window.scrollTo({top:0});
   await prRenderBoth();
@@ -2995,18 +2989,18 @@ async function prRenderBoth(){
   if(!PL) $('prPaneL').innerHTML='<p class="kbd">This book could not be opened here.</p>';
   if(!PRt) $('prPaneR').innerHTML='<p class="kbd">'+(R? 'That book’s file could not be restored from this browser — import it again to read it here.' : 'Pick a second book above.')+'</p>';
   PR.panes={L:PL, R:PRt};
-  if(PL) prBuildRail(PL);
-  if(PRt) prBuildRail(PRt);
   if(PL) prScrollToUnit(PL, prUnitIndex(L));
   if(PRt){ if(L.parallelSync!=='off' && PL) prSyncFrom('L'); else prScrollToUnit(PRt, prUnitIndex(R)); }
-  prRefreshRails();
+  /* the rail shows the book in use — keep the side that was active (e.g. after picking a new partner), else the first book */
+  let act= PR.panes[PR.active]? PR.active : (PL? 'L' : 'R');
+  if(PR.panes[act]) prSetActive(act,true); else { $('prRail').innerHTML=''; PR.railBook=null; }
   prUpdatePositions();
   /* scroll events from the moves above arrive before the next frames' callbacks — release the guard after them */
   requestAnimationFrame(()=>requestAnimationFrame(()=>{ if(tok===PR.token) PR.suspend=false; }));
 }
 async function prBuildPane(side,book,tok){
   let el=$('prPane'+side);
-  let P={side:side, el:el, book:book, expect:null, tok:tok, rail:null, railExpect:null, lastPos:null};
+  let P={side:side, el:el, book:book, expect:null, tok:tok, lastPos:null, zoom:prClampZoom(book.parallelZoom||1), zoomT:null};
   if(book.kind==='epub'){
     let wrap=document.createElement('div'); wrap.className='prEpub';
     wrap.innerHTML=(book.chapters||[]).map((c,i)=>'<section data-unit="'+i+'"><h3>'+esc(c.title)+'</h3>'+c.html+'</section>').join('');
@@ -3071,15 +3065,36 @@ function prOnScroll(side){
   if(P.expect!==null && Math.abs(P.el.scrollTop-P.expect)<=2){ P.expect=null; prQueuePositions(); return; } /* our own move — not the reader */
   P.expect=null;
   PR.driver=side;
-  if(!PR.raf) PR.raf=requestAnimationFrame(()=>{ PR.raf=0; if(PR.on && PR.driver){ prSyncFrom(PR.driver); prRefreshRails(); } prQueuePositions(); });
+  if(!PR.raf) PR.raf=requestAnimationFrame(()=>{ PR.raf=0; if(PR.on && PR.driver){ prSetActive(PR.driver); prSyncFrom(PR.driver); prRefreshRails(); } prQueuePositions(); });
 }
 $('prPaneL').addEventListener('scroll',()=>prOnScroll('L'),{passive:true});
 $('prPaneR').addEventListener('scroll',()=>prOnScroll('R'),{passive:true});
 
-/* --- page-number rail --- */
+/* --- one page-number rail for the book you are using ---
+   A single rail sits on the left of Parallel Read. It shows the page (or
+   chapter) numbers of the ACTIVE book — the one the reader last touched,
+   clicked, scrolled, zoomed or tabbed into — and switches to the other
+   book as soon as the reader starts using that one. Merely moving the
+   mouse across does not switch it (no flicker). The active book's panel
+   gets an accent edge so it is clear which book the numbers belong to.
+   Rail position p (in units) = rail.scrollTop / PR_RAIL_H = page index +
+   fraction into that page, the same position the book reports. Scrolling
+   the rail scrolls the active book (the partner follows by the sync
+   mode); scrolling the active book scrolls the rail; tapping a number
+   jumps the active book there. */
+function prSetActive(side,force){
+  if(!PR.on) return;
+  let P=PR.panes[side]; if(!P) return;
+  if(!force && PR.active===side && PR.railBook===P.book.id) return;
+  PR.active=side;
+  ['L','R'].forEach(s=>{ let c=$('prPane'+s).closest('.prCol'); if(c) c.classList.toggle('prActive', s===side && !!PR.panes.L && !!PR.panes.R); });
+  prBuildRail(P);
+  prSetRail();
+  prShowZoom();
+}
 function prBuildRail(P){
-  let rail=$('prRail'+P.side); if(!rail) return;
-  P.rail=rail; P.railExpect=null; P._railActive=-1;
+  let rail=$('prRail'); if(!rail) return;
+  PR.railBook=P.book.id; PR.railExpect=null; PR.railActive=-1;
   let n=prUnits(P).length, isPdf=P.book.kind==='pdf', items='';
   for(let k=0;k<n;k++){
     let t= isPdf? 'Page '+(k+1) : 'Chapter '+(k+1)+((P.book.chapters&&P.book.chapters[k])? ' — '+P.book.chapters[k].title : '');
@@ -3087,100 +3102,131 @@ function prBuildRail(P){
   }
   rail.innerHTML='<div class="prRailPad" aria-hidden="true"></div>'+items+'<div class="prRailPad" aria-hidden="true"></div>';
   rail.setAttribute('aria-label',(isPdf?'Pages of ':'Chapters of ')+P.book.title);
+  let lab=$('prRailLabel');
+  if(lab){ lab.textContent= isPdf? 'Page' : 'Ch.'; lab.title=(isPdf?'Pages of ':'Chapters of ')+P.book.title+' ('+(P.side==='L'?'first':'second')+' book)'; lab.dataset.side=P.side; }
   rail.scrollTop=0;
-  prRailPads(P);
+  prRailPads();
 }
 /* half a rail of padding above and below, so number k sits on the reading line when rail.scrollTop = k * PR_RAIL_H */
-function prRailPads(P){ if(!P||!P.rail) return; let h=Math.round(P.rail.clientHeight/2); P.rail.querySelectorAll('.prRailPad').forEach(d=>{ d.style.height=h+'px'; }); }
-function prMarkRail(P,i){
-  if(!P||!P.rail||P._railActive===i) return; P._railActive=i;
-  P.rail.querySelectorAll('.prRailNum.active').forEach(b=>{ b.classList.remove('active'); b.removeAttribute('aria-current'); });
-  let b=P.rail.querySelector('.prRailNum[data-k="'+i+'"]'); if(b){ b.classList.add('active'); b.setAttribute('aria-current','page'); }
+function prRailPads(){ let rail=$('prRail'); if(!rail) return; let h=Math.round(rail.clientHeight/2); rail.querySelectorAll('.prRailPad').forEach(d=>{ d.style.height=h+'px'; }); }
+function prMarkRail(i){
+  let rail=$('prRail'); if(!rail || PR.railActive===i) return; PR.railActive=i;
+  rail.querySelectorAll('.prRailNum.active').forEach(b=>{ b.classList.remove('active'); b.removeAttribute('aria-current'); });
+  let b=rail.querySelector('.prRailNum[data-k="'+i+'"]'); if(b){ b.classList.add('active'); b.setAttribute('aria-current','page'); }
 }
-function prSetRail(P){
-  if(!P||!P.rail) return; let pos=prPos(P); if(!pos) return;
-  let r=P.rail, max=Math.max(0,r.scrollHeight-r.clientHeight);
+/* put the rail where the active book is */
+function prSetRail(){
+  let P=PR.panes[PR.active], r=$('prRail'); if(!P||!r||PR.railBook!==P.book.id) return;
+  let pos=prPos(P); if(!pos) return;
+  let max=Math.max(0,r.scrollHeight-r.clientHeight);
   let target=Math.max(0,Math.min(max,Math.round((pos.i+pos.f)*PR_RAIL_H)));
-  if(Math.abs(r.scrollTop-target)>=1){ r.scrollTop=target; P.railExpect=r.scrollTop; }
-  prMarkRail(P,pos.i);
+  if(Math.abs(r.scrollTop-target)>=1){ r.scrollTop=target; PR.railExpect=r.scrollTop; }
+  prMarkRail(pos.i);
 }
-function prRefreshRails(except){ ['L','R'].forEach(s=>{ if(s!==except) prSetRail(PR.panes[s]); }); }
-function prOnRailScroll(side){
+function prRefreshRails(){ prSetRail(); }
+function prOnRailScroll(){
   if(!PR.on || PR.suspend) return;
-  let P=PR.panes[side]; if(!P||!P.rail) return;
-  if(P.railExpect!==null && Math.abs(P.rail.scrollTop-P.railExpect)<=2){ P.railExpect=null; return; } /* moved by code to follow its book */
-  P.railExpect=null;
-  PR.railDriver=side;
-  if(!PR.railRaf) PR.railRaf=requestAnimationFrame(()=>{ PR.railRaf=0; let s=PR.railDriver; PR.railDriver=null; if(PR.on && s) prFollowRail(s); });
+  let r=$('prRail');
+  if(PR.railExpect!==null && Math.abs(r.scrollTop-PR.railExpect)<=2){ PR.railExpect=null; return; } /* moved by code to follow its book */
+  PR.railExpect=null;
+  if(!PR.railRaf) PR.railRaf=requestAnimationFrame(()=>{ PR.railRaf=0; if(PR.on) prFollowRail(); });
 }
-/* the reader scrolled a rail: its book follows, the partner follows by the sync mode, the partner's rail follows */
-function prFollowRail(side){
-  let P=PR.panes[side]; if(!P) return;
+/* the reader scrolled the rail: the active book follows, the partner follows by the sync mode */
+function prFollowRail(){
+  let side=PR.active, P=PR.panes[side]; if(!P) return;
   let us=prUnits(P); if(!us.length) return;
-  let p=P.rail.scrollTop/PR_RAIL_H;
+  let p=$('prRail').scrollTop/PR_RAIL_H;
   let i=Math.max(0,Math.min(us.length-1,Math.floor(p))), f=Math.max(0,Math.min(1,p-i));
   prMoveTo(P, us[i].top+f*us[i].h);
   prSyncFrom(side);
-  prMarkRail(P,i);
-  prRefreshRails(side);
+  prMarkRail(i);
   prQueuePositions();
 }
-/* tap a number (or follow a link inside the PDF): jump that book to the start of that page / chapter */
+/* tap a number (or follow a link inside a PDF): jump that book to the start of that page / chapter */
 function prJump(side,k){
   let P=PR.panes[side]; if(!P) return;
   let us=prUnits(P); if(!us.length) return;
   k=Math.max(0,Math.min(us.length-1,k));
   prMoveTo(P, k===0? 0 : us[k].top);
   PR.driver=side;
-  prSyncFrom(side); prRefreshRails(); prQueuePositions();
+  prSetActive(side);
+  prSyncFrom(side); prSetRail(); prQueuePositions();
 }
+(function(){
+  let r=$('prRail');
+  r.addEventListener('scroll',prOnRailScroll,{passive:true});
+  r.addEventListener('click',e=>{ let b=e.target.closest('.prRailNum'); if(b) prJump(PR.active,+b.dataset.k); });
+})();
+/* using a book makes it the active one (hover alone does not) */
 ['L','R'].forEach(s=>{
-  let r=$('prRail'+s);
-  r.addEventListener('scroll',()=>prOnRailScroll(s),{passive:true});
-  r.addEventListener('click',e=>{ let b=e.target.closest('.prRailNum'); if(b) prJump(s,+b.dataset.k); });
+  let el=$('prPane'+s);
+  ['pointerdown','wheel','touchstart','focusin','keydown'].forEach(t=>el.addEventListener(t,()=>{ if(PR.on) prSetActive(s); },{passive:true}));
 });
 
-/* --- zoom --- */
+/* --- zoom: each book has its own ---
+   Ctrl + mouse wheel / trackpad pinch zooms the book under the pointer;
+   a two-finger pinch zooms the book under the fingers; the - / 100% / +
+   buttons zoom the active book. PDF pages are re-laid-out at the new
+   width and redrawn sharp at that size (never just stretched); EPUB text
+   is scaled. Pointer and pinch zoom happen around the pointer / fingers;
+   the other book does not move or zoom; each book remembers its own zoom. */
 function prApplyZoom(P){
   let w=P&&P.el.firstElementChild; if(!w) return;
-  if(P.book.kind==='pdf') w.style.width=(PR.zoom*100)+'%';
-  else w.style.setProperty('--pr-zoom',String(PR.zoom));
+  if(P.book.kind==='pdf') w.style.width=(P.zoom*100)+'%';
+  else w.style.setProperty('--pr-zoom',String(P.zoom));
 }
-function prZoomBy(f){ prSetZoom(f===0? 1 : PR.zoom*f); }
-function prSetZoom(z){
+function prShowZoom(){
+  let P=PR.panes[PR.active], lab=$('prZoomLabel'); if(!lab) return;
+  lab.textContent=Math.round((P? P.zoom : 1)*100)+'%';
+  let which= PR.active==='L'? 'first' : 'second';
+  $('parallelRead').querySelectorAll('.prZoom button').forEach(b=>{ let base=b.dataset.base||(b.dataset.base=b.title); b.title=base+' — '+which+' book'; });
+}
+function prZoomBy(f){ let P=PR.panes[PR.active]; if(!P) return; prSetZoom(PR.active, f===0? 1 : P.zoom*f); }
+/* ax, ay (screen point, optional): zoom AROUND that point — the spot under
+   the pointer / between the fingers stays where it is while the page grows
+   or shrinks around it. Without a point (the buttons) the page's top line
+   and horizontal centre stay put. */
+function prSetZoom(side,z,ax,ay){
   if(!PR.on) return;
+  let P=PR.panes[side]; if(!P) return;
   z=prClampZoom(z);
-  if(Math.abs(z-PR.zoom)<0.005) return;
-  /* remember where each book is (page + fraction, and the horizontal centre) so it stays put across the zoom */
-  let keep={};
-  ['L','R'].forEach(s=>{ let P=PR.panes[s]; if(!P) return; let el=P.el; keep[s]={pos:prPos(P), hx: el.scrollWidth>el.clientWidth? (el.scrollLeft+el.clientWidth/2)/el.scrollWidth : 0.5}; });
-  PR.zoom=z;
-  let L=curBook(); if(L){ L.parallelZoom=z; scheduleSave(); }
-  $('prZoomLabel').textContent=Math.round(z*100)+'%';
+  if(Math.abs(z-P.zoom)<0.005) return;
+  let el=P.el, pos=prPos(P), hx= el.scrollWidth>el.clientWidth? (el.scrollLeft+el.clientWidth/2)/el.scrollWidth : 0.5;
+  let anchor=null;
+  if(typeof ax==='number' && typeof ay==='number'){
+    let rect=el.getBoundingClientRect(), oy=Math.max(0,Math.min(el.clientHeight,ay-rect.top)), ox=Math.max(0,Math.min(el.clientWidth,ax-rect.left));
+    let yc=el.scrollTop+oy, us=prUnits(P), i=0;
+    for(let k=0;k<us.length;k++){ if(us[k].top<=yc) i=k; else break; }
+    if(us.length) anchor={i:i, g: us[i].h? (yc-us[i].top)/us[i].h : 0, oy:oy, ox:ox, fx:(el.scrollLeft+ox)/Math.max(1,el.scrollWidth)};
+  }
+  P.zoom=z; P.book.parallelZoom=z; scheduleSave();
   PR.suspend=true;
-  ['L','R'].forEach(s=>{
-    let P=PR.panes[s]; if(!P) return;
-    prApplyZoom(P); prPadEnd(P);
-    let k=keep[s];
-    if(k && k.pos){ let us=prUnits(P), u=us[Math.min(k.pos.i,us.length-1)]; if(u) prMoveTo(P,u.top+k.pos.f*u.h); }
-    P.el.scrollLeft=Math.max(0,(k? k.hx : 0.5)*P.el.scrollWidth-P.el.clientWidth/2);
-  });
-  prRefreshRails();
+  prApplyZoom(P); prPadEnd(P);
+  if(anchor){
+    let us=prUnits(P), u=us[Math.min(anchor.i,us.length-1)];
+    if(u) prMoveTo(P, u.top+anchor.g*u.h-anchor.oy);
+    el.scrollLeft=Math.max(0, anchor.fx*el.scrollWidth-anchor.ox);
+  } else {
+    if(pos){ let us=prUnits(P), u=us[Math.min(pos.i,us.length-1)]; if(u) prMoveTo(P,u.top+pos.f*u.h); }
+    el.scrollLeft=Math.max(0,hx*el.scrollWidth-el.clientWidth/2);
+  }
+  /* zooming is a change of view, not of place: the other book is left exactly where it is (the two re-align on the next scroll) */
+  prSetRail(); prShowZoom();
   let tok=PR.token;
   requestAnimationFrame(()=>requestAnimationFrame(()=>{ if(tok===PR.token) PR.suspend=false; }));
   /* the new layout shows at once; pages are redrawn sharp at the new size a moment after the zooming stops */
-  clearTimeout(PR.zoomT); PR.zoomT=setTimeout(()=>{ if(PR.on) prRefreshPages(); },220);
+  clearTimeout(P.zoomT); P.zoomT=setTimeout(()=>{ if(PR.on && PR.panes[side]===P && P.book.kind==='pdf') pdfRefresh(P.el,P.el._io); },220);
 }
 function prRefreshPages(){ ['L','R'].forEach(s=>{ let P=PR.panes[s]; if(P && P.book.kind==='pdf') pdfRefresh(P.el, P.el._io); }); }
-/* Ctrl + mouse wheel, and a laptop trackpad pinch (which the browser reports as Ctrl + wheel) */
-function prOnWheel(e){ if(!PR.on || !(e.ctrlKey||e.metaKey)) return; e.preventDefault(); prSetZoom(PR.zoom*Math.exp(-e.deltaY*0.0025)); }
-/* two-finger pinch on phones and tablets: a live preview while pinching, the real (sharp) zoom when the fingers lift */
+/* Ctrl + mouse wheel, and a laptop trackpad pinch (which the browser reports as Ctrl + wheel): the book under the pointer */
+function prOnWheel(side,e){ if(!PR.on || !(e.ctrlKey||e.metaKey)) return; e.preventDefault(); let P=PR.panes[side]; if(!P) return; prSetZoom(side, P.zoom*Math.exp(-e.deltaY*0.0025), e.clientX, e.clientY); }
+/* two-finger pinch on phones and tablets: the book under the fingers; a live preview while pinching, the real (sharp) zoom when the fingers lift */
 function prTouchStart(side,e){
   if(!PR.on || e.touches.length!==2) return;
   let P=PR.panes[side]; if(!P) return;
   let w=P.el.firstElementChild; if(!w) return;
   let a=e.touches[0], b=e.touches[1], r=w.getBoundingClientRect();
-  prPinch={side:side, w:w, d0:Math.max(20,Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)), z0:PR.zoom, s:1};
+  prPinch={side:side, w:w, d0:Math.max(20,Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)), z0:P.zoom, s:1, mx:(a.clientX+b.clientX)/2, my:(a.clientY+b.clientY)/2};
   w.style.transformOrigin=((a.clientX+b.clientX)/2-r.left)+'px '+((a.clientY+b.clientY)/2-r.top)+'px';
 }
 function prTouchMove(e){
@@ -3194,11 +3240,11 @@ function prTouchEnd(e){
   if(!prPinch || e.touches.length>=2) return;
   let p=prPinch; prPinch=null;
   p.w.style.transform=''; p.w.style.transformOrigin='';
-  if(Math.abs(p.s-1)>0.02) prSetZoom(p.z0*p.s);
+  if(Math.abs(p.s-1)>0.02) prSetZoom(p.side, p.z0*p.s, p.mx, p.my);
 }
 ['L','R'].forEach(s=>{
   let el=$('prPane'+s);
-  el.addEventListener('wheel',prOnWheel,{passive:false});
+  el.addEventListener('wheel',e=>prOnWheel(s,e),{passive:false});
   el.addEventListener('touchstart',e=>prTouchStart(s,e),{passive:true});
   el.addEventListener('touchmove',prTouchMove,{passive:true});
   el.addEventListener('touchend',prTouchEnd,{passive:true});
@@ -3239,9 +3285,10 @@ function closeParallelRead(silent){
   PR.on=false; PR.token++; PR.panes={}; PR.suspend=false; prPinch=null;
   if(PR.raf){ cancelAnimationFrame(PR.raf); PR.raf=0; }
   if(PR.railRaf){ cancelAnimationFrame(PR.railRaf); PR.railRaf=0; }
-  clearTimeout(PR.posT); clearTimeout(PR.resizeT); clearTimeout(PR.zoomT);
+  clearTimeout(PR.posT); clearTimeout(PR.resizeT);
   prRescueCards();
-  ['L','R'].forEach(prClearPane);
+  ['L','R'].forEach(s=>{ let el=$('prPane'+s); el.closest('.prCol').classList.remove('prActive'); prClearPane(s); });
+  $('prRail').innerHTML=''; PR.railBook=null; PR.railExpect=null; PR.railActive=-1;
   $('parallelRead').classList.add('hidden'); $('readerGrid').classList.remove('hidden');
   $('parallelBtn').setAttribute('aria-pressed','false'); document.body.classList.remove('prOn');
   scheduleSave();
@@ -3255,7 +3302,8 @@ function prLeave(){ if(PR.on) closeParallelRead(); }
 window.addEventListener('resize',()=>{
   if(!PR.on) return;
   /* pane heights may have changed (rotation, phone address bar): end room + rail padding follow at once */
-  Object.values(PR.panes).forEach(P=>{ if(P){ prPadEnd(P); prRailPads(P); } });
+  Object.values(PR.panes).forEach(P=>{ if(P) prPadEnd(P); });
+  prRailPads();
   prRefreshRails();
   /* width changed: pages re-lay-out by themselves; put each book back on its page and redraw pages sharp at the new size */
   if(window.innerWidth===PR.lastW) return;

@@ -430,10 +430,16 @@ body.prOn .layout{max-width:min(1800px,100%)}
 .prHead b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .prHead .kbd{white-space:nowrap;flex:0 0 auto}
 .prBody{display:flex;min-width:0;height:calc(100vh - 220px);height:calc(100dvh - 220px);min-height:320px}
-/* page-number rail: numbers scroll past a fixed reading line; the number on the line is the page at the top of the book */
-.prRailBox{position:relative;flex:0 0 44px;width:44px;border-right:1px solid var(--line);background:color-mix(in srgb,var(--paper2) 70%, transparent)}
-.prRailBox::before{content:"";position:absolute;left:3px;right:3px;top:50%;height:2px;margin-top:-1px;background:var(--accent);opacity:.45;border-radius:2px;pointer-events:none;z-index:1}
-.prRail{height:100%;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;outline:none}
+/* one page-number rail on the left, for the book in use: numbers scroll past a fixed reading line; the number on the line is the page at the top of that book */
+.prMain{display:flex;gap:10px;align-items:stretch;min-width:0}
+.prMain>.prGrid{flex:1 1 auto;min-width:0}
+.prRailBox{flex:0 0 48px;width:48px;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:var(--shadow)}
+.prRailLabel{flex:0 0 auto;padding:10px 2px 8px;text-align:center;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);border-bottom:1px solid var(--line)}
+.prRailTrack{position:relative;flex:1 1 auto;min-height:0;background:color-mix(in srgb,var(--paper2) 70%, transparent)}
+.prRailTrack::before{content:"";position:absolute;left:3px;right:3px;top:50%;height:2px;margin-top:-1px;background:var(--accent);opacity:.45;border-radius:2px;pointer-events:none;z-index:1}
+/* the book the rail belongs to */
+.prCol.prActive{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 35%, transparent),var(--shadow)}
+.prRail{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;outline:none}
 .prRail::-webkit-scrollbar{display:none}
 .prRailNum{display:block;width:calc(100% - 8px);margin:0 4px;height:36px;min-height:36px;border:0;border-radius:8px;background:transparent;color:var(--muted);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;padding:0;cursor:pointer;line-height:36px}
 .prRailNum:hover{color:var(--ink);background:var(--paper2)}
@@ -452,8 +458,10 @@ body.prOn .layout{max-width:min(1800px,100%)}
 .pdfHolder canvas,.pdfPage .pdfHolder canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #parallelRead[data-theme=sepia] .prCol{background:#fbf3d9;color:#3b2f1a}
 #parallelRead[data-theme=dark] .prCol{background:#171917;color:#e8e6df;border-color:#3d443c}
-#parallelRead[data-theme=dark] .prHead,#parallelRead[data-theme=dark] .prRailBox{border-color:#3d443c}
-#parallelRead[data-theme=dark] .prRailBox{background:#1e211e}
+#parallelRead[data-theme=dark] .prHead,#parallelRead[data-theme=dark] .prRailBox,#parallelRead[data-theme=dark] .prRailLabel{border-color:#3d443c}
+#parallelRead[data-theme=dark] .prRailBox{background:#171917}
+#parallelRead[data-theme=dark] .prRailTrack{background:#1e211e}
+#parallelRead[data-theme=sepia] .prRailBox{background:#fbf3d9}
 #parallelRead[data-theme=dark] .prPdf{filter:invert(.92) hue-rotate(180deg)}
 .prEpub::after,.prPdf::after{content:"End";display:block;text-align:center;color:var(--muted);font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-top:18px}
 #parallelBtn[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -470,7 +478,9 @@ body.prOn .layout{max-width:min(1800px,100%)}
   .prLong{display:none}
   .prShort{display:inline}
   .prPane{padding:8px}
-  .prRailBox{flex-basis:36px;width:36px}
+  .prMain{gap:6px}
+  .prRailBox{flex-basis:40px;width:40px;border-radius:14px}
+  .prRailLabel{font-size:9px;letter-spacing:.04em}
   .prRailNum{font-size:11px;width:calc(100% - 6px);margin:0 3px}
   body.prOn #resumeLabel{display:none}
   #parallelRead > p.kbd{display:none}
@@ -498,6 +508,6 @@ body.prOn .layout{max-width:min(1800px,100%)}
   .miniBtn{min-width:32px;min-height:32px;font-size:14px}
   .pageThumb .ptRow{gap:6px}
   #noteTitle{min-height:36px!important}
-  .prRailBox{flex-basis:42px;width:42px}
+  .prRailBox{flex-basis:44px;width:44px}
   .prRailNum{width:calc(100% - 6px);margin:0 3px}
 }
