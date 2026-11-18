@@ -1,6 +1,6 @@
 # Inkwell
 
-Open-source handwriting notes and PDF / EPUB reader. All features free — no paywall, no locked notebooks, no VIP tier.
+Open-source handwriting notes and PDF / EPUB reader. All features free: no paywall, no locked notebooks, no VIP tier.
 
 
 ## What it does

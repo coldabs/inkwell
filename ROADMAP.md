@@ -1,6 +1,6 @@
 # Inkwell roadmap
 
-Working rule: one feature at a time. A feature is only done when it is confirmed working on a real phone — the builder's check alone is not enough.
+Working rule: one feature at a time. A feature is only done when it is confirmed working on a real phone. The builder's check alone is not enough.
 
 ## Done
 
@@ -25,7 +25,7 @@ Working rule: one feature at a time. A feature is only done when it is confirmed
 
 ## After the features
 
-- Android app (the main goal) — Piper offline TTS voice (about 60 MB, download-on-demand) to be decided; note the GPL-3.0 eSpeak NG dependency needs a licence decision
+- Android app (the main goal): Piper offline TTS voice (about 60 MB, download-on-demand) to be decided; note the GPL-3.0 eSpeak NG dependency needs a licence decision
 - Website version alongside the app
 - PC version later
 
