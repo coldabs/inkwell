@@ -96,8 +96,8 @@ function serializeLibrary(){
           board:p.board?{color:p.board.color,strokes:p.board.strokes,view:p.board.view,geom:p.board.geom||null}:null,
           audio:(p.audio&&p.audio.blob)?{blob:p.audio.blob,dur:p.audio.dur}:null,
           bgPdf:p.bgPdf?{page:p.bgPdf.page,bookTitle:p.bgPdf.bookTitle,imgData:bgPdfImgData(p.bgPdf)}:null }))};
-      if(it.kind==='pdf') return {id:it.id,kind:'pdf',title:it.title,color:it.color,updated:it.updated,sample:!!it.sample,fileName:it.fileName,numPages:it.numPages,page:it.page,mode:it.mode,bookmarks:it.bookmarks||[],annotations:it.annotations||[],textCache:it.textCache||{},parallelNotes:it.parallelNotes||{},parallelWith:it.parallelWith||null,parallelSync:it.parallelSync||'unit',parallelOffset:it.parallelOffset||0};
-      return {id:it.id,kind:'epub',title:it.title,color:it.color,updated:it.updated,sample:!!it.sample,ch:it.ch||0,mode:it.mode||'scroll',bookmarks:it.bookmarks||[],annotations:it.annotations||[],parallelNotes:it.parallelNotes||{},parallelWith:it.parallelWith||null,parallelSync:it.parallelSync||'unit',parallelOffset:it.parallelOffset||0,chapters:it.chapters||[]};
+      if(it.kind==='pdf') return {id:it.id,kind:'pdf',title:it.title,color:it.color,updated:it.updated,sample:!!it.sample,fileName:it.fileName,numPages:it.numPages,page:it.page,mode:it.mode,bookmarks:it.bookmarks||[],annotations:it.annotations||[],textCache:it.textCache||{},parallelNotes:it.parallelNotes||{},parallelWith:it.parallelWith||null,parallelSync:it.parallelSync||'unit',parallelOffset:it.parallelOffset||0,parallelZoom:it.parallelZoom||1};
+      return {id:it.id,kind:'epub',title:it.title,color:it.color,updated:it.updated,sample:!!it.sample,ch:it.ch||0,mode:it.mode||'scroll',bookmarks:it.bookmarks||[],annotations:it.annotations||[],parallelNotes:it.parallelNotes||{},parallelWith:it.parallelWith||null,parallelSync:it.parallelSync||'unit',parallelOffset:it.parallelOffset||0,parallelZoom:it.parallelZoom||1,chapters:it.chapters||[]};
     })};
 }
 async function saveNow(){
@@ -148,7 +148,7 @@ async function restoreLibrary(token){
       if(nb.cur>=nb.pages.length) nb.cur=nb.pages.length-1; if(nb.cur<0) nb.cur=0;
       items.push(nb);
     } else if(raw.kind==='pdf'){
-      let b={id:raw.id,kind:'pdf',title:raw.title||'PDF',color:raw.color||'#4a5a74',updated:raw.updated||'',sample:!!raw.sample,fileName:raw.fileName||raw.title,numPages:raw.numPages||0,page:raw.page||1,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],textCache:raw.textCache||{},parallelNotes:raw.parallelNotes||{},parallelWith:raw.parallelWith||null,parallelSync:raw.parallelSync||'unit',parallelOffset:+raw.parallelOffset||0,doc:null,fileData:null};
+      let b={id:raw.id,kind:'pdf',title:raw.title||'PDF',color:raw.color||'#4a5a74',updated:raw.updated||'',sample:!!raw.sample,fileName:raw.fileName||raw.title,numPages:raw.numPages||0,page:raw.page||1,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],textCache:raw.textCache||{},parallelNotes:raw.parallelNotes||{},parallelWith:raw.parallelWith||null,parallelSync:raw.parallelSync||'unit',parallelOffset:+raw.parallelOffset||0,parallelZoom:+raw.parallelZoom||1,doc:null,fileData:null};
       try{
         let fd=await idbGet('pdf:'+raw.id);
         if(fd) b.fileData=fd;
@@ -161,7 +161,7 @@ async function restoreLibrary(token){
       }catch(e){}
       items.push(b);
     } else if(raw.kind==='epub'){
-      items.push({id:raw.id,kind:'epub',title:raw.title||'Book',color:raw.color||'#2e6f6a',updated:raw.updated||'',sample:!!raw.sample,ch:raw.ch||0,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],parallelNotes:raw.parallelNotes||{},parallelWith:raw.parallelWith||null,parallelSync:raw.parallelSync||'unit',parallelOffset:+raw.parallelOffset||0,chapters:raw.chapters||[]});
+      items.push({id:raw.id,kind:'epub',title:raw.title||'Book',color:raw.color||'#2e6f6a',updated:raw.updated||'',sample:!!raw.sample,ch:raw.ch||0,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],parallelNotes:raw.parallelNotes||{},parallelWith:raw.parallelWith||null,parallelSync:raw.parallelSync||'unit',parallelOffset:+raw.parallelOffset||0,parallelZoom:+raw.parallelZoom||1,chapters:raw.chapters||[]});
     }
    }catch(e){ /* one damaged item must not cost the whole shelf */ }
   }
@@ -2395,18 +2395,115 @@ function jumpToChapter(i){ let b=curBook(); if(!b||b.kind!=='epub') return; clos
   if(b.mode==='page') renderEpubBook(); else { let el=document.querySelector('[data-ch="'+b.ch+'"]'); if(el) el.scrollIntoView({behavior:'smooth'}); updateResume(); }
   renderReaderSide(); }
 
-/* --- PDF rendering with real text layer --- */
-let pdfToken=0, pdfObserver=null;
-function pdfPageWidth(){ let host=$('pdfPages'); return Math.max(260,(host&&host.clientWidth)||document.documentElement.clientWidth-32); }
-async function renderPdfTextLayer(page,vp,holder,book,pageNum){
+/* ============ PDF pages: sharp, lazy drawing — shared by the reader and Parallel Read ============
+   Why pages used to look soft: each page was drawn at exactly the size it
+   shows on screen (one canvas pixel per screen pixel). On a screen with
+   fractional scaling (125%, 150%) that canvas lands between screen pixels
+   and the browser resamples the whole page, smearing every letter; the
+   canvas width was also rounded to whole CSS pixels, adding a small stretch.
+   Now:
+   - every page is drawn at at least 2x the screen's pixel density (up to
+     3x on very dense phone screens) from the page's EXACT on-screen width,
+     and the browser scales it DOWN — downscaling keeps edges crisp;
+   - one canvas never exceeds ~16 million pixels (phone browsers refuse or
+     crash on bigger ones);
+   - a page is only drawn when it comes within ~1200px of the visible area
+     and is freed again when it goes further away, so a long PDF no longer
+     keeps every page in memory (the reader used to draw and keep ALL pages);
+   - pages are redrawn when the width, browser zoom or screen scaling changes.
+   Each page is a placeholder sized to its own page shape before drawing, so
+   the layout is final from the start and never jumps. */
+const PDF_MAX_CANVAS_PX=16e6;
+function pdfDensity(){ let d=window.devicePixelRatio||1; return Math.min(3, Math.max(2, d)); }
+let pdfToken=0, pdfObserver=null, pdfDrawIO=null, pdfLastW=0;
+/* every page's size (rotation included), read once per opened file, kept in memory only */
+async function pdfPageSizes(book){
+  if(book._pageSizes && book._pageSizesDoc===book.doc && book._pageSizes.length===book.numPages) return book._pageSizes;
+  let sizes=[];
+  for(let start=1; start<=book.numPages; start+=16){
+    let batch=[]; for(let n=start; n<Math.min(book.numPages+1,start+16); n++) batch.push(n);
+    let got=await Promise.all(batch.map(n=>book.doc.getPage(n).then(p=>{ let v=p.getViewport({scale:1}); return [v.width,v.height]; })));
+    sizes=sizes.concat(got);
+  }
+  book._pageSizes=sizes; book._pageSizesDoc=book.doc;
+  return sizes;
+}
+/* placeholders: <section class=pageClass data-page=n data-unit=n-1><label/><div class=pdfHolder data-n=n/></section> */
+function pdfBuildPages(host,book,sizes,nums,pageClass){
+  let holders=[];
+  nums.forEach(n=>{
+    let pg=document.createElement('section'); pg.className=pageClass; pg.dataset.page=n; pg.dataset.unit=n-1;
+    let lab=document.createElement('div'); lab.className='pdfPageNum'; lab.textContent='Page '+n+' of '+book.numPages; pg.appendChild(lab);
+    let sz=sizes[n-1]||sizes[0]||[612,792];
+    let holder=document.createElement('div'); holder.className='pdfHolder'; holder.dataset.n=n; holder.style.aspectRatio=sz[0]+' / '+sz[1]; pg.appendChild(holder);
+    host.appendChild(pg); holders.push(holder);
+  });
+  return holders;
+}
+async function pdfDrawPage(book,n,holder,isLive,onJump){
+  if(holder._drawn || holder._drawing) return;
+  holder._drawing=true; let gen=holder._gen=(holder._gen||0)+1;
+  let stale=()=> !isLive() || holder._gen!==gen || !holder.isConnected;
+  try{
+    let page=await book.doc.getPage(n); if(stale()) return;
+    let cssW=holder.getBoundingClientRect().width; if(cssW<20) return;
+    let base=page.getViewport({scale:1}), cssScale=cssW/base.width, dens=pdfDensity();
+    let px=(base.width*cssScale*dens)*(base.height*cssScale*dens);
+    if(px>PDF_MAX_CANVAS_PX) dens*=Math.sqrt(PDF_MAX_CANVAS_PX/px);
+    let vp=page.getViewport({scale:cssScale*dens});
+    let cv=document.createElement('canvas'); cv.width=Math.ceil(vp.width); cv.height=Math.ceil(vp.height);
+    let task=page.render({canvasContext:cv.getContext('2d'),viewport:vp}); holder._task=task;
+    await task.promise;
+    if(stale()){ cv.width=cv.height=0; return; }
+    holder.querySelectorAll('canvas,.textLayer,.pdfLink').forEach(x=>x.remove());
+    holder.appendChild(cv);
+    holder._drawn=true; holder._cssW=cssW; holder._dens=pdfDensity();
+    let cssVp=page.getViewport({scale:cssScale});
+    renderPdfTextLayer(page,cssVp,holder,book,n);
+    renderPdfLinks(page,cssVp,holder,book,onJump);
+  }catch(e){ /* a page that fails to draw keeps its blank placeholder; the rest still reads */ }
+  finally{ if(holder._gen===gen){ holder._drawing=false; holder._task=null; } }
+}
+function pdfReleasePage(holder){
+  holder._gen=(holder._gen||0)+1; holder._drawing=false;
+  if(holder._task){ try{ holder._task.cancel(); }catch(e){} holder._task=null; }
+  holder.querySelectorAll('canvas').forEach(c=>{ c.width=c.height=0; c.remove(); }); /* zeroing frees the bitmap right away on mobile browsers */
+  holder.querySelectorAll('.textLayer,.pdfLink').forEach(x=>x.remove());
+  holder._drawn=false;
+}
+/* draw pages near the visible area, free pages far from it */
+function pdfWatch(holders,root,book,isLive,onJump){
+  let io=new IntersectionObserver(es=>{ es.forEach(en=>{ let h=en.target; if(en.isIntersecting) pdfDrawPage(book,+h.dataset.n,h,isLive,onJump); else if(h._drawn||h._drawing) pdfReleasePage(h); }); },{root:root||null, rootMargin:'1200px 0px'});
+  holders.forEach(h=>io.observe(h));
+  return io;
+}
+/* redraw every page in a container at the current width / density (re-observing makes the observer report the near ones again) */
+function pdfRefresh(container,io){
+  if(!container || !io) return;
+  container.querySelectorAll('.pdfHolder').forEach(h=>{ if(h._drawn||h._drawing) pdfReleasePage(h); io.unobserve(h); io.observe(h); });
+}
+/* the whole book's text, read in the background — pages are only drawn
+   near the screen now, but search should still find text on every page */
+async function pdfFillTextCache(book,isLive){
+  if(!book.textCache) book.textCache={};
+  for(let n=1;n<=book.numPages;n++){
+    if(!isLive()) return;
+    if(book.textCache[n]) continue;
+    try{ let tc=await (await book.doc.getPage(n)).getTextContent(); book.textCache[n]=tc.items.map(i=>i.str||'').join(' ').replace(/\s+/g,' ').trim(); }catch(e){}
+    if(n%8===0) await new Promise(r=>setTimeout(r,30));
+  }
+  scheduleSave();
+}
+/* selectable text over a drawn page; positions in CSS pixels from the page's CSS-size viewport */
+async function renderPdfTextLayer(page,cssVp,holder,book,pageNum){
   try{
     let tc=await page.getTextContent();
+    if(!holder.isConnected) return;
     let layer=document.createElement('div'); layer.className='textLayer'; holder.appendChild(layer);
-    let vpCss=page.getViewport({scale:vp.scale/(Math.min(window.devicePixelRatio||1,2))});
     let full='';
     tc.items.forEach(item=>{
       if(!item.str) return;
-      let tx=pdfjsLib.Util.transform(vpCss.transform,item.transform);
+      let tx=pdfjsLib.Util.transform(cssVp.transform,item.transform);
       let fontSize=Math.hypot(tx[2],tx[3]);
       let span=document.createElement('span');
       span.textContent=item.str;
@@ -2414,33 +2511,24 @@ async function renderPdfTextLayer(page,vp,holder,book,pageNum){
       span.dataset.pg=pageNum;
       layer.appendChild(span);
       full+=item.str+' ';
-      requestAnimationFrame(()=>{ let w=item.width*vpCss.scale; let ow=span.offsetWidth; if(ow>2 && w>2) span.style.transform='scaleX('+(w/ow)+')'; });
+      requestAnimationFrame(()=>{ let w=item.width*cssVp.scale; let ow=span.offsetWidth; if(ow>2 && w>2) span.style.transform='scaleX('+(w/ow)+')'; });
     });
-    book.textCache[pageNum]=full.trim();
+    if(book.textCache) book.textCache[pageNum]=full.trim();
+    /* put this page's saved highlights / underlines back — they used to vanish after a reload */
+    (book.annotations||[]).forEach(a=>{ if(a.where==='PDF page '+pageNum) wrapTextOnce(layer,a.text,a.kind||'highlight'); });
   }catch(e){ /* text layer is best-effort; page image still reads */ }
 }
-async function renderPdfPageInto(num,host,book){
-  let page=await book.doc.getPage(num);
-  let wrap=document.createElement('div'); wrap.className='pdfPage'; wrap.dataset.page=num;
-  let label=document.createElement('div'); label.className='pdfPageNum'; label.textContent='Page '+num+' of '+book.numPages; wrap.appendChild(label);
-  let holder=document.createElement('div'); holder.className='pageHolder'; wrap.appendChild(holder);
-  let canvas=document.createElement('canvas'); holder.appendChild(canvas); host.appendChild(wrap);
-  let base=page.getViewport({scale:1}); let scale=pdfPageWidth()/base.width;
-  let dpr=Math.min(window.devicePixelRatio||1,2); let vp=page.getViewport({scale:scale*dpr});
-  canvas.width=Math.floor(vp.width); canvas.height=Math.floor(vp.height);
-  await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
-  renderPdfTextLayer(page,vp,holder,book,num);
-  renderPdfLinks(page,vp,holder,book);
-}
-/* Follow links from the background PDF: link annotations become clickable
-   overlays — web links open in a new tab, internal links jump pages. */
-async function renderPdfLinks(page,vp,holder,book){
+/* Follow links from the PDF: link annotations become clickable overlays —
+   web links open in a new tab, internal links jump to their page (in the
+   book the link belongs to). */
+async function renderPdfLinks(page,cssVp,holder,book,onJump){
   try{
     let annos=await page.getAnnotations();
+    if(!holder.isConnected) return;
     annos.forEach(a=>{
       if(a.subtype!=='Link' || !a.rect) return;
       let r=pdfjsLib.Util.normalizeRect(a.rect);
-      let rect=vp.convertToViewportRectangle(r);
+      let rect=cssVp.convertToViewportRectangle(r);
       let x=Math.min(rect[0],rect[2]), y=Math.min(rect[1],rect[3]), w=Math.abs(rect[2]-rect[0]), h=Math.abs(rect[3]-rect[1]);
       if(w<2||h<2) return;
       let link=document.createElement('a'); link.className='pdfLink';
@@ -2450,7 +2538,7 @@ async function renderPdfLinks(page,vp,holder,book){
         link.href='#'; link.title='Go to linked page';
         link.addEventListener('click',async ev=>{
           ev.preventDefault();
-          try{ let dest=typeof a.dest==='string'? await book.doc.getDestination(a.dest):a.dest; let idx=await book.doc.getPageIndex(dest[0]); jumpToPdfPage(idx+1); }
+          try{ let dest=typeof a.dest==='string'? await book.doc.getDestination(a.dest):a.dest; let idx=await book.doc.getPageIndex(dest[0]); (onJump||jumpToPdfPage)(idx+1); }
           catch(e){ toast('That link has no readable destination'); }
         });
       } else return;
@@ -2462,26 +2550,64 @@ async function renderPdfBook(){
   let b=curBook(); if(!b||b.kind!=='pdf') return;
   let token=++pdfToken; let host=$('pdfPages'); host.innerHTML='';
   if(pdfObserver){ pdfObserver.disconnect(); pdfObserver=null; }
+  if(pdfDrawIO){ pdfDrawIO.disconnect(); pdfDrawIO=null; }
   $('pdfName').textContent=b.fileName||b.title;
   $('pdfMeta').textContent=b.numPages+' page'+(b.numPages===1?'':'s')+' • Fit to width • Text is selectable';
   let st=$('pdfStatus'); st.classList.remove('hidden'); st.textContent='Rendering pages…';
-  if(b.mode==='page'){ try{ await renderPdfPageInto(b.page,host,b); }catch(e){} if(token!==pdfToken) return; st.classList.add('hidden'); updateResume(); renderReaderSide(); return; }
-  for(let n=1;n<=b.numPages;n++){ if(token!==pdfToken) return; try{ await renderPdfPageInto(n,host,b); }catch(e){} if(n===1) st.classList.add('hidden'); }
+  let live=()=> token===pdfToken && curBook()===b && S.view==='reader';
+  let sizes; try{ sizes=await pdfPageSizes(b); }catch(e){ if(token===pdfToken) st.textContent='This PDF could not be drawn.'; return; }
   if(token!==pdfToken) return;
+  b.page=Math.max(1,Math.min(b.numPages,b.page||1));
+  let nums=[]; if(b.mode==='page') nums.push(b.page); else for(let n=1;n<=b.numPages;n++) nums.push(n);
+  let holders=pdfBuildPages(host,b,sizes,nums,'pdfPage');
+  st.classList.add('hidden'); st.textContent='';
+  pdfLastW=window.innerWidth;
+  pdfDrawIO=pdfWatch(holders,null,b,live);
   updateResume(); renderReaderSide();
-  let target=document.querySelector('.pdfPage[data-page="'+b.page+'"]'); if(target && b.page>1) target.scrollIntoView();
-  pdfObserver=new IntersectionObserver(es=>{ es.forEach(en=>{ if(en.isIntersecting){ b.page=+en.target.dataset.page; updateResume(); } }); },{rootMargin:'-35% 0px -55% 0px'});
-  host.querySelectorAll('.pdfPage').forEach(el=>pdfObserver.observe(el));
+  if(b.mode!=='page'){
+    let target=host.querySelector('.pdfPage[data-page="'+b.page+'"]'); if(target && b.page>1) target.scrollIntoView();
+    pdfObserver=new IntersectionObserver(es=>{ es.forEach(en=>{ if(en.isIntersecting && !pdfJump){ b.page=+en.target.dataset.page; updateResume(); } }); },{rootMargin:'-35% 0px -55% 0px'});
+    host.querySelectorAll('.pdfPage').forEach(el=>pdfObserver.observe(el));
+  }
+  pdfFillTextCache(b,live);
 }
-function jumpToPdfPage(n){
+/* While a jump is scrolling to its page, the page tracker must not record
+   the pages it glides past (a save in the middle of the glide used to
+   store one of those instead of the page asked for). The guard lifts when
+   the scroll ends, or after 1.5s on browsers without 'scrollend'. */
+let pdfJump=null;
+function pdfJumpGuard(){
+  if(pdfJump){ clearTimeout(pdfJump.t); window.removeEventListener('scrollend',pdfJump.done); }
+  let g={}; g.done=()=>{ if(pdfJump!==g) return; clearTimeout(g.t); window.removeEventListener('scrollend',g.done); pdfJump=null; };
+  g.t=setTimeout(g.done,1500); window.addEventListener('scrollend',g.done);
+  pdfJump=g;
+}
+function jumpToPdfPage(n,instant){
   let b=curBook(); if(!b||b.kind!=='pdf') return; closeReaderCards();
   b.page=Math.max(1,Math.min(b.numPages,n));
   if(b.mode==='page'){ renderPdfBook(); window.scrollTo({top:0}); }
-  else { let el=document.querySelector('.pdfPage[data-page="'+b.page+'"]'); if(el) el.scrollIntoView({behavior:'smooth'}); updateResume(); }
+  else { let el=document.querySelector('.pdfPage[data-page="'+b.page+'"]'); if(el){ pdfJumpGuard(); el.scrollIntoView({behavior: instant? 'auto':'smooth'}); } updateResume(); }
 }
 let pdfResizeT=null;
-window.addEventListener('resize',()=>{ if(S.view==='editor' && document.activeElement && document.activeElement.className!=='canvasText') renderCanvasTexts(); let b=curBook(); if(!b||b.kind!=='pdf'||S.view!=='reader') return; clearTimeout(pdfResizeT); pdfResizeT=setTimeout(()=>renderPdfBook(),400); });
-
+window.addEventListener('resize',()=>{
+  if(S.view==='editor' && document.activeElement && document.activeElement.className!=='canvasText') renderCanvasTexts();
+  let b=curBook(); if(!b||b.kind!=='pdf'||S.view!=='reader'||!pdfDrawIO) return;
+  /* a phone's address bar showing / hiding changes only the height: pages keep their size, nothing to redraw */
+  if(window.innerWidth===pdfLastW) return;
+  pdfLastW=window.innerWidth;
+  clearTimeout(pdfResizeT); pdfResizeT=setTimeout(()=>pdfRefresh($('pdfPages'),pdfDrawIO),250);
+});
+/* browser zoom or moving the window to a screen with different scaling changes the pixel density — redraw so pages stay crisp */
+(function watchDensity(){
+  let d=window.devicePixelRatio||1;
+  try{
+    window.matchMedia('(resolution: '+d+'dppx)').addEventListener('change',()=>{
+      if(pdfDrawIO && S.view==='reader') pdfRefresh($('pdfPages'),pdfDrawIO);
+      if(typeof PR!=='undefined' && PR.on) prRefreshPages();
+      watchDensity();
+    },{once:true});
+  }catch(e){}
+})();
 /* --- reader sidebar: TOC, bookmarks, annotations, thumbnails --- */
 async function renderReaderSide(){
   scheduleSave();
@@ -2800,16 +2926,29 @@ setInterval(()=>{ if(S.view==='editor') S.stats.writeSec++; if(S.view==='reader'
    its matching unit (shifted by the Offset, for books whose front matter
    differs). "By overall position" maps the whole-book scroll fraction
    instead; "Off" lets each pane scroll freely.
-   Echo guard: when one pane is moved by code, the position it was moved
-   to is remembered (pane.expect). The scroll event that move produces is
-   recognised and ignored, so the panes never bounce each other around.
-   Each book's reading place, its partner, sync mode and offset are saved
-   on the left book with the rest of the shelf. */
-const PR={on:false, token:0, panes:{}, raf:0, driver:null, posT:null, resizeT:null, suspend:false, lastW:0};
+   Echo guard: when a pane (or a page-number rail) is moved by code, the
+   position it was moved to is remembered (expect / railExpect). The scroll
+   event that move produces is recognised and ignored, so nothing bounces.
+   Page-number rail: a narrow column of page (or chapter) numbers beside
+   each pane, with a reading line across its middle. Rail position p
+   (in units) = rail.scrollTop / PR_RAIL_H, and p = page index + fraction
+   into that page — the same position the pane reports. So scrolling the
+   rail scrolls its book (and the partner follows by the sync mode),
+   scrolling the book scrolls the rail, and tapping a number jumps there.
+   Zoom: +/- buttons, Ctrl + mouse wheel / trackpad pinch, or a two-finger
+   pinch on touch screens. PDF pages are re-laid-out at the new width and
+   then redrawn sharp at that size (never just stretched); EPUB text is
+   scaled. Both books keep their place.
+   Each book's reading place, its partner, sync mode, offset and zoom are
+   saved on the left book with the rest of the shelf. */
+const PR={on:false, token:0, panes:{}, raf:0, driver:null, posT:null, resizeT:null, suspend:false, lastW:0, zoom:1, zoomT:null, railRaf:0, railDriver:null};
+const PR_RAIL_H=36, PR_ZOOM_MIN=0.6, PR_ZOOM_MAX=3;
+let prPinch=null;
 function prOtherBooks(leftId){ return S.items.filter(i=>(i.kind==='pdf'||i.kind==='epub') && i.id!==leftId); }
 function toggleParallelRead(){ if(PR.on) closeParallelRead(); else openParallelRead(); }
 /* the lookup / OCR cards can be parked inside a pane — move them home before a pane is emptied */
 function prRescueCards(){ ['dictBox','ocrBox'].forEach(id=>{ let x=$(id); if(x && x.closest('#parallelRead')){ x.classList.add('hidden'); $('readerArticle').appendChild(x); } }); }
+function prClampZoom(z){ z=+z; if(!isFinite(z)||z<=0) z=1; return Math.max(PR_ZOOM_MIN,Math.min(PR_ZOOM_MAX,Math.round(z*100)/100)); }
 async function openParallelRead(){
   let L=curBook(); if(!L || S.view!=='reader'){ toast('Open a book first'); return; }
   let others=prOtherBooks(L.id);
@@ -2817,13 +2956,15 @@ async function openParallelRead(){
   if(!others.some(o=>o.id===L.parallelWith)) L.parallelWith=others[0].id;
   if(['unit','percent','off'].indexOf(L.parallelSync)<0) L.parallelSync='unit';
   if(typeof L.parallelOffset!=='number' || !isFinite(L.parallelOffset)) L.parallelOffset=0;
+  PR.zoom=prClampZoom(L.parallelZoom||1);
   closeReaderCards(); $('parallelBox').classList.add('hidden');
-  PR.on=true; PR.lastW=window.innerWidth;
+  PR.on=true; PR.lastW=window.innerWidth; document.body.classList.add('prOn');
   $('readerGrid').classList.add('hidden'); $('annotateFab').classList.add('hidden');
   $('parallelRead').classList.remove('hidden');
   let btn=$('parallelBtn'); btn.setAttribute('aria-pressed','true');
   $('prSync').value=L.parallelSync; $('prOffset').value=L.parallelOffset;
   $('prOffsetWrap').classList.toggle('hidden', L.parallelSync!=='unit');
+  $('prZoomLabel').textContent=Math.round(PR.zoom*100)+'%';
   prFillPicker(L);
   window.scrollTo({top:0});
   await prRenderBoth();
@@ -2834,6 +2975,7 @@ function prFillPicker(L){
   prOtherBooks(L.id).forEach(b=>{ let o=document.createElement('option'); o.value=b.id; o.textContent=b.title+(b.kind==='pdf'?' (PDF)':' (EPUB)'); if(b.id===L.parallelWith) o.selected=true; sel.appendChild(o); });
 }
 function prUnitIndex(b){ return b.kind==='pdf'? Math.max(0,(b.page||1)-1) : Math.max(0,b.ch||0); }
+function prClearPane(s){ let el=$('prPane'+s); if(el._io){ el._io.disconnect(); el._io=null; } el.querySelectorAll('.pdfHolder').forEach(pdfReleasePage); el.innerHTML=''; let r=$('prRail'+s); if(r) r.innerHTML=''; }
 async function prRenderBoth(){
   let L=curBook(); if(!L || !PR.on) return;
   let tok=++PR.token;
@@ -2842,7 +2984,7 @@ async function prRenderBoth(){
   let R=S.items.find(i=>i.id===L.parallelWith)||null;
   $('prTitleL').textContent=L.title; $('prTitleR').textContent=R? R.title : '';
   $('prPosL').textContent=''; $('prPosR').textContent='';
-  ['L','R'].forEach(s=>{ let el=$('prPane'+s); if(el._io){ el._io.disconnect(); el._io=null; } el.innerHTML='<p class="kbd">Opening…</p>'; el.scrollTop=0; });
+  ['L','R'].forEach(s=>{ prClearPane(s); let el=$('prPane'+s); el.innerHTML='<p class="kbd">Opening…</p>'; el.scrollTop=0; el.scrollLeft=0; });
   let okL= L.kind!=='pdf' || await ensurePdfDoc(L);
   let okR= !!R && (R.kind!=='pdf' || await ensurePdfDoc(R));
   if(tok!==PR.token) return;
@@ -2853,76 +2995,41 @@ async function prRenderBoth(){
   if(!PL) $('prPaneL').innerHTML='<p class="kbd">This book could not be opened here.</p>';
   if(!PRt) $('prPaneR').innerHTML='<p class="kbd">'+(R? 'That book’s file could not be restored from this browser — import it again to read it here.' : 'Pick a second book above.')+'</p>';
   PR.panes={L:PL, R:PRt};
+  if(PL) prBuildRail(PL);
+  if(PRt) prBuildRail(PRt);
   if(PL) prScrollToUnit(PL, prUnitIndex(L));
   if(PRt){ if(L.parallelSync!=='off' && PL) prSyncFrom('L'); else prScrollToUnit(PRt, prUnitIndex(R)); }
+  prRefreshRails();
   prUpdatePositions();
   /* scroll events from the moves above arrive before the next frames' callbacks — release the guard after them */
   requestAnimationFrame(()=>requestAnimationFrame(()=>{ if(tok===PR.token) PR.suspend=false; }));
 }
 async function prBuildPane(side,book,tok){
   let el=$('prPane'+side);
-  let P={side:side, el:el, book:book, expect:null, tok:tok};
+  let P={side:side, el:el, book:book, expect:null, tok:tok, rail:null, railExpect:null, lastPos:null};
   if(book.kind==='epub'){
     let wrap=document.createElement('div'); wrap.className='prEpub';
     wrap.innerHTML=(book.chapters||[]).map((c,i)=>'<section data-unit="'+i+'"><h3>'+esc(c.title)+'</h3>'+c.html+'</section>').join('');
-    el.innerHTML=''; el.appendChild(wrap); prPadEnd(P);
+    el.innerHTML=''; el.appendChild(wrap); prApplyZoom(P); prPadEnd(P);
     return P;
   }
-  /* PDF: one placeholder per page, each sized to ITS OWN page's shape
-     before anything is drawn, so the layout is final from the start —
-     a landscape or tall page never resizes later and shifts the pane
-     under the reader (which would throw the two panes out of step).
-     Pages are drawn only as they come near the visible part of the pane. */
+  /* PDF: placeholders sized to each page's own shape (final layout from
+     the start), drawn sharp near the visible part of the pane and freed
+     far from it — see "PDF pages" above */
   let sizes;
-  try{ sizes=await prPdfPageSizes(book); }catch(e){ return null; }
+  try{ sizes=await pdfPageSizes(book); }catch(e){ return null; }
   if(tok!==PR.token) return null;
   let wrap=document.createElement('div'); wrap.className='prPdf';
-  for(let n=1;n<=book.numPages;n++){
-    let pg=document.createElement('section'); pg.className='prPage'; pg.dataset.unit=n-1;
-    let lab=document.createElement('div'); lab.className='pdfPageNum'; lab.textContent='Page '+n+' of '+book.numPages; pg.appendChild(lab);
-    let sz=sizes[n-1]||sizes[0];
-    let holder=document.createElement('div'); holder.className='prHolder'; holder.dataset.n=n; holder.style.aspectRatio=sz[0]+' / '+sz[1]; pg.appendChild(holder);
-    wrap.appendChild(pg);
-  }
-  el.innerHTML=''; el.appendChild(wrap); prPadEnd(P);
-  let io=new IntersectionObserver(es=>{ es.forEach(en=>{ if(!en.isIntersecting || en.target._drawn) return; en.target._drawn=true; io.unobserve(en.target); prDrawPdfPage(book,+en.target.dataset.n,en.target,tok); }); },{root:el, rootMargin:'900px 0px'});
-  wrap.querySelectorAll('.prHolder').forEach(h=>io.observe(h));
-  el._io=io;
+  let nums=[]; for(let n=1;n<=book.numPages;n++) nums.push(n);
+  let holders=pdfBuildPages(wrap,book,sizes,nums,'prPage');
+  el.innerHTML=''; el.appendChild(wrap); prApplyZoom(P); prPadEnd(P);
+  el._io=pdfWatch(holders, el, book, ()=> tok===PR.token && PR.on, n=>prJump(side,n-1));
   return P;
 }
-/* every page's size (rotation included), read once per opened file and
-   kept in memory only (never saved); fetched in small batches so a long
-   PDF does not flood pdf.js */
-async function prPdfPageSizes(book){
-  if(book._pageSizes && book._pageSizesDoc===book.doc && book._pageSizes.length===book.numPages) return book._pageSizes;
-  let sizes=[];
-  for(let start=1; start<=book.numPages; start+=16){
-    let batch=[]; for(let n=start; n<Math.min(book.numPages+1,start+16); n++) batch.push(n);
-    let got=await Promise.all(batch.map(n=>book.doc.getPage(n).then(p=>{ let v=p.getViewport({scale:1}); return [v.width,v.height]; })));
-    sizes=sizes.concat(got);
-  }
-  book._pageSizes=sizes; book._pageSizesDoc=book.doc;
-  return sizes;
-}
-async function prDrawPdfPage(book,n,holder,tok){
-  try{
-    let page=await book.doc.getPage(n); if(tok!==PR.token) return;
-    let base=page.getViewport({scale:1});
-    holder.style.aspectRatio=base.width+' / '+base.height;
-    let cssW=holder.clientWidth||300, dpr=Math.min(window.devicePixelRatio||1,2);
-    let vp=page.getViewport({scale:cssW/base.width*dpr});
-    let cv=document.createElement('canvas'); cv.width=Math.floor(vp.width); cv.height=Math.floor(vp.height);
-    holder.appendChild(cv);
-    await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
-    if(tok!==PR.token) return;
-    renderPdfTextLayer(page,vp,holder,book,n); /* selectable text; also fills this page's search text */
-  }catch(e){ /* a page that fails to draw keeps its blank placeholder; the rest still reads */ }
-}
 /* room after the last chapter / page, so even a short last one can be
-   scrolled up to the top of its pane — without it the pane runs out of
-   scroll first, never reports the last unit, and sync stops one short */
-/* Only as much room as the last unit actually needs: a page taller than
-   the pane needs none, so the end of a PDF is never a screen of blank. */
+   scrolled up to the top of its pane — only as much as the last unit
+   needs: a page taller than the pane needs none, so the end of a PDF is
+   never a screen of blank */
 function prPadEnd(P){
   let w=P.el.firstElementChild; if(!w) return;
   let us=w.querySelectorAll('[data-unit]'); let last=us[us.length-1];
@@ -2944,7 +3051,7 @@ function prMoveTo(P,y){
   if(Math.abs(el.scrollTop-y)<1) return;
   el.scrollTop=y; P.expect=el.scrollTop;
 }
-function prScrollToUnit(P,i){ let us=prUnits(P); if(!us.length) return; i=Math.max(0,Math.min(us.length-1,i||0)); prMoveTo(P, us[i].top - (i===0? us[i].top : 0)); }
+function prScrollToUnit(P,i){ let us=prUnits(P); if(!us.length) return; i=Math.max(0,Math.min(us.length-1,i||0)); prMoveTo(P, i===0? 0 : us[i].top); }
 function prSyncFrom(side){
   let L=curBook(); if(!L || !PR.on) return;
   let mode=L.parallelSync; if(mode==='off') return;
@@ -2964,10 +3071,140 @@ function prOnScroll(side){
   if(P.expect!==null && Math.abs(P.el.scrollTop-P.expect)<=2){ P.expect=null; prQueuePositions(); return; } /* our own move — not the reader */
   P.expect=null;
   PR.driver=side;
-  if(!PR.raf) PR.raf=requestAnimationFrame(()=>{ PR.raf=0; if(PR.on && PR.driver) prSyncFrom(PR.driver); prQueuePositions(); });
+  if(!PR.raf) PR.raf=requestAnimationFrame(()=>{ PR.raf=0; if(PR.on && PR.driver){ prSyncFrom(PR.driver); prRefreshRails(); } prQueuePositions(); });
 }
 $('prPaneL').addEventListener('scroll',()=>prOnScroll('L'),{passive:true});
 $('prPaneR').addEventListener('scroll',()=>prOnScroll('R'),{passive:true});
+
+/* --- page-number rail --- */
+function prBuildRail(P){
+  let rail=$('prRail'+P.side); if(!rail) return;
+  P.rail=rail; P.railExpect=null; P._railActive=-1;
+  let n=prUnits(P).length, isPdf=P.book.kind==='pdf', items='';
+  for(let k=0;k<n;k++){
+    let t= isPdf? 'Page '+(k+1) : 'Chapter '+(k+1)+((P.book.chapters&&P.book.chapters[k])? ' — '+P.book.chapters[k].title : '');
+    items+='<button type="button" class="prRailNum" data-k="'+k+'" title="'+esc(t)+'" aria-label="'+esc(t)+'">'+(k+1)+'</button>';
+  }
+  rail.innerHTML='<div class="prRailPad" aria-hidden="true"></div>'+items+'<div class="prRailPad" aria-hidden="true"></div>';
+  rail.setAttribute('aria-label',(isPdf?'Pages of ':'Chapters of ')+P.book.title);
+  rail.scrollTop=0;
+  prRailPads(P);
+}
+/* half a rail of padding above and below, so number k sits on the reading line when rail.scrollTop = k * PR_RAIL_H */
+function prRailPads(P){ if(!P||!P.rail) return; let h=Math.round(P.rail.clientHeight/2); P.rail.querySelectorAll('.prRailPad').forEach(d=>{ d.style.height=h+'px'; }); }
+function prMarkRail(P,i){
+  if(!P||!P.rail||P._railActive===i) return; P._railActive=i;
+  P.rail.querySelectorAll('.prRailNum.active').forEach(b=>{ b.classList.remove('active'); b.removeAttribute('aria-current'); });
+  let b=P.rail.querySelector('.prRailNum[data-k="'+i+'"]'); if(b){ b.classList.add('active'); b.setAttribute('aria-current','page'); }
+}
+function prSetRail(P){
+  if(!P||!P.rail) return; let pos=prPos(P); if(!pos) return;
+  let r=P.rail, max=Math.max(0,r.scrollHeight-r.clientHeight);
+  let target=Math.max(0,Math.min(max,Math.round((pos.i+pos.f)*PR_RAIL_H)));
+  if(Math.abs(r.scrollTop-target)>=1){ r.scrollTop=target; P.railExpect=r.scrollTop; }
+  prMarkRail(P,pos.i);
+}
+function prRefreshRails(except){ ['L','R'].forEach(s=>{ if(s!==except) prSetRail(PR.panes[s]); }); }
+function prOnRailScroll(side){
+  if(!PR.on || PR.suspend) return;
+  let P=PR.panes[side]; if(!P||!P.rail) return;
+  if(P.railExpect!==null && Math.abs(P.rail.scrollTop-P.railExpect)<=2){ P.railExpect=null; return; } /* moved by code to follow its book */
+  P.railExpect=null;
+  PR.railDriver=side;
+  if(!PR.railRaf) PR.railRaf=requestAnimationFrame(()=>{ PR.railRaf=0; let s=PR.railDriver; PR.railDriver=null; if(PR.on && s) prFollowRail(s); });
+}
+/* the reader scrolled a rail: its book follows, the partner follows by the sync mode, the partner's rail follows */
+function prFollowRail(side){
+  let P=PR.panes[side]; if(!P) return;
+  let us=prUnits(P); if(!us.length) return;
+  let p=P.rail.scrollTop/PR_RAIL_H;
+  let i=Math.max(0,Math.min(us.length-1,Math.floor(p))), f=Math.max(0,Math.min(1,p-i));
+  prMoveTo(P, us[i].top+f*us[i].h);
+  prSyncFrom(side);
+  prMarkRail(P,i);
+  prRefreshRails(side);
+  prQueuePositions();
+}
+/* tap a number (or follow a link inside the PDF): jump that book to the start of that page / chapter */
+function prJump(side,k){
+  let P=PR.panes[side]; if(!P) return;
+  let us=prUnits(P); if(!us.length) return;
+  k=Math.max(0,Math.min(us.length-1,k));
+  prMoveTo(P, k===0? 0 : us[k].top);
+  PR.driver=side;
+  prSyncFrom(side); prRefreshRails(); prQueuePositions();
+}
+['L','R'].forEach(s=>{
+  let r=$('prRail'+s);
+  r.addEventListener('scroll',()=>prOnRailScroll(s),{passive:true});
+  r.addEventListener('click',e=>{ let b=e.target.closest('.prRailNum'); if(b) prJump(s,+b.dataset.k); });
+});
+
+/* --- zoom --- */
+function prApplyZoom(P){
+  let w=P&&P.el.firstElementChild; if(!w) return;
+  if(P.book.kind==='pdf') w.style.width=(PR.zoom*100)+'%';
+  else w.style.setProperty('--pr-zoom',String(PR.zoom));
+}
+function prZoomBy(f){ prSetZoom(f===0? 1 : PR.zoom*f); }
+function prSetZoom(z){
+  if(!PR.on) return;
+  z=prClampZoom(z);
+  if(Math.abs(z-PR.zoom)<0.005) return;
+  /* remember where each book is (page + fraction, and the horizontal centre) so it stays put across the zoom */
+  let keep={};
+  ['L','R'].forEach(s=>{ let P=PR.panes[s]; if(!P) return; let el=P.el; keep[s]={pos:prPos(P), hx: el.scrollWidth>el.clientWidth? (el.scrollLeft+el.clientWidth/2)/el.scrollWidth : 0.5}; });
+  PR.zoom=z;
+  let L=curBook(); if(L){ L.parallelZoom=z; scheduleSave(); }
+  $('prZoomLabel').textContent=Math.round(z*100)+'%';
+  PR.suspend=true;
+  ['L','R'].forEach(s=>{
+    let P=PR.panes[s]; if(!P) return;
+    prApplyZoom(P); prPadEnd(P);
+    let k=keep[s];
+    if(k && k.pos){ let us=prUnits(P), u=us[Math.min(k.pos.i,us.length-1)]; if(u) prMoveTo(P,u.top+k.pos.f*u.h); }
+    P.el.scrollLeft=Math.max(0,(k? k.hx : 0.5)*P.el.scrollWidth-P.el.clientWidth/2);
+  });
+  prRefreshRails();
+  let tok=PR.token;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ if(tok===PR.token) PR.suspend=false; }));
+  /* the new layout shows at once; pages are redrawn sharp at the new size a moment after the zooming stops */
+  clearTimeout(PR.zoomT); PR.zoomT=setTimeout(()=>{ if(PR.on) prRefreshPages(); },220);
+}
+function prRefreshPages(){ ['L','R'].forEach(s=>{ let P=PR.panes[s]; if(P && P.book.kind==='pdf') pdfRefresh(P.el, P.el._io); }); }
+/* Ctrl + mouse wheel, and a laptop trackpad pinch (which the browser reports as Ctrl + wheel) */
+function prOnWheel(e){ if(!PR.on || !(e.ctrlKey||e.metaKey)) return; e.preventDefault(); prSetZoom(PR.zoom*Math.exp(-e.deltaY*0.0025)); }
+/* two-finger pinch on phones and tablets: a live preview while pinching, the real (sharp) zoom when the fingers lift */
+function prTouchStart(side,e){
+  if(!PR.on || e.touches.length!==2) return;
+  let P=PR.panes[side]; if(!P) return;
+  let w=P.el.firstElementChild; if(!w) return;
+  let a=e.touches[0], b=e.touches[1], r=w.getBoundingClientRect();
+  prPinch={side:side, w:w, d0:Math.max(20,Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)), z0:PR.zoom, s:1};
+  w.style.transformOrigin=((a.clientX+b.clientX)/2-r.left)+'px '+((a.clientY+b.clientY)/2-r.top)+'px';
+}
+function prTouchMove(e){
+  if(!prPinch || e.touches.length!==2) return;
+  let a=e.touches[0], b=e.touches[1];
+  let z=prClampZoom(prPinch.z0*Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)/prPinch.d0);
+  prPinch.s=z/prPinch.z0;
+  prPinch.w.style.transform='scale('+prPinch.s+')';
+}
+function prTouchEnd(e){
+  if(!prPinch || e.touches.length>=2) return;
+  let p=prPinch; prPinch=null;
+  p.w.style.transform=''; p.w.style.transformOrigin='';
+  if(Math.abs(p.s-1)>0.02) prSetZoom(p.z0*p.s);
+}
+['L','R'].forEach(s=>{
+  let el=$('prPane'+s);
+  el.addEventListener('wheel',prOnWheel,{passive:false});
+  el.addEventListener('touchstart',e=>prTouchStart(s,e),{passive:true});
+  el.addEventListener('touchmove',prTouchMove,{passive:true});
+  el.addEventListener('touchend',prTouchEnd,{passive:true});
+  el.addEventListener('touchcancel',prTouchEnd,{passive:true});
+});
+
 function prQueuePositions(){ clearTimeout(PR.posT); PR.posT=setTimeout(prUpdatePositions,150); }
 /* keep each book's own reading place in step with its pane, and label it */
 function prUpdatePositions(){
@@ -2975,6 +3212,7 @@ function prUpdatePositions(){
   ['L','R'].forEach(side=>{
     let P=PR.panes[side], lab=$('prPos'+side); if(!P){ lab.textContent=''; return; }
     let pos=prPos(P); if(!pos) return;
+    P.lastPos={i:pos.i, f:pos.f};
     let b=P.book;
     if(b.kind==='pdf'){ b.page=pos.i+1; lab.textContent='Page '+b.page+' / '+pos.n; S.stats.pagesRead['pdf:'+b.id+':'+b.page]=1; }
     else { b.ch=pos.i; lab.textContent='Chapter '+(b.ch+1)+' / '+pos.n; S.stats.pagesRead['epub:'+b.id+':'+b.ch]=1; }
@@ -2986,41 +3224,48 @@ function prSetSync(v){
   let L=curBook(); if(!L) return;
   L.parallelSync=(['unit','percent','off'].indexOf(v)>=0)? v : 'unit';
   $('prOffsetWrap').classList.toggle('hidden', L.parallelSync!=='unit');
-  scheduleSave(); prSyncFrom('L');
+  scheduleSave(); prSyncFrom('L'); prRefreshRails();
   toast(L.parallelSync==='off'? 'Sync off — each book scrolls on its own' : L.parallelSync==='percent'? 'Synced by overall position' : 'Synced by chapter / page');
 }
 function prSetOffset(v){
   let L=curBook(); if(!L) return;
   let n=Math.round(+v); if(!isFinite(n)) n=0; n=Math.max(-999,Math.min(999,n));
   L.parallelOffset=n; $('prOffset').value=n;
-  scheduleSave(); prSyncFrom('L');
+  scheduleSave(); prSyncFrom('L'); prRefreshRails();
 }
 function closeParallelRead(silent){
   if(!PR.on) return;
   prUpdatePositions(); /* capture both places while the panes can still be measured */
-  PR.on=false; PR.token++; PR.panes={}; PR.suspend=false;
+  PR.on=false; PR.token++; PR.panes={}; PR.suspend=false; prPinch=null;
   if(PR.raf){ cancelAnimationFrame(PR.raf); PR.raf=0; }
-  clearTimeout(PR.posT); clearTimeout(PR.resizeT);
+  if(PR.railRaf){ cancelAnimationFrame(PR.railRaf); PR.railRaf=0; }
+  clearTimeout(PR.posT); clearTimeout(PR.resizeT); clearTimeout(PR.zoomT);
   prRescueCards();
-  ['L','R'].forEach(s=>{ let el=$('prPane'+s); if(el._io){ el._io.disconnect(); el._io=null; } el.innerHTML=''; });
+  ['L','R'].forEach(prClearPane);
   $('parallelRead').classList.add('hidden'); $('readerGrid').classList.remove('hidden');
-  $('parallelBtn').setAttribute('aria-pressed','false');
+  $('parallelBtn').setAttribute('aria-pressed','false'); document.body.classList.remove('prOn');
   scheduleSave();
   if(silent) return;
   let b=curBook(); if(!b) return;
-  if(b.kind==='pdf'){ $('annotateFab').classList.remove('hidden'); jumpToPdfPage(b.page); }
+  if(b.kind==='pdf'){ $('annotateFab').classList.remove('hidden'); jumpToPdfPage(b.page,true); }
   else jumpToChapter(b.ch);
 }
 /* reader tools that live in the normal reader view leave Parallel Read first */
 function prLeave(){ if(PR.on) closeParallelRead(); }
 window.addEventListener('resize',()=>{
   if(!PR.on) return;
-  Object.values(PR.panes).forEach(P=>{ if(P) prPadEnd(P); }); /* the pane height may have changed */
-  /* a phone's address bar showing/hiding changes only the height — ignore that; redraw PDF pages only when the width changes */
+  /* pane heights may have changed (rotation, phone address bar): end room + rail padding follow at once */
+  Object.values(PR.panes).forEach(P=>{ if(P){ prPadEnd(P); prRailPads(P); } });
+  prRefreshRails();
+  /* width changed: pages re-lay-out by themselves; put each book back on its page and redraw pages sharp at the new size */
   if(window.innerWidth===PR.lastW) return;
   PR.lastW=window.innerWidth;
   clearTimeout(PR.resizeT);
-  PR.resizeT=setTimeout(()=>{ if(!PR.on) return; let hasPdf=Object.values(PR.panes).some(P=>P && P.book.kind==='pdf'); if(!hasPdf){ prSyncFrom('L'); return; } prUpdatePositions(); prRenderBoth(); },400);
+  PR.resizeT=setTimeout(()=>{
+    if(!PR.on) return;
+    ['L','R'].forEach(s=>{ let P=PR.panes[s]; if(!P||!P.lastPos) return; let us=prUnits(P), u=us[Math.min(P.lastPos.i,us.length-1)]; if(u) prMoveTo(P,u.top+P.lastPos.f*u.h); });
+    prSyncFrom('L'); prRefreshRails(); prRefreshPages();
+  },250);
 });
 
 /* ============ hash routing (P14, safe part) ============

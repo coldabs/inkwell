@@ -377,24 +377,25 @@
     <!-- PARALLEL READ — two books side by side (stacked on a phone), scrolling together -->
     <div id="parallelRead" class="hidden" aria-label="Parallel Read">
       <div class="prBar">
-        <b style="font-size:14px">Parallel Read</b>
-        <label class="kbd" for="prRight">Beside it</label>
+        <b class="prBarTitle" style="font-size:14px">Parallel Read</b>
+        <label class="kbd prBarLabel" for="prRight">Beside it</label>
         <select id="prRight" onchange="prPickRight(this.value)" aria-label="Second book"></select>
-        <label class="kbd" for="prSync">Sync</label>
+        <label class="kbd prBarLabel" for="prSync">Sync</label>
         <select id="prSync" onchange="prSetSync(this.value)" aria-label="How the two books scroll together">
           <option value="unit">By chapter / page</option>
           <option value="percent">By overall position</option>
           <option value="off">Off — scroll each on its own</option>
         </select>
-        <span class="prOffsetWrap" id="prOffsetWrap"><label class="kbd" for="prOffset" title="Use this when the two books do not start on the same chapter or page — e.g. 2 means the right book's chapter / page 3 lines up with the left book's 1">Right is ahead by</label><input id="prOffset" type="number" step="1" value="0" inputmode="numeric" onchange="prSetOffset(this.value)" aria-label="Right book is ahead by this many chapters or pages"/></span>
-        <span style="flex:1"></span>
+        <span class="prOffsetWrap" id="prOffsetWrap"><label class="kbd" for="prOffset" title="Use this when the two books do not start on the same chapter or page — e.g. 2 means the right book's chapter / page 3 lines up with the left book's 1"><span class="prLong">Right is ahead by</span><span class="prShort">Offset</span></label><input id="prOffset" type="number" step="1" value="0" inputmode="numeric" onchange="prSetOffset(this.value)" aria-label="Right book is ahead by this many chapters or pages"/></span>
+        <span class="prZoom" role="group" aria-label="Zoom"><button class="btn small" type="button" onclick="prZoomBy(1/1.2)" aria-label="Zoom out" title="Zoom out (Ctrl + scroll, or pinch)">−</button><button class="btn small prZoomLabel" type="button" id="prZoomLabel" onclick="prZoomBy(0)" title="Reset zoom to 100%">100%</button><button class="btn small" type="button" onclick="prZoomBy(1.2)" aria-label="Zoom in" title="Zoom in (Ctrl + scroll, or pinch)">+</button></span>
+        <span class="prSpacer"></span>
         <button class="btn small" type="button" onclick="closeParallelRead()">Close</button>
       </div>
       <div class="prGrid">
-        <div class="prCol"><div class="prHead"><b id="prTitleL"></b><span class="kbd" id="prPosL"></span></div><div class="prPane" id="prPaneL" tabindex="0" aria-label="Left book"></div></div>
-        <div class="prCol"><div class="prHead"><b id="prTitleR"></b><span class="kbd" id="prPosR"></span></div><div class="prPane" id="prPaneR" tabindex="0" aria-label="Right book"></div></div>
+        <div class="prCol"><div class="prHead"><b id="prTitleL"></b><span class="kbd" id="prPosL"></span></div><div class="prBody"><div class="prRailBox"><div class="prRail" id="prRailL" role="navigation"></div></div><div class="prPane" id="prPaneL" tabindex="0" aria-label="Left book"></div></div></div>
+        <div class="prCol"><div class="prHead"><b id="prTitleR"></b><span class="kbd" id="prPosR"></span></div><div class="prBody"><div class="prRailBox"><div class="prRail" id="prRailR" role="navigation"></div></div><div class="prPane" id="prPaneR" tabindex="0" aria-label="Right book"></div></div></div>
       </div>
-      <p class="kbd" style="margin:0;line-height:1.5">Scroll either book and the other follows. Your place in both books is remembered. Highlighting, Listen and OCR work in the normal reader — tap Close to get back to it.</p>
+      <p class="kbd" style="margin:0;line-height:1.5">Scroll either book — or the page numbers beside it — and the other book follows. Tap a number to jump to that page. Zoom with − / +, Ctrl + scroll, or pinch. Highlighting, Listen and OCR work in the normal reader — tap Close to get back to it.</p>
     </div>
   </section>
 </main>
