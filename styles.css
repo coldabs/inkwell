@@ -131,7 +131,9 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 .wordmarkName{font-family:var(--font-display);font-size:26px;font-weight:600;letter-spacing:-.03em;line-height:1}
 .wordmarkTag{font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
 .mastheadTools{display:flex;align-items:center;justify-self:end;gap:8px;flex:0 0 auto}
-.saveFlag{font-size:11px;line-height:1.4;color:var(--muted);max-width:210px;text-align:right}
+.installBtn{min-height:34px;padding:0 10px;font-size:11px;border-color:var(--line-strong)}
+.installBtn .ic{width:14px;height:14px}
+.saveFlag{font-size:11px;line-height:1.4;color:var(--muted);max-width:210px;text-align:right;white-space:nowrap}
 .libraryHead{display:block;padding:52px 0 32px}
 .navSearch{width:100%;max-width:560px;justify-self:center}
 .navSearch .search{min-height:44px;background:var(--paper)}
@@ -520,6 +522,8 @@ mark{background:#F2D887;color:#1A1A1A;padding:0 2px;border-radius:2px}
   .mastheadTools{grid-column:2;grid-row:1}
   .navSearch{grid-column:1/-1;grid-row:2;max-width:none;justify-self:stretch}
   .saveFlag{display:none}
+  .installBtn{width:44px;min-width:44px;min-height:44px;padding:0;justify-content:center}
+  .installBtn .installLabel{display:none}
   .iconBtn{width:44px;height:44px;min-width:44px;min-height:44px}
   .libraryHead{padding:32px 0 24px}
   .libraryTitle h1{font-size:clamp(2.8rem,12vw,4rem);margin-bottom:12px}

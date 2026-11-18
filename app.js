@@ -115,7 +115,7 @@ function deletePdfFile(id){ idbDel('pdf:'+id); }
 function updateSaveStatus(failed){
   let el=$('saveStatus'); if(!el) return;
   if(failed){ el.textContent='Could not save in this browser. Use Backup to keep your notes safe.'; return; }
-  el.textContent= lastSaveAt? 'Saved locally · '+new Date(lastSaveAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}) : 'Saves in this browser';
+  el.textContent= lastSaveAt? 'Saved '+new Date(lastSaveAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}) : 'Saved';
 }
 function scheduleSave(){ if(!persistReady || inSave) return; persistDirty=true; clearTimeout(saveTimer); saveTimer=setTimeout(saveNow,700); }
 function bgPdfImgData(bg){

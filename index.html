@@ -6,7 +6,11 @@
 <meta name="color-scheme" content="light dark"/>
 <meta name="theme-color" content="#EDE7DA"/>
 <meta name="description" content="Inkwell is a local-first handwriting notebook and long-form reader for PDFs and EPUBs."/>
-<link rel="icon" href="data:,"/>
+<link rel="icon" href="icon-192.png"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="Inkwell"/>
 <title>Inkwell · Notes &amp; Reading</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -25,7 +29,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="styles.css?v=2026-11-18-merge-parallel-read">
+<link rel="stylesheet" href="styles.css?v=2026-11-19-pwa">
 </head>
 <body>
 <!-- Icons: Tabler Icons 3.52.0, MIT, https://tabler.io/icons -->
@@ -132,7 +136,8 @@
         <div id="searchResults" class="searchResults hidden"></div>
       </div>
       <div class="mastheadTools">
-        <span class="saveFlag" id="saveStatus" aria-live="polite">Saves in this browser</span>
+        <span class="saveFlag" id="saveStatus" aria-live="polite">Saved</span>
+        <button id="installBtn" class="btn small installBtn" type="button" style="display:none" aria-label="Install Inkwell"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-download"></use></svg><span class="installLabel">Install</span></button>
         <button class="iconBtn" id="themeToggle" type="button" onclick="toggleTheme()" aria-label="Switch to dark theme" title="Switch theme">
           <svg class="ic" aria-hidden="true"><use href="#ticon-moon"></use></svg>
         </button>
@@ -434,7 +439,7 @@
       <div class="seg" role="tablist" aria-label="Reading mode"><button class="active" id="modeScrollBtn" onclick="setReaderMode('scroll')">Scroll</button><button id="modePageBtn" onclick="setReaderMode('page')">Page</button></div>
       <button class="btn" id="sideToggle" onclick="toggleReaderSide()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-list"></use></svg> Contents</button>
       <button class="btn" id="bookmarkBtn" onclick="toggleBookmark()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-bookmark"></use></svg> Bookmark</button>
-      <button class="btn" id="parallelBtn" aria-pressed="false" onclick="toggleParallelRead()" title="Open this book beside a second book" aria-label="Parallel Read"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-columns"></use></svg> Parallel</button>
+      <button class="btn" id="parallelBtn" aria-pressed="false" onclick="toggleParallelRead()" title="Open this book beside a second book" aria-label="Parallel Read"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-columns"></use></svg> Parallel Read</button>
       <button class="btn" id="readerMoreBtn" aria-expanded="false" onclick="toggleReaderMore(this)"><span id="readerMoreLabel">More</span> <svg class="ic ic-sm moreChevron" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg></button>
       <span class="readerResume" id="resumeLabel"></span>
     </div>
@@ -627,6 +632,43 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<script src="app.js?v=2026-11-18-merge-parallel-read"></script>
+<script src="app.js?v=2026-11-19-pwa"></script>
+<script>
+/* PWA: install prompt and offline app shell. */
+(function(){
+  var btn=document.getElementById('installBtn');
+  var deferredPrompt=null;
+  function installed(){ return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone; }
+  function updateInstallBtn(){
+    if(!btn) return;
+    var canInstall=(typeof navigator.install==='function') || !!deferredPrompt;
+    btn.style.display=(!installed() && canInstall)? '' : 'none';
+  }
+  window.addEventListener('beforeinstallprompt',function(e){
+    e.preventDefault();
+    deferredPrompt=e;
+    updateInstallBtn();
+  });
+  window.addEventListener('appinstalled',function(){
+    deferredPrompt=null;
+    updateInstallBtn();
+  });
+  if(btn) btn.addEventListener('click',function(){
+    if(typeof navigator.install==='function'){ navigator.install(); return; }
+    if(deferredPrompt){
+      var prompt=deferredPrompt;
+      deferredPrompt=null;
+      updateInstallBtn();
+      prompt.prompt();
+    }
+  });
+  updateInstallBtn();
+  if('serviceWorker' in navigator){
+    window.addEventListener('load',function(){
+      navigator.serviceWorker.register('sw.js').catch(function(){});
+    });
+  }
+})();
+</script>
 </body>
 </html>
