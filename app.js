@@ -2580,6 +2580,27 @@ async function renderPdfTextLayer(page,cssVp,holder,book,pageNum){
     (book.annotations||[]).forEach(a=>{ if(a.where==='PDF page '+pageNum) wrapTextOnce(layer,a.text,a.kind||'highlight'); });
   }catch(e){ /* text layer is best-effort; page image still reads */ }
 }
+/* Draw the linked annotation notebook's ink on a PDF page in reading mode.
+   The ink lives in that notebook (prInkPage) in notebook-page coordinates;
+   prInkGeom says where the PDF page sits inside the notebook page, so the
+   same transform the Parallel Read panes use (prRenderInk) puts every stroke
+   back in the same place, drawn by the editor's own drawStroke(). Without
+   this, ink drawn in Annotate was saved but never visible in reading mode. */
+function renderPdfInkOverlay(book,num,holder,vp){
+ let old=holder.querySelector(':scope>canvas.pdfInk');
+ let pg=prInkPage(book,num,false);
+ let has=pg&&((pg.ink&&pg.ink.length)||(pg.hi&&pg.hi.length));
+ if(!has||holder.closest('.prPane')){ if(old) old.remove(); return; }
+ let W=Math.max(1,Math.floor(vp.width)), Hh=Math.max(1,Math.floor(vp.height));
+ let cv=old||document.createElement('canvas');
+ cv.className='pdfInk'; cv.setAttribute('aria-hidden','true');
+ if(cv.width!==W||cv.height!==Hh){ cv.width=W; cv.height=Hh; }
+ if(!cv.isConnected) holder.appendChild(cv);
+ let x=cv.getContext('2d'); x.setTransform(1,0,0,1,0,0); x.clearRect(0,0,W,Hh);
+ let g=prInkGeom(book,num,pg), kx=W/g.dw, ky=Hh/g.dh;
+ x.setTransform(kx,0,0,ky,-g.ox*kx,-g.oy*ky); x.lineCap='round'; x.lineJoin='round';
+ (pg.hi||[]).forEach(st=>drawStroke(x,st)); (pg.ink||[]).forEach(st=>drawStroke(x,st));
+}
 async function renderPdfPageInto(num,host,book){
   let page=await book.doc.getPage(num);
   let wrap=document.createElement('div'); wrap.className='pdfPage'; wrap.dataset.page=num;
@@ -2591,7 +2612,7 @@ async function renderPdfPageInto(num,host,book){
   canvas.width=Math.floor(vp.width); canvas.height=Math.floor(vp.height);
   await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
   renderPdfTextLayer(page,vp,holder,book,num);
-  renderPdfLinks(page,vp,holder,book);
+  renderPdfLinks(page,vp,holder,book); renderPdfInkOverlay(book,num,holder,vp);
 }
 /* Follow links from the background PDF: link annotations become clickable
    overlays, web links open in a new tab, internal links jump pages. */
