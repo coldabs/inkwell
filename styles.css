@@ -753,3 +753,15 @@ html.themeAnim,html.themeAnim *,html.themeAnim *::before,html.themeAnim *::after
   .prInkHint{display:none}
   .prInkBar .seg button{padding:6px 9px}
 }
+/* Annotate this PDF in Parallel Read: the editor's tools on the page */
+.prInkTools{display:inline-flex;flex-wrap:wrap;align-items:center;gap:2px}
+.prInkTools .tool{width:38px;height:38px;min-height:38px;border-radius:var(--r-md)}
+.prInkTools .tool svg{width:19px;height:19px}
+.prInkTools .tool.active{background:var(--accent);color:var(--accent-fg)}
+.prInkSizeGroup{background:var(--bg-2);border-radius:var(--r-md);padding:2px 8px 2px 10px;gap:6px}
+.prInkSizeGroup input[type=range]{width:86px}
+.prInkOpt{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600}
+.prInkOpt.hidden,#prInkCustom.hidden{display:none!important}
+#prInkSizePreview{background:#FFFDF6;border-radius:var(--r-sm);box-shadow:inset 0 0 0 1px var(--border-subtle)}
+@media (pointer:coarse){ .prInkTools .tool{width:44px;height:44px;min-height:44px} }
+@media (max-width:700px){ .prInkSizeGroup input[type=range]{width:64px} .prInkSizeGroup .tool-label{display:none} }

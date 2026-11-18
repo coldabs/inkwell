@@ -3175,6 +3175,7 @@ function prSetActive(side,force){
   prSetRail();
   prShowZoom();
   prUpdateMarksBtn();
+  prUpdateAnnotateFab();
 }
 function prBuildRail(P){
   let rail=$('prRail'); if(!rail) return;
@@ -3428,11 +3429,10 @@ window.addEventListener('resize',()=>{
    notebook yet, one is made on the first stroke — its page pictures are
    drawn from the PDF only when the editor first shows them. EPUB text
    reflows, so handwriting cannot stay attached to it: PDFs only. */
-const PRA={marksChanged:false, ink:false, tool:'pen', penColor:'#1b2a4a', hiColor:'#f5d90a', size:4,
-  undo:[], redo:[], stroke:null, strokeHolder:null, strokeSide:null, erase:null, ptrs:new Map(), pan:null, last:null, raf:0, selT:null, warnedEpub:false};
+const PRA={marksChanged:false, ink:false, tool:'pen', penColor:'#1b2a4a', hiColor:'#f5d90a', size:4, style:'solid', fill:false, eraserMode:'stroke',
+  undo:[], redo:[], stroke:null, strokeHolder:null, strokeSide:null, strokePtr:null, erase:null, ptrs:new Map(), pan:null, last:null, raf:0, selT:null, warnedEpub:false};
 const PR_PEN_COLORS=['#1b2a4a','#2456c8','#b23a2e','#2e7d46','#7b4ba8','#c26d1e','#0e7d86','#d1497a'];
 const PR_HI_COLORS=['#f5d90a','#7ee081','#7cc4ff','#ff8fb1','#ffb366'];
-const PR_SIZES={thin:2, medium:4, thick:8};
 
 /* ---------- text marks ---------- */
 function prSideOfNode(node){
@@ -3518,7 +3518,16 @@ $('prMarksPop').addEventListener('click',e=>{
 });
 document.addEventListener('click',e=>{ if(!e.target.closest('#prMarksPop,#prMarksBtn')) prCloseMarks(); });
 
-/* ---------- handwriting on PDF pages ---------- */
+/* ---------- handwriting on PDF pages ("Annotate this PDF", right in Parallel Read) ----------
+   The same drawing tools as the editor, on the page itself: pen, calligraphy
+   pen, highlighter, eraser (whole stroke, or cut only where you rub), line,
+   rectangle, ellipse, arrow (optionally filled), the size slider with its
+   plain-word sizes, the ink colours plus a custom colour, solid / dashed /
+   dotted / dash-dot lines, undo / redo. Strokes are the editor's own stroke
+   objects drawn by the editor's own drawStroke(), so they look the same in
+   both places. "Open in editor" goes to the same notebook page for the
+   editor-only extras (text, images, stickies, LaTeX, floating board). */
+const PR_PEN_TOOLS=['pen','calligraphy','highlighter','eraser','line','rect','ellipse','arrow'];
 function prInkNotebook(book,create){
   let nb=S.items.find(i=>i.kind==='notebook' && i.pdfBookId===book.id);
   if(nb || !create) return nb||null;
@@ -3526,7 +3535,7 @@ function prInkNotebook(book,create){
   nb={id:uid(),kind:'notebook',title:'Annotations — '+book.title,color:'#1e3a5f',template:'blank',cur:0,updated:'Just now',annotations:[],pdfBookId:book.id,pages:[]};
   for(let n=1;n<=book.numPages;n++){ let pg=blankPage(), sz=sizes[n-1]||sizes[0]||[612,792]; pg.bgPdf={img:null,imgData:null,page:n,bookTitle:book.title,w:sz[0],h:sz[1]}; nb.pages.push(pg); }
   S.items.unshift(nb); scheduleSave();
-  toast('Your handwriting on “'+book.title+'” is also in the notebook “'+nb.title+'”',4000);
+  toast('Your annotations on “'+book.title+'” are also in the notebook “'+nb.title+'”',4000);
   return nb;
 }
 /* the notebook page holding the ink of PDF page n (matched by PDF page, so reordering pages in the editor is fine) */
@@ -3567,9 +3576,19 @@ function prRenderInk(P,holder){
 }
 function prAllHolders(){ let out=[]; ['L','R'].forEach(s=>{ let P=PR.panes[s]; if(P && P.book.kind==='pdf') P.el.querySelectorAll('.pdfHolder').forEach(h=>out.push({P:P,h:h})); }); return out; }
 function prRedrawInkFor(book,n){ ['L','R'].forEach(s=>{ let P=PR.panes[s]; if(!P || P.book!==book) return; let h=P.el.querySelector('.pdfHolder[data-n="'+n+'"]'); if(h && h._drawn) prRenderInk(P,h); }); }
+/* the PDF to annotate: the book in use if it is a PDF, otherwise the other one */
+function prInkSide(){ let a=PR.panes[PR.active]; if(a && a.book.kind==='pdf') return PR.active; let o=PR.active==='L'?'R':'L'; return (PR.panes[o] && PR.panes[o].book.kind==='pdf')? o : null; }
+function prUpdateAnnotateFab(){
+  let f=$('prAnnotateFab'); if(!f) return;
+  let show= PR.on && !PRA.ink && !!prInkSide();
+  f.classList.toggle('hidden',!show);
+  if(show){ let P=PR.panes[prInkSide()]; f.title='Annotate “'+P.book.title+'” here, beside the other book'; }
+}
+/* the blue "Annotate this PDF" button: annotate right here, without leaving Parallel Read */
+function prAnnotateThisPdf(){ let s=prInkSide(); if(!s){ toast('Handwriting works on PDF pages — neither book here is a PDF'); return; } prSetActive(s); prToggleInk(true); }
 function prToggleInk(force,quiet){
   let on= typeof force==='boolean'? force : !PRA.ink;
-  if(on && !Object.values(PR.panes).some(P=>P && P.book.kind==='pdf')){ toast('Handwriting works on PDF pages — neither book here is a PDF'); return; }
+  if(on && !prInkSide()){ toast('Handwriting works on PDF pages — neither book here is a PDF'); return; }
   if(!on) prInkCancel();
   PRA.ink=on;
   $('parallelRead').classList.toggle('prInking',on);
@@ -3577,23 +3596,52 @@ function prToggleInk(force,quiet){
   $('prInkBar').classList.toggle('hidden',!on);
   if(on){ let s=window.getSelection(); if(s) s.removeAllRanges(); prHideSelBar(); prRenderInkBar(); }
   prAllHolders().forEach(o=>{ if(o.h._drawn) prRenderInk(o.P,o.h); });
+  prUpdateAnnotateFab();
   if(on && !quiet) toast('Annotate: draw on the PDF pages — one finger or a pen draws, two fingers scroll');
 }
+function prInkColor(){ return PRA.tool==='highlighter'? PRA.hiColor : PRA.penColor; }
 function prRenderInkBar(){
   let bar=$('prInkBar'); if(!bar) return;
   bar.querySelectorAll('[data-tool]').forEach(b=>{ let on=b.dataset.tool===PRA.tool; b.classList.toggle('active',on); b.setAttribute('aria-pressed',on?'true':'false'); });
-  bar.querySelectorAll('[data-size]').forEach(b=>{ let on=PR_SIZES[b.dataset.size]===PRA.size; b.classList.toggle('active',on); b.setAttribute('aria-pressed',on?'true':'false'); });
+  let er=PRA.tool==='eraser', hi=PRA.tool==='highlighter', shape=SHAPE_TOOLS.indexOf(PRA.tool)>=0;
   let box=$('prInkSwatches');
-  if(PRA.tool==='eraser') box.innerHTML='<span class="kbd">Touch a stroke to remove it</span>';
+  if(er) box.innerHTML='';
   else {
-    let cols= PRA.tool==='highlighter'? PR_HI_COLORS : PR_PEN_COLORS, cur= PRA.tool==='highlighter'? PRA.hiColor : PRA.penColor;
-    box.innerHTML=cols.map(c=>'<button type="button" class="swatch'+(c===cur?' active':'')+'" style="background:'+c+'" data-color="'+c+'" aria-label="Colour '+c+'" aria-pressed="'+(c===cur)+'"></button>').join('');
+    let cols= hi? PR_HI_COLORS : PR_PEN_COLORS, cur=prInkColor();
+    box.innerHTML=cols.map(c=>'<button type="button" class="swatch'+(c.toLowerCase()===String(cur).toLowerCase()?' active':'')+'" style="background:'+c+'" data-color="'+c+'" aria-label="Colour '+c+'" aria-pressed="'+(c===cur)+'"></button>').join('');
   }
+  let cp=$('prInkCustom'); cp.classList.toggle('hidden',er); if(/^#[0-9a-f]{6}$/i.test(prInkColor())) cp.value=prInkColor();
+  $('prInkStyleWrap').classList.toggle('hidden',er||hi);
+  $('prInkFillWrap').classList.toggle('hidden',!(PRA.tool==='rect'||PRA.tool==='ellipse'));
+  $('prInkEraserWrap').classList.toggle('hidden',!er);
+  $('prInkStyle').value=PRA.style; $('prInkFill').checked=!!PRA.fill; $('prInkEraser').value=PRA.eraserMode;
+  $('prInkSize').value=PRA.size; $('prInkSizeWord').textContent=sizeWord(PRA.size);
+  prDrawSizePreview();
   $('prUndoBtn').disabled=!PRA.undo.length; $('prRedoBtn').disabled=!PRA.redo.length;
 }
-function prSetInkTool(t){ PRA.tool=t; prRenderInkBar(); }
-function prSetInkSize(k){ PRA.size=PR_SIZES[k]||4; prRenderInkBar(); }
-$('prInkSwatches').addEventListener('click',e=>{ let b=e.target.closest('[data-color]'); if(!b) return; if(PRA.tool==='highlighter') PRA.hiColor=b.dataset.color; else PRA.penColor=b.dataset.color; prRenderInkBar(); });
+/* the size preview: the next stroke at its real width (at 100% zoom), on page-coloured paper */
+function prDrawSizePreview(){
+  let c=$('prInkSizePreview'); if(!c) return; let x=c.getContext('2d'); x.clearRect(0,0,c.width,c.height);
+  let v=PRA.size, my=c.height/2; x.lineCap='round';
+  if(PRA.tool==='eraser'){ x.strokeStyle='#b2261e'; x.lineWidth=1.6; x.setLineDash([4,3]); x.beginPath(); x.arc(c.width/2,my,Math.min(13,5+v*0.55),0,7); x.stroke(); return; }
+  let w= PRA.tool==='highlighter'? Math.min(26,v*4.5) : SHAPE_TOOLS.indexOf(PRA.tool)>=0? Math.max(1.5,v*1.4) : PRA.tool==='calligraphy'? v*1.7 : v*1.8;
+  x.strokeStyle=prInkColor(); x.globalAlpha= PRA.tool==='highlighter'? 0.45 : 1; x.lineWidth=Math.max(1,w);
+  x.beginPath(); x.moveTo(5,my+3); x.quadraticCurveTo(c.width/2,my-4,c.width-5,my+3); x.stroke(); x.globalAlpha=1;
+}
+function prSetInkTool(t){ if(PR_PEN_TOOLS.indexOf(t)<0) t='pen'; PRA.tool=t; prRenderInkBar(); }
+function prSetInkSize(v){ v=Math.round(+v); PRA.size=Math.max(1,Math.min(16,isFinite(v)? v : 4)); prRenderInkBar(); }
+function prSetInkColor(c){ if(!/^#[0-9a-f]{6}$/i.test(c)) return; if(PRA.tool==='highlighter') PRA.hiColor=c; else PRA.penColor=c; prRenderInkBar(); }
+$('prInkSwatches').addEventListener('click',e=>{ let b=e.target.closest('[data-color]'); if(b) prSetInkColor(b.dataset.color); });
+/* "Open in editor": the same notebook, at the page in use — for text, images, stickies, LaTeX, the board */
+function prOpenInEditor(){
+  let s=prInkSide(); if(!s){ toast('Open a PDF beside it first'); return; }
+  let P=PR.panes[s], n=prPos(P).i+1, book=P.book;
+  let nb=prInkNotebook(book,true); prInkPage(book,n,true);
+  let i=nb.pages.findIndex(p=>p.bgPdf && p.bgPdf.page===n);
+  closeParallelRead(true);
+  openNotebook(nb.id); if(i>=0) switchPage(i);
+  toast('The same page in the editor — everything you add here shows in Parallel Read too');
+}
 /* page coordinates (the notebook page's) of a pointer over a page */
 function prInkPoint(P,h,e){
   let r=h.getBoundingClientRect(), n=+h.dataset.n, g=prInkGeom(P.book,n,prInkPage(P.book,n,false));
@@ -3606,13 +3654,13 @@ function prInkPoint(P,h,e){
 function prMid(ps){ return {x:(ps[0].x+ps[1].x)/2, y:(ps[0].y+ps[1].y)/2}; }
 function prInkCancel(){
   let h=PRA.strokeHolder, side=PRA.strokeSide;
-  PRA.stroke=null; PRA.strokeHolder=null; PRA.strokeSide=null; PRA.erase=null; PRA.last=null;
+  PRA.stroke=null; PRA.strokeHolder=null; PRA.strokeSide=null; PRA.strokePtr=null; PRA.erase=null; PRA.last=null;
   if(h && PR.panes[side]) prRenderInk(PR.panes[side],h);
 }
 function prInkSnapshot(book,pg){ PRA.undo.push({book:book, pg:pg, ink:cloneStrokes(pg.ink), hi:cloneStrokes(pg.hi)}); if(PRA.undo.length>80) PRA.undo.shift(); PRA.redo=[]; }
 function prInkUndo(){ let s=PRA.undo.pop(); if(!s){ toast('Nothing to undo'); return; } PRA.redo.push({book:s.book, pg:s.pg, ink:cloneStrokes(s.pg.ink), hi:cloneStrokes(s.pg.hi)}); s.pg.ink=s.ink; s.pg.hi=s.hi; bumpV(s.pg); prRedrawInkFor(s.book,s.pg.bgPdf.page); prRenderInkBar(); }
 function prInkRedo(){ let s=PRA.redo.pop(); if(!s){ toast('Nothing to redo'); return; } PRA.undo.push({book:s.book, pg:s.pg, ink:cloneStrokes(s.pg.ink), hi:cloneStrokes(s.pg.hi)}); s.pg.ink=s.ink; s.pg.hi=s.hi; bumpV(s.pg); prRedrawInkFor(s.book,s.pg.bgPdf.page); prRenderInkBar(); }
-/* the eraser removes whole strokes it touches (like the editor's), swept from the last sample to this one */
+/* eraser, whole-stroke mode: removes strokes it touches, swept from the last sample to this one (the editor's test) */
 function prStrokeHit(st,a,b,r){
   let tol=r+strokeWidthOf(st)/2, polys= st.tool==='shape'? shapeToPolylines(st) : [st];
   for(let pi=0;pi<polys.length;pi++){
@@ -3624,11 +3672,26 @@ function prStrokeHit(st,a,b,r){
 }
 function prEraseAt(P,h,a,b){
   let n=+h.dataset.n, pg=prInkPage(P.book,n,false); if(!pg) return;
-  let r=10+PRA.size*2, hit=false;
-  ['ink','hi'].forEach(layer=>{
-    let keep=pg[layer].filter(st=>!prStrokeHit(st,a,b,r));
-    if(keep.length!==pg[layer].length){ if(!PRA.erase.snap){ prInkSnapshot(P.book,pg); PRA.erase.snap=true; } pg[layer]=keep; hit=true; }
-  });
+  let hit=false, snap=()=>{ if(!PRA.erase.snap){ prInkSnapshot(P.book,pg); PRA.erase.snap=true; } };
+  if(PRA.eraserMode==='split'){
+    /* cut mode: the editor's padded-box splitter — only the rubbed stretch goes, the rest of the stroke stays */
+    let half=8+PRA.size;
+    ['ink','hi'].forEach(layer=>{
+      let out=[], changed=false;
+      pg[layer].forEach(st=>{
+        let list= st.tool==='shape'? shapeToPolylines(st) : [st], any=false, pieces=[];
+        list.forEach(t=>{ let res=eraseStrokeSplit(t,{cx:b.x, cy:b.y, half:half, halfPad:half+ERASE_PAD_COEFF*strokeWidthOf(t)}); if(res===null) pieces.push(t); else { any=true; res.forEach(x=>pieces.push(x)); } });
+        if(!any) out.push(st); else { changed=true; pieces.forEach(x=>out.push(x)); }
+      });
+      if(changed){ snap(); pg[layer]=out; hit=true; }
+    });
+  } else {
+    let r=10+PRA.size*2;
+    ['ink','hi'].forEach(layer=>{
+      let keep=pg[layer].filter(st=>!prStrokeHit(st,a,b,r));
+      if(keep.length!==pg[layer].length){ snap(); pg[layer]=keep; hit=true; }
+    });
+  }
   if(hit){ bumpV(pg); prRenderInk(P,h); }
 }
 function prInkDown(side,e){
@@ -3646,7 +3709,11 @@ function prInkDown(side,e){
   PRA.last=null;
   let pt=prInkPoint(P,h,e);
   if(PRA.tool==='eraser'){ PRA.erase={side:side, h:h, last:pt, snap:false, ptr:e.pointerId}; prEraseAt(P,h,pt,pt); return; }
-  PRA.stroke={tool:PRA.tool==='highlighter'?'highlighter':'pen', color:PRA.tool==='highlighter'? PRA.hiColor : PRA.penColor, size:PRA.size, style:'solid', points:[pt]};
+  if(SHAPE_TOOLS.indexOf(PRA.tool)>=0){
+    PRA.stroke={tool:'shape', shape:PRA.tool, color:PRA.penColor, size:PRA.size, fill:!!PRA.fill && (PRA.tool==='rect'||PRA.tool==='ellipse'), style:PRA.style, points:[{x:pt.x,y:pt.y},{x:pt.x,y:pt.y}]};
+  } else {
+    PRA.stroke={tool:PRA.tool, color:prInkColor(), size:PRA.size, style: PRA.tool==='highlighter'? 'solid' : PRA.style, points:[pt]};
+  }
   PRA.strokeHolder=h; PRA.strokeSide=side; PRA.strokePtr=e.pointerId; PRA.last={x:e.clientX,y:e.clientY};
   prRenderInk(P,h);
 }
@@ -3664,7 +3731,8 @@ function prInkMove(e){
   if(!PRA.stroke || !rec || e.pointerId!==PRA.strokePtr) return;
   e.preventDefault();
   let P=PR.panes[PRA.strokeSide], h=PRA.strokeHolder; if(!P) return;
-  (e.getCoalescedEvents? e.getCoalescedEvents() : [e]).forEach(ev=>{ PRA.stroke.points.push(prInkPoint(P,h,ev)); PRA.last={x:ev.clientX,y:ev.clientY}; });
+  if(PRA.stroke.tool==='shape'){ let pt=prInkPoint(P,h,e); PRA.stroke.points[1]={x:pt.x,y:pt.y}; }
+  else (e.getCoalescedEvents? e.getCoalescedEvents() : [e]).forEach(ev=>{ PRA.stroke.points.push(prInkPoint(P,h,ev)); PRA.last={x:ev.clientX,y:ev.clientY}; });
   if(!PRA.raf) PRA.raf=requestAnimationFrame(()=>{ PRA.raf=0; if(PRA.stroke && PR.panes[PRA.strokeSide]) prRenderInk(PR.panes[PRA.strokeSide],PRA.strokeHolder); });
 }
 function prInkUp(e){
@@ -3676,6 +3744,7 @@ function prInkUp(e){
   let st=PRA.stroke, side=PRA.strokeSide, P=PR.panes[side], h=PRA.strokeHolder;
   PRA.stroke=null; PRA.strokeHolder=null; PRA.strokeSide=null; PRA.strokePtr=null; PRA.last=null;
   if(!P || !h) return;
+  if(st.tool==='shape' && Math.hypot(st.points[1].x-st.points[0].x, st.points[1].y-st.points[0].y)<3){ prRenderInk(P,h); return; } /* a tap is not a shape */
   let pg=prInkPage(P.book,+h.dataset.n,true);
   prInkSnapshot(P.book,pg);
   (st.tool==='highlighter'? pg.hi : pg.ink).push(st); S.stats.strokes++; bumpV(pg);
@@ -3697,6 +3766,7 @@ document.addEventListener('keydown',e=>{
 function prAnnotationsOnClose(silent){
   if(PRA.ink) prToggleInk(false,true);
   prHideSelBar(); prCloseMarks(); PRA.ptrs.clear(); PRA.pan=null;
+  let fab=$('prAnnotateFab'); if(fab) fab.classList.add('hidden');
   let changed=PRA.marksChanged; PRA.marksChanged=false;
   if(!changed || silent) return false;
   let b=curBook(); if(!b) return false;
