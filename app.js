@@ -3325,7 +3325,7 @@ function prRefreshPages(){ ['L','R'].forEach(s=>{ let P=PR.panes[s]; if(P && P.b
 function prOnWheel(side,e){ if(!PR.on || !(e.ctrlKey||e.metaKey)) return; e.preventDefault(); let P=PR.panes[side]; if(!P) return; prSetZoom(side, P.zoom*Math.exp(-e.deltaY*0.0025), e.clientX, e.clientY); }
 /* two-finger pinch on phones and tablets: the book under the fingers; a live preview while pinching, the real (sharp) zoom when the fingers lift */
 function prTouchStart(side,e){
-  if(!PR.on || e.touches.length!==2) return;
+  if(!PR.on || !e.touches || e.touches.length!==2) return;
   let P=PR.panes[side]; if(!P) return;
   let w=P.el.firstElementChild; if(!w) return;
   let a=e.touches[0], b=e.touches[1], r=w.getBoundingClientRect();
@@ -3333,14 +3333,14 @@ function prTouchStart(side,e){
   w.style.transformOrigin=((a.clientX+b.clientX)/2-r.left)+'px '+((a.clientY+b.clientY)/2-r.top)+'px';
 }
 function prTouchMove(e){
-  if(!prPinch || e.touches.length!==2) return;
+  if(!prPinch || !e.touches || e.touches.length!==2) return;
   let a=e.touches[0], b=e.touches[1];
   let z=prClampZoom(prPinch.z0*Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)/prPinch.d0);
   prPinch.s=z/prPinch.z0;
   prPinch.w.style.transform='scale('+prPinch.s+')';
 }
 function prTouchEnd(e){
-  if(!prPinch || e.touches.length>=2) return;
+  if(!prPinch || (e.touches && e.touches.length>=2)) return;
   let p=prPinch; prPinch=null;
   p.w.style.transform=''; p.w.style.transformOrigin='';
   if(Math.abs(p.s-1)>0.02) prSetZoom(p.side, p.z0*p.s, p.mx, p.my);
@@ -3588,24 +3588,31 @@ function prAllHolders(){ let out=[]; ['L','R'].forEach(s=>{ let P=PR.panes[s]; i
 function prRedrawInkFor(book,n){ ['L','R'].forEach(s=>{ let P=PR.panes[s]; if(!P || P.book!==book) return; let h=P.el.querySelector('.pdfHolder[data-n="'+n+'"]'); if(h && h._drawn) prRenderInk(P,h); }); }
 /* the PDF to annotate by default: the book in use if it is a PDF, otherwise the other one */
 function prInkSide(){ let a=PR.panes[PR.active]; if(a && a.book.kind==='pdf') return PR.active; let o=PR.active==='L'?'R':'L'; return (PR.panes[o] && PR.panes[o].book.kind==='pdf')? o : null; }
-/* EACH PDF has its own "Annotate this PDF" button (on its own pane) and its own on/off.
-   Annotating one book never changes the other: a book that is not being annotated keeps
-   text selection, marks and one-finger scrolling. The pen bar works on the book you are
-   drawing on (its name is shown in the bar); undo / redo, Done and "Open in editor" act on it. */
+/* ONE "Annotate this PDF" button for Parallel Read. It follows the book you are using (the one
+   with the blue edge, which also owns the page-number rail): scroll, tap or click the other PDF and
+   the button now annotates that one. Each book still has its own on/off ("Annotating · Stop" in its
+   header), so both PDFs can be annotated at once. If the book in use is an EPUB, the button targets
+   the PDF beside it. The pen bar works on the book you are drawing on (its name is shown in the bar). */
 function prUpdateAnnotateFab(){
+  let t= PR.on? prInkSide() : null, tp= t? PR.panes[t] : null;
+  let f=$('prAnnotateFab');
+  if(f){
+    f.classList.toggle('hidden', !PR.on || !tp || !!PRA.inkOn[t] || !!PRA.pending[t]);
+    if(tp){ f.title='Annotate “'+tp.book.title+'” — the '+(t==='L'?'left':'right')+' book'; f.setAttribute('aria-label',f.title); f.dataset.side=t; }
+  }
   ['L','R'].forEach(s=>{
     let P=PR.panes[s], pdf=!!(PR.on && P && P.book.kind==='pdf'), on=!!PRA.inkOn[s];
-    let f=$('prFab'+s); if(f){ f.classList.toggle('hidden', !pdf || on || !!PRA.pending[s]); if(pdf) f.title='Annotate “'+P.book.title+'” here, beside the other book'; }
     let pill=$('prInkPill'+s); if(pill) pill.classList.toggle('hidden', !pdf || !on);
-    let col=$('prPane'+s).closest('.prCol'); if(col) col.classList.toggle('prInkOn', pdf && on);
+    let el=$('prPane'+s), col=el && el.closest('.prCol'); if(col) col.classList.toggle('prInkOn', pdf && on);
   });
 }
-/* the blue "Annotate this PDF" button of one book (side 'L' or 'R'; without a side: the PDF in use) */
+/* the blue "Annotate this PDF" button: annotate the PDF in use (or a given side) */
 function prAnnotateThisPdf(side){
+  if(PR.suspend){ let s=side || PR.active || 'L'; PRA.pending[s]=true; prUpdateAnnotateFab(); toast('Annotate starts as soon as this book has loaded'); return; } /* still loading: switch on when ready */
   side= side || prInkSide();
   if(!side){ toast('Handwriting works on PDF pages — neither book here is a PDF'); return; }
   let P=PR.panes[side];
-  if(!P || PR.suspend){ PRA.pending[side]=true; prUpdateAnnotateFab(); toast('Annotate starts as soon as this book has loaded'); return; } /* still loading: switch on when ready */
+  if(!P){ PRA.pending[side]=true; prUpdateAnnotateFab(); toast('Annotate starts as soon as this book has loaded'); return; }
   prSetActive(side); prSetInk(side,true);
 }
 function prSetInk(side,on,quiet){
@@ -3811,7 +3818,7 @@ document.addEventListener('keydown',e=>{
 function prAnnotationsOnClose(silent){
   prToggleInk(false,true);
   prHideSelBar(); prCloseMarks(); PRA.ptrs.clear(); PRA.pan=null;
-  ['L','R'].forEach(s=>{ let f=$('prFab'+s); if(f) f.classList.add('hidden'); let p=$('prInkPill'+s); if(p) p.classList.add('hidden'); });
+  { let f=$('prAnnotateFab'); if(f) f.classList.add('hidden'); } ['L','R'].forEach(s=>{ let p=$('prInkPill'+s); if(p) p.classList.add('hidden'); });
   let changed=PRA.marksChanged; PRA.marksChanged=false;
   if(!changed || silent) return false;
   let b=curBook(); if(!b) return false;

@@ -771,14 +771,13 @@ html.themeAnim,html.themeAnim *,html.themeAnim *::before,html.themeAnim *::after
    can reach below the window once the pen bar opens). overflow:clip keeps the rounded corners without
    becoming a scroll box, so sticking works. */
 .prCol{position:relative;overflow:clip}
-.prPaneFab{position:sticky;bottom:14px;align-self:flex-end;margin:-62px 14px 14px 0;z-index:6}
 .prInkPill{flex:0 0 auto;border:0;border-radius:999px;background:var(--accent);color:var(--accent-fg);font-size:12px;font-weight:600;min-height:26px;padding:0 10px;cursor:pointer;transition:background-color var(--dur-fast) var(--ease)}
 .prInkPill:hover{background:color-mix(in srgb,var(--accent) 88%,var(--core-fg))}
-.prInkPill.hidden,.prPaneFab.hidden{display:none!important}
+.prInkPill.hidden{display:none!important}
 .prHead{align-items:center}
 .prInkWhoWrap{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:240px}
 .prInkWho{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (pointer:coarse){ .prInkPill{min-height:36px;padding:0 12px} }
-@media (max-width:700px){ .prPaneFab{bottom:10px;margin:-56px 10px 10px 0;min-height:44px;padding:0 14px;font-size:13px} .prInkWhoWrap .tool-label{display:none} .prInkWhoWrap{max-width:140px} }
+@media (max-width:700px){ .prInkWhoWrap .tool-label{display:none} .prInkWhoWrap{max-width:140px} }
 /* notifications only inform: taps go straight through to whatever is under them (they used to block a book's Annotate button) */
 .toast{pointer-events:none}
