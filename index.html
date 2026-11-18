@@ -4,99 +4,250 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
 <meta name="color-scheme" content="light dark"/>
+<meta name="theme-color" content="#EDE7DA"/>
+<meta name="description" content="Inkwell is a local-first handwriting notebook and long-form reader for PDFs and EPUBs."/>
 <link rel="icon" href="data:,"/>
-<title>Inkwell — Notes & Reading</title>
-<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Noto+Sans+Bengali:wght@400;600&family=Noto+Sans+Arabic:wght@400;600&display=swap" rel="stylesheet">
+<title>Inkwell · Notes &amp; Reading</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500&family=Noto+Sans+Bengali:wght@400;600&family=Noto+Sans+Arabic:wght@400;600&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"/>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script>
+(function(){
+  try{
+    var saved=localStorage.getItem('inkwell-theme');
+    if(saved==='dark'||saved==='light') document.documentElement.dataset.theme=saved;
+  }catch(e){}
+})();
+</script>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<main class="layout" id="mainLayout">
-  <!-- LIBRARY — same shelf as the app: search, filter chips, book covers, bottom action bar -->
-  <section id="view-library">
-    <div class="searchRow">
-      <div class="searchWrap">
-        <div class="search"><input id="globalSearch" placeholder="Search notes…" aria-label="Search notebooks and notes" oninput="onSearchInput()" autocomplete="off"/></div>
+<!-- Icons: Tabler Icons 3.52.0, MIT, https://tabler.io/icons -->
+<svg class="iconSprite" aria-hidden="true" focusable="false" width="0" height="0">
+<symbol id="ticon-arrow-left" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M5 12l14 0"/> <path d="M5 12l6 6"/> <path d="M5 12l6 -6"/></symbol>
+<symbol id="ticon-arrow-up" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M12 5l0 14"/> <path d="M18 11l-6 -6"/> <path d="M6 11l6 -6"/></symbol>
+<symbol id="ticon-arrow-down" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M12 5l0 14"/> <path d="M18 13l-6 6"/> <path d="M6 13l6 6"/></symbol>
+<symbol id="ticon-arrow-up-right" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M17 7l-10 10"/> <path d="M8 7l9 0l0 9"/></symbol>
+<symbol id="ticon-search" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/> <path d="M21 21l-6 -6"/></symbol>
+<symbol id="ticon-sun" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/> <path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7"/></symbol>
+<symbol id="ticon-moon" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454l0 .008"/></symbol>
+<symbol id="ticon-adjustments" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M4 10a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/> <path d="M6 4v4"/> <path d="M6 12v8"/> <path d="M10 16a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/> <path d="M12 4v10"/> <path d="M12 18v2"/> <path d="M16 7a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/> <path d="M18 4v1"/> <path d="M18 9v11"/></symbol>
+<symbol id="ticon-plus" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M12 5l0 14"/> <path d="M5 12l14 0"/></symbol>
+<symbol id="ticon-file-type-pdf" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M14 3v4a1 1 0 0 0 1 1h4"/> <path d="M5 12v-7a2 2 0 0 1 2 -2h7l5 5v4"/> <path d="M5 18h1.5a1.5 1.5 0 0 0 0 -3h-1.5v6"/> <path d="M17 18h2"/> <path d="M20 15h-3v6"/> <path d="M11 15v6h1a2 2 0 0 0 2 -2v-2a2 2 0 0 0 -2 -2h-1"/></symbol>
+<symbol id="ticon-book" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0"/> <path d="M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0"/> <path d="M3 6l0 13"/> <path d="M12 6l0 13"/> <path d="M21 6l0 13"/></symbol>
+<symbol id="ticon-book-2" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M19 4v16h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12"/> <path d="M19 16h-12a2 2 0 0 0 -2 2"/> <path d="M9 8h6"/></symbol>
+<symbol id="ticon-notebook" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M6 4h11a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-11a1 1 0 0 1 -1 -1v-14a1 1 0 0 1 1 -1m3 0v18"/> <path d="M13 8l2 0"/> <path d="M13 12l2 0"/></symbol>
+<symbol id="ticon-download" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/> <path d="M7 11l5 5l5 -5"/> <path d="M12 4l0 12"/></symbol>
+<symbol id="ticon-upload" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/> <path d="M7 9l5 -5l5 5"/> <path d="M12 4l0 12"/></symbol>
+<symbol id="ticon-info-circle" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/> <path d="M12 9h.01"/> <path d="M11 12h1v4h1"/></symbol>
+<symbol id="ticon-clock" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/> <path d="M12 7v5l3 3"/></symbol>
+<symbol id="ticon-x" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M18 6l-12 12"/> <path d="M6 6l12 12"/></symbol>
+<symbol id="ticon-chevron-down" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M6 9l6 6l6 -6"/></symbol>
+<symbol id="ticon-chevron-left" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M15 6l-6 6l6 6"/></symbol>
+<symbol id="ticon-chevron-right" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M9 6l6 6l-6 6"/></symbol>
+<symbol id="ticon-dots" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M4 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/> <path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/> <path d="M18 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/></symbol>
+<symbol id="ticon-pencil" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/> <path d="M13.5 6.5l4 4"/></symbol>
+<symbol id="ticon-trash" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M4 7l16 0"/> <path d="M10 11l0 6"/> <path d="M14 11l0 6"/> <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/> <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/></symbol>
+<symbol id="ticon-copy" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M7 9.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667l0 -8.666"/> <path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"/></symbol>
+<symbol id="ticon-external-link" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6"/> <path d="M11 13l9 -9"/> <path d="M15 4h5v5"/></symbol>
+<symbol id="ticon-menu-2" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M4 6l16 0"/> <path d="M4 12l16 0"/> <path d="M4 18l16 0"/></symbol>
+<symbol id="ticon-bookmark" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M18 7v14l-6 -4l-6 4v-14a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4"/></symbol>
+<symbol id="ticon-bookmarks" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M15 10v11l-5 -3l-5 3v-11a3 3 0 0 1 3 -3h4a3 3 0 0 1 3 3"/> <path d="M11 3h5a3 3 0 0 1 3 3v11"/></symbol>
+<symbol id="ticon-volume" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M15 8a5 5 0 0 1 0 8"/> <path d="M17.7 5a9 9 0 0 1 0 14"/> <path d="M6 15h-2a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h2l3.5 -4.5a.8 .8 0 0 1 1.5 .5v14a.8 .8 0 0 1 -1.5 .5l-3.5 -4.5"/></symbol>
+<symbol id="ticon-language" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M9 6.371c0 4.418 -2.239 6.629 -5 6.629"/> <path d="M4 6.371h7"/> <path d="M5 9c0 2.144 2.252 3.908 6 4"/> <path d="M12 20l4 -9l4 9"/> <path d="M19.1 18h-6.2"/> <path d="M6.694 3l.793 .582"/></symbol>
+<symbol id="ticon-player-play" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M7 4v16l13 -8l-13 -8"/></symbol>
+<symbol id="ticon-player-stop" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M5 7a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2l0 -10"/></symbol>
+<symbol id="ticon-circle-dot" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/> <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/></symbol>
+<symbol id="ticon-photo" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M15 8h.01"/> <path d="M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12"/> <path d="M3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5"/> <path d="M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3"/></symbol>
+<symbol id="ticon-table" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14"/> <path d="M3 10h18"/> <path d="M10 3v18"/></symbol>
+<symbol id="ticon-note" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M13 20l7 -7"/> <path d="M13 20v-6a1 1 0 0 1 1 -1h6v-7a2 2 0 0 0 -2 -2h-12a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h7"/></symbol>
+<symbol id="ticon-math-function" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M3 19a2 2 0 0 0 2 2c2 0 2 -4 3 -9s1 -9 3 -9a2 2 0 0 1 2 2"/> <path d="M5 12h6"/> <path d="M15 12l6 6"/> <path d="M15 18l6 -6"/></symbol>
+<symbol id="ticon-scan" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M5 12h14"/> <path d="M3 7v-2a2 2 0 0 1 2 -2h2"/> <path d="M3 17v2a2 2 0 0 0 2 2h2"/> <path d="M17 3h2a2 2 0 0 1 2 2v2"/> <path d="M17 21h2a2 2 0 0 0 2 -2v-2"/></symbol>
+<symbol id="ticon-columns" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M4 6l5.5 0"/> <path d="M4 10l5.5 0"/> <path d="M4 14l5.5 0"/> <path d="M4 18l5.5 0"/> <path d="M14.5 6l5.5 0"/> <path d="M14.5 10l5.5 0"/> <path d="M14.5 14l5.5 0"/> <path d="M14.5 18l5.5 0"/></symbol>
+<symbol id="ticon-link" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M9 15l6 -6"/> <path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464"/> <path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463"/></symbol>
+<symbol id="ticon-palette" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M12 21a9 9 0 0 1 0 -18c4.97 0 9 3.582 9 8c0 1.06 -.474 2.078 -1.318 2.828c-.844 .75 -1.989 1.172 -3.182 1.172h-2.5a2 2 0 0 0 -1 3.75a1.3 1.3 0 0 1 -1 2.25"/> <path d="M7.5 10.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/> <path d="M11.5 7.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/> <path d="M15.5 10.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/></symbol>
+<symbol id="ticon-zoom-in" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/> <path d="M7 10l6 0"/> <path d="M10 7l0 6"/> <path d="M21 21l-6 -6"/></symbol>
+<symbol id="ticon-zoom-out" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/> <path d="M7 10l6 0"/> <path d="M21 21l-6 -6"/></symbol>
+<symbol id="ticon-zoom-reset" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M21 21l-6 -6"/> <path d="M3.268 12.043a7.017 7.017 0 0 0 6.634 4.957a7.012 7.012 0 0 0 7.043 -6.131a7 7 0 0 0 -5.314 -7.672a7.021 7.021 0 0 0 -8.241 4.403"/> <path d="M3 4v4h4"/></symbol>
+<symbol id="ticon-rotate-clockwise" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M4.05 11a8 8 0 1 1 .5 4m-.5 5v-5h5"/></symbol>
+<symbol id="ticon-flip-horizontal" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M12 3l0 18"/> <path d="M16 7l0 10l5 0l-5 -10"/> <path d="M8 7l0 10l-5 0l5 -10"/></symbol>
+<symbol id="ticon-flip-vertical" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M3 12l18 0"/> <path d="M7 16l10 0l-10 5l0 -5"/> <path d="M7 8l10 0l-10 -5l0 5"/></symbol>
+<symbol id="ticon-arrows-vertical" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M8 7l4 -4l4 4"/> <path d="M8 17l4 4l4 -4"/> <path d="M12 3l0 18"/></symbol>
+<symbol id="ticon-arrows-maximize" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M16 4l4 0l0 4"/> <path d="M14 10l6 -6"/> <path d="M8 20l-4 0l0 -4"/> <path d="M4 20l6 -6"/> <path d="M16 20l4 0l0 -4"/> <path d="M14 14l6 6"/> <path d="M8 4l-4 0l0 4"/> <path d="M4 4l6 6"/></symbol>
+<symbol id="ticon-arrows-minimize" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M5 9l4 0l0 -4"/> <path d="M3 3l6 6"/> <path d="M5 15l4 0l0 4"/> <path d="M3 21l6 -6"/> <path d="M19 9l-4 0l0 -4"/> <path d="M15 9l6 -6"/> <path d="M19 15l-4 0l0 4"/> <path d="M15 15l6 6"/></symbol>
+<symbol id="ticon-eraser" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M19 20h-10.5l-4.21 -4.3a1 1 0 0 1 0 -1.41l10 -10a1 1 0 0 1 1.41 0l5 5a1 1 0 0 1 0 1.41l-9.2 9.3"/> <path d="M18 13.3l-6.3 -6.3"/></symbol>
+<symbol id="ticon-highlighter" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M3 19h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/> <path d="M12.5 5.5l4 4"/> <path d="M4.5 13.5l4 4"/> <path d="M21 15v4h-8l4 -4l4 0"/></symbol>
+<symbol id="ticon-pointer" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M7.904 17.563a1.2 1.2 0 0 0 2.228 .308l2.09 -3.093l4.907 4.907a1.067 1.067 0 0 0 1.509 0l1.047 -1.047a1.067 1.067 0 0 0 0 -1.509l-4.907 -4.907l3.113 -2.09a1.2 1.2 0 0 0 -.309 -2.228l-13.582 -3.904l3.904 13.563"/></symbol>
+<symbol id="ticon-hand-stop" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M8 13v-7.5a1.5 1.5 0 0 1 3 0v6.5"/> <path d="M11 5.5v-2a1.5 1.5 0 1 1 3 0v8.5"/> <path d="M14 5.5a1.5 1.5 0 0 1 3 0v6.5"/> <path d="M17 7.5a1.5 1.5 0 0 1 3 0v8.5a6 6 0 0 1 -6 6h-2h.208a6 6 0 0 1 -5.012 -2.7a69.74 69.74 0 0 1 -.196 -.3c-.312 -.479 -1.407 -2.388 -3.286 -5.728a1.5 1.5 0 0 1 .536 -2.022a1.867 1.867 0 0 1 2.28 .28l1.47 1.47"/></symbol>
+<symbol id="ticon-typography" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M4 20l3 0"/> <path d="M14 20l7 0"/> <path d="M6.9 15l6.9 0"/> <path d="M10.2 6.3l5.8 13.7"/> <path d="M5 20l6 -16l2 0l7 16"/></symbol>
+<symbol id="ticon-line" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M4 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/> <path d="M16 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/> <path d="M7.5 16.5l9 -9"/></symbol>
+<symbol id="ticon-rectangle" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10"/></symbol>
+<symbol id="ticon-circle" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/></symbol>
+<symbol id="ticon-wave-sine" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M21 12h-2c-.894 0 -1.662 -.857 -1.761 -2c-.296 -3.45 -.749 -6 -2.749 -6s-2.5 3.582 -2.5 8s-.5 8 -2.5 8s-2.452 -2.547 -2.749 -6c-.1 -1.147 -.867 -2 -1.763 -2h-2"/></symbol>
+<symbol id="ticon-compass" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M8 16l2 -6l6 -2l-2 6l-6 2"/> <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/> <path d="M12 3l0 2"/> <path d="M12 19l0 2"/> <path d="M3 12l2 0"/> <path d="M19 12l2 0"/></symbol>
+<symbol id="ticon-lasso" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M4.028 13.252c-.657 -.972 -1.028 -2.078 -1.028 -3.252c0 -3.866 4.03 -7 9 -7s9 3.134 9 7s-4.03 7 -9 7c-1.913 0 -3.686 -.464 -5.144 -1.255"/> <path d="M3 15a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/> <path d="M5 17c0 1.42 .316 2.805 1 4"/></symbol>
+<symbol id="ticon-layout-board" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12"/> <path d="M4 9h8"/> <path d="M12 15h8"/> <path d="M12 4v16"/></symbol>
+<symbol id="ticon-undo" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M9 14l-4 -4l4 -4"/> <path d="M5 10h11a4 4 0 1 1 0 8h-1"/></symbol>
+<symbol id="ticon-redo" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M15 14l4 -4l-4 -4"/> <path d="M19 10h-11a4 4 0 1 0 0 8h1"/></symbol>
+<symbol id="ticon-check" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M5 12l5 5l10 -10"/></symbol>
+<symbol id="ticon-list" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M9 6l11 0"/> <path d="M9 12l11 0"/> <path d="M9 18l11 0"/> <path d="M5 6l0 .01"/> <path d="M5 12l0 .01"/> <path d="M5 18l0 .01"/></symbol>
+<symbol id="ticon-device-tablet" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M5 4a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v16a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1v-16"/> <path d="M11 17a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/></symbol>
+<symbol id="ticon-grip-vertical" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M8 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/> <path d="M8 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/> <path d="M8 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/> <path d="M14 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/> <path d="M14 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/> <path d="M14 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/></symbol>
+<symbol id="ticon-microphone" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M9 5a3 3 0 0 1 3 -3a3 3 0 0 1 3 3v5a3 3 0 0 1 -3 3a3 3 0 0 1 -3 -3l0 -5"/> <path d="M5 10a7 7 0 0 0 14 0"/> <path d="M8 21l8 0"/> <path d="M12 17l0 4"/></symbol>
+<symbol id="ticon-headphones" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M4 15a2 2 0 0 1 2 -2h1a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-1a2 2 0 0 1 -2 -2l0 -3"/> <path d="M15 15a2 2 0 0 1 2 -2h1a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-1a2 2 0 0 1 -2 -2l0 -3"/> <path d="M4 15v-3a8 8 0 0 1 16 0v3"/></symbol>
+<symbol id="ticon-layout-grid" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M4 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/> <path d="M14 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/> <path d="M4 15a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/> <path d="M14 15a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/></symbol>
+<symbol id="ticon-world" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/> <path d="M3.6 9h16.8"/> <path d="M3.6 15h16.8"/> <path d="M11.5 3a17 17 0 0 0 0 18"/> <path d="M12.5 3a17 17 0 0 1 0 18"/></symbol>
+<symbol id="ticon-ruler" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M5 4h14a1 1 0 0 1 1 1v5a1 1 0 0 1 -1 1h-7a1 1 0 0 0 -1 1v7a1 1 0 0 1 -1 1h-5a1 1 0 0 1 -1 -1v-14a1 1 0 0 1 1 -1"/> <path d="M4 8l2 0"/> <path d="M4 12l3 0"/> <path d="M4 16l2 0"/> <path d="M8 4l0 2"/> <path d="M12 4l0 3"/> <path d="M16 4l0 2"/></symbol>
+<symbol id="ticon-layers-selected" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M8 10.5l6.492 -6.492"/> <path d="M13.496 16l6.504 -6.504l-6.504 6.504"/> <path d="M8.586 15.414l10.827 -10.827"/> <path d="M8 6a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2l0 -8"/> <path d="M16 16v2a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-8a2 2 0 0 1 2 -2h2"/></symbol>
+<symbol id="ticon-bring-to-front" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M12 4l-8 4l8 4l8 -4l-8 -4" fill="currentColor"/> <path d="M8 14l-4 2l8 4l8 -4l-4 -2"/> <path d="M8 10l-4 2l8 4l8 -4l-4 -2"/></symbol>
+<symbol id="ticon-text-recognition" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M4 8v-2a2 2 0 0 1 2 -2h2"/> <path d="M4 16v2a2 2 0 0 0 2 2h2"/> <path d="M16 4h2a2 2 0 0 1 2 2v2"/> <path d="M16 20h2a2 2 0 0 0 2 -2v-2"/> <path d="M12 16v-7"/> <path d="M9 9h6"/></symbol>
+<symbol id="ticon-file-text" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M14 3v4a1 1 0 0 0 1 1h4"/> <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2"/> <path d="M9 9l1 0"/> <path d="M9 13l6 0"/> <path d="M9 17l6 0"/></symbol>
+<symbol id="ticon-feather" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M4 20l10 -10m0 -5v5h5m-9 -1v5h5m-9 -1v5h5m-5 -5l4 -4l4 -4"/> <path d="M19 10c.638 -.636 1 -1.515 1 -2.486a3.515 3.515 0 0 0 -3.517 -3.514c-.97 0 -1.847 .367 -2.483 1m-3 13l4 -4l4 -4"/></symbol>
+<symbol id="ticon-signature" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M3 17c3.333 -3.333 5 -6 5 -8c0 -3 -1 -3 -2 -3s-2.032 1.085 -2 3c.034 2.048 1.658 4.877 2.5 6c1.5 2 2.5 2.5 3.5 1l2 -3c.333 2.667 1.333 4 3 4c.53 0 2.639 -2 3 -2c.517 0 1.517 .667 3 2"/></symbol>
+<symbol id="ticon-select-all" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M8 9a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1l0 -6"/> <path d="M12 20v.01"/> <path d="M16 20v.01"/> <path d="M8 20v.01"/> <path d="M4 20v.01"/> <path d="M4 16v.01"/> <path d="M4 12v.01"/> <path d="M4 8v.01"/> <path d="M4 4v.01"/> <path d="M8 4v.01"/> <path d="M12 4v.01"/> <path d="M16 4v.01"/> <path d="M20 4v.01"/> <path d="M20 8v.01"/> <path d="M20 12v.01"/> <path d="M20 16v.01"/> <path d="M20 20v.01"/></symbol>
+<symbol id="ticon-square" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14"/></symbol>
+<symbol id="ticon-oval" viewBox="0 0 24 24"><path stroke="none" d="M0 0h24v24H0z" fill="none"/> <path d="M6 12a6 9 0 1 0 12 0a6 9 0 1 0 -12 0"/></symbol>
+</svg>
+
+<main class="layout shelf" id="mainLayout">
+  <!-- Library -->
+  <section id="view-library" aria-labelledby="shelfTitle">
+    <header class="masthead">
+      <a class="wordmark" href="#/">
+        <span class="wordmarkName">Inkwell</span>
+        <span class="wordmarkTag">Notes &amp; reading</span>
+      </a>
+      <div class="mastheadTools">
+        <span class="saveFlag" id="saveStatus" aria-live="polite">Saves automatically in this browser</span>
+        <button class="iconBtn" id="themeToggle" type="button" onclick="toggleTheme()" aria-label="Switch to dark theme" title="Switch theme">
+          <svg class="ic" aria-hidden="true"><use href="#ticon-moon"></use></svg>
+        </button>
+        <button class="iconBtn" type="button" onclick="toggleLibUtils(this)" aria-expanded="false" aria-controls="libUtils" aria-label="Shelf options" title="Shelf options">
+          <svg class="ic" aria-hidden="true"><use href="#ticon-adjustments"></use></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="libraryHead">
+      <div class="libraryTitle">
+        <p class="runningHead">Your library</p>
+        <h1 id="shelfTitle">Your shelf</h1>
+        <p class="lede">Handwritten notebooks and long-form reading, kept on this device.</p>
+      </div>
+      <div class="searchWrap searchMain">
+        <div class="search">
+          <svg class="ic searchIcon" aria-hidden="true"><use href="#ticon-search"></use></svg>
+          <input id="globalSearch" placeholder="Search notes, notebooks and books" aria-label="Search notebooks and notes" oninput="onSearchInput()" autocomplete="off"/>
+          <kbd class="searchKbd" title="Press / to search">/</kbd>
+        </div>
         <div id="searchResults" class="searchResults hidden"></div>
       </div>
-      <button class="searchBtn" type="button" aria-label="Search" onclick="document.getElementById('globalSearch').focus();onSearchInput()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.8-3.8"/></svg></button>
     </div>
 
-    <div class="chipRow" id="chipRow" role="group" aria-label="Filter the shelf">
-      <button class="chip active" data-filter="all" onclick="filterLib('all',this)">All notebooks</button>
-      <button class="chip" data-filter="notebook" onclick="filterLib('notebook',this)">Notebooks</button>
-      <button class="chip" data-filter="pdf" onclick="filterLib('pdf',this)">PDFs</button>
-      <button class="chip" data-filter="epub" onclick="filterLib('epub',this)">EPUBs</button>
-      <button class="chip dashed" type="button" onclick="openBook(SAMPLE_ID)">Sample book</button>
-      <button class="chip dashed" type="button" onclick="openBook(SAMPLE_PDF_ID)">Demo PDF</button>
-      <button class="chip" type="button" onclick="toggleLibUtils()">Shelf options ▾</button>
+    <div class="shelfBar">
+      <div class="chipRow" id="chipRow" role="group" aria-label="Filter the shelf">
+        <button class="chip active" data-filter="all" onclick="filterLib('all',this)">All</button>
+        <button class="chip" data-filter="notebook" onclick="filterLib('notebook',this)">Notebooks</button>
+        <button class="chip" data-filter="pdf" onclick="filterLib('pdf',this)">PDFs</button>
+        <button class="chip" data-filter="epub" onclick="filterLib('epub',this)">EPUBs</button>
+      </div>
+      <p class="kbd libHint" id="libHint"></p>
     </div>
-    <p class="kbd" id="libHint" style="margin:2px 0 10px"></p>
 
+    <h2 class="srOnly">On your shelf</h2>
     <div id="emptyState" class="empty hidden">
-      <div class="emptyIcon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 20.5V6.2A1.7 1.7 0 0 1 7.2 4.5h.6a1.7 1.7 0 0 1 1.7 1.7v14.3"/><path d="M5.5 9h4"/><path d="M9.5 20.5V8.7A1.7 1.7 0 0 1 11.2 7h.6a1.7 1.7 0 0 1 1.7 1.7v11.8"/><path d="M9.5 12h4"/><path d="M14.8 20.5l1.9-11.8a1.6 1.6 0 0 1 1.9-1.3l.7.2a1.6 1.6 0 0 1 1.2 1.9l-1.9 11.2"/><path d="M3.5 20.5h17"/></svg></div>
-      <h3>A fresh, empty shelf</h3>
-      <p style="color:var(--muted);line-height:1.6;max-width:340px;margin:0 auto;font-size:14px">Tap <strong>+ New notebook</strong> below to start your first notebook, or import a PDF or EPUB to read.</p>
+      <div class="emptyIcon"><svg class="ic" aria-hidden="true"><use href="#ticon-notebook"></use></svg></div>
+      <h3>A quiet shelf</h3>
+      <p>Start a notebook, or import a PDF or EPUB to read.</p>
+      <button class="btn primary" type="button" onclick="openNewNotebook()">
+        <svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-plus"></use></svg> New notebook
+      </button>
     </div>
 
     <div id="libraryGrid" class="grid"></div>
 
-    <div id="libUtils" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
-      <button class="btn" onclick="exportBackup()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 21h16"/></svg> Backup</button>
-      <label class="btn" for="backupImport"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="M7 7l5-5 5 5"/><path d="M4 21h16"/></svg> Restore</label>
-      <input id="backupImport" type="file" accept=".json" class="hidden" onchange="importBackup(event)"/>
-      <button class="btn" onclick="toggleAbout()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg> About</button>
-      <button class="btn" onclick="openTimer()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> <span id="timerLabel">Focus 25:00</span></button>
-      <span class="kbd" id="saveStatus" style="align-self:center">Saves automatically in this browser</span>
+    <div id="libUtils" class="libraryUtils hidden">
+      <div class="utilsColumn">
+        <h4>Library</h4>
+        <div class="utilsRow">
+          <button class="btn" onclick="exportBackup()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-download"></use></svg> Export backup</button>
+          <label class="btn" for="backupImport"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-upload"></use></svg> Restore backup</label>
+          <input id="backupImport" type="file" accept=".json" class="hidden" onchange="importBackup(event)"/>
+        </div>
+      </div>
+      <div class="utilsColumn">
+        <h4>Samples</h4>
+        <div class="utilsRow">
+          <button class="btn" onclick="openBook(SAMPLE_ID)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-book-2"></use></svg> Open sample book</button>
+          <button class="btn" onclick="openBook(SAMPLE_PDF_ID)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-file-type-pdf"></use></svg> Open demo PDF</button>
+        </div>
+      </div>
+      <div class="utilsColumn">
+        <h4>Workspace</h4>
+        <div class="utilsRow">
+          <button class="btn" onclick="openTimer()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-clock"></use></svg> <span id="timerLabel">Focus 25:00</span></button>
+          <button class="btn" onclick="toggleAbout()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-info-circle"></use></svg> About this shelf</button>
+        </div>
+      </div>
     </div>
 
-    <div id="aboutPanel" class="panel hidden" style="margin-top:14px">
-      <h4>About this shelf</h4>
-      <p class="kbd" style="line-height:1.7;margin:0 0 10px">Inkwell — handwriting notebooks, PDFs and EPUBs in one place, every feature free. Everything is saved automatically in this browser on this device, so your shelf is still here when you close the tab and come back. Backup gives you a copy you can move to another device. On this shelf: <b id="statNotebooks">0</b> notebooks · <b id="statBooks">0</b> books · <b id="statPages">0</b> pages · <b id="statAnnos">0</b> annotations.</p>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
+    <div id="aboutPanel" class="aboutPanel hidden">
+      <div class="aboutIntro">
+        <h4>About this shelf</h4>
+        <p>Inkwell keeps handwriting, PDFs and EPUBs in one library. Everything is stored in this browser on this device, so it is here when you close the tab. Backup gives you a copy for another device.</p>
+        <p class="aboutCounts">On this shelf: <b id="statNotebooks">0</b> notebooks · <b id="statBooks">0</b> books · <b id="statPages">0</b> pages · <b id="statAnnos">0</b> annotations.</p>
+      </div>
+      <div class="aboutStats">
         <div class="listRow"><span>Time writing</span><b id="statWrite">0m</b></div>
         <div class="listRow"><span>Time reading</span><b id="statRead">0m</b></div>
         <div class="listRow"><span>Strokes drawn</span><b id="statStrokes">0</b></div>
         <div class="listRow"><span>Pages read</span><b id="statPagesRead">0</b></div>
-        <div class="listRow"><span>Focus sessions done</span><b id="statFocus">0</b></div>
+        <div class="listRow"><span>Focus sessions</span><b id="statFocus">0</b></div>
         <div class="listRow"><span>Words typed</span><b id="statWords">0</b></div>
       </div>
     </div>
 
+    <footer class="libraryFoot">
+      <p>Inkwell. Local-first notes and reading.</p>
+      <p><a href="https://github.com/coldabs/inkwell" target="_blank" rel="noopener">Source on GitHub</a> <span aria-hidden="true">·</span> Icons by <a href="https://tabler.io/icons" target="_blank" rel="noopener">Tabler</a></p>
+    </footer>
+
     <div class="bottomBar" id="libraryBar">
       <div class="bottomBarInner">
-        <button class="btn newMain" onclick="openNewNotebook()"><span style="font-size:18px;line-height:1">+</span> New notebook</button>
-        <label class="btn outlineBlue" for="pdfImport"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg> PDF</label>
+        <button class="btn newMain" onclick="openNewNotebook()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-plus"></use></svg> New notebook</button>
+        <label class="btn outlineBlue" for="pdfImport" aria-label="Import a PDF"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-file-type-pdf"></use></svg> PDF</label>
         <input id="pdfImport" type="file" accept=".pdf" class="hidden" onchange="handleImport(event)"/>
-        <label class="btn outlineBlue" for="epubImport"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4a1 1 0 0 0-1-1H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg> EPUB</label>
+        <label class="btn outlineBlue" for="epubImport" aria-label="Import an EPUB"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-book"></use></svg> EPUB</label>
         <input id="epubImport" type="file" accept=".epub,.txt" class="hidden" onchange="handleImport(event)"/>
       </div>
     </div>
   </section>
 
-  <!-- EDITOR -->
-  <section id="view-editor" class="hidden">
+  <!-- Editor -->
+  <section id="view-editor" class="hidden" aria-label="Notebook editor">
     <div class="editorTop">
-      <button class="iconBtn" style="font-size:18px" onclick="showView('library')" aria-label="Back to library">←</button>
-      <div style="flex:1;min-width:0">
-        <input id="noteTitle" value="Untitled notebook" aria-label="Notebook title" style="width:100%;border:0;background:transparent;font-family:var(--hand);font-size:25px;font-weight:600;outline:none;color:var(--ink);min-height:28px;padding:0" oninput="syncTitle()"/>
+      <button class="iconBtn" onclick="showView('library')" aria-label="Back to library" title="Back to library"><svg class="ic" aria-hidden="true"><use href="#ticon-arrow-left"></use></svg></button>
+      <div class="titleField">
+        <label class="srOnly" for="noteTitle">Notebook title</label>
+        <input id="noteTitle" value="Untitled notebook" oninput="syncTitle()"/>
       </div>
-      <button class="btn small edFocus" onclick="openTimer()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> <span class="timerLabel">Focus 25:00</span></button>
+      <button class="btn small edFocus" onclick="openTimer()" title="Start a 25 minute focus session"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-clock"></use></svg> <span class="timerLabel">Focus 25:00</span></button>
       <span class="popWrap">
-        <button class="btn small" id="exportBtn" aria-haspopup="true" aria-expanded="false" onclick="toggleExportMenu(this)">Export ▾</button>
+        <button class="btn small" id="exportBtn" aria-haspopup="true" aria-expanded="false" onclick="toggleExportMenu(this)">Export <svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg></button>
         <span class="popMenu" id="exportPop">
           <button class="btn small" onclick="closeExportPop();exportPagePNG()">Page as PNG</button>
           <button class="btn small" onclick="closeExportPop();exportPageSVG()">Page as SVG</button>
           <button class="btn small" onclick="closeExportPop();exportNotebookPDF()">Notebook as PDF</button>
-          <button class="btn small" onclick="closeExportPop();exportNotebookTXT()">Notebook as .txt</button>
+          <button class="btn small" onclick="closeExportPop();exportNotebookTXT()">Notebook as text</button>
           <button class="btn small" onclick="closeExportPop();exportXopp()">Notebook as .xopp</button>
-          <label class="btn small" for="xoppImport" title="Open a .xopp / .xoj notebook" onclick="closeExportPop()">Open a .xopp…</label>
-          <button class="btn small" onclick="closeExportPop();exportBackup()">Backup everything</button>
+          <label class="btn small" for="xoppImport" title="Open a .xopp or .xoj notebook" onclick="closeExportPop()">Open a .xopp file</label>
+          <button class="btn small" onclick="closeExportPop();exportBackup()">Back up everything</button>
         </span>
       </span>
       <input id="xoppImport" type="file" accept=".xopp,.xoj" class="hidden" onchange="importXopp(event)"/>
@@ -104,86 +255,88 @@
 
     <div class="toolbar" id="mainToolbar" role="toolbar" aria-label="Writing tools">
       <div class="tbRow tbRowTools" aria-label="Tools">
-      <button class="tool active" data-tool="pen" onclick="setTool('pen',this)" title="Pen — pressure sensitive" aria-label="Pen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
-      <button class="tool" data-tool="calligraphy" onclick="setTool('calligraphy',this)" title="Calligraphy pen — nib angle changes width" aria-label="Calligraphy pen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg></button>
-      <button class="tool" data-tool="highlighter" onclick="setTool('highlighter',this)" title="Highlighter — own layer" aria-label="Highlighter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg></button>
-      <button class="tool" data-tool="eraser" onclick="setTool('eraser',this)" title="Eraser — touch a stroke and the whole stroke is deleted" aria-label="Eraser — touch a stroke to delete the whole stroke"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></button>
-      <button class="tool" data-tool="hand" onclick="setTool('hand',this)" title="Hand — scroll without drawing" aria-label="Hand — scroll the page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg></button>
-      <button class="tool" data-tool="select" onclick="setTool('select',this)" title="Select — drag a box around strokes, then drag them to move" aria-label="Select strokes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l7 18 2.5-7.5L20 11z"/><path d="M13 13l5 5"/></svg></button>
-      <button class="tool" data-tool="text" onclick="setTool('text',this)" title="Text — tap the page to place typed text on it" aria-label="Text tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 6V4h14v2"/><path d="M12 4v16"/><path d="M9 20h6"/></svg></button>
-      <button class="tool" data-tool="line" onclick="setTool('line',this)" title="Straight line" aria-label="Line tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 19L19 5"/></svg></button>
-      <button class="tool" data-tool="rect" onclick="setTool('rect',this)" title="Rectangle" aria-label="Rectangle tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="6" width="16" height="12" rx="1"/></svg></button>
-      <button class="tool" data-tool="ellipse" onclick="setTool('ellipse',this)" title="Ellipse / circle" aria-label="Ellipse tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><ellipse cx="12" cy="12" rx="9" ry="6"/></svg></button>
-      <button class="tool" data-tool="arrow" onclick="setTool('arrow',this)" title="Arrow" aria-label="Arrow tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20L20 4"/><path d="M12 4h8v8"/></svg></button>
-      <button class="tool" data-tool="spline" onclick="setTool('spline',this)" title="Spline — tap points on the page, double-tap or press Finish to draw a smooth curve through them" aria-label="Spline tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 19c5-1 4-13 9-13s4 9 9 8"/><circle cx="3" cy="19" r="1.6" fill="currentColor"/><circle cx="12" cy="6" r="1.6" fill="currentColor"/><circle cx="21" cy="14" r="1.6" fill="currentColor"/></svg></button>
-      <button class="tool" data-tool="compass" onclick="setTool('compass',this)" title="Compass — drag out from the centre to draw a true circle" aria-label="Compass tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5V1.8"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg></button>
-      <button class="tool" data-tool="lasso" onclick="setTool('lasso',this)" title="Lasso select — draw a free loop around strokes to select them" aria-label="Lasso select"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="3.5 3" aria-hidden="true"><path d="M6 5c6-2.5 13 1 13 7 0 5-5 8-10 7C4.5 18.2 3 14 4 10c.4-1.8 1-3.6 2-5z"/></svg></button>
-      <button class="tool" data-tool="vspace" onclick="setTool('vspace',this)" title="Vertical space — drag down to push everything below the line down and make room" aria-label="Vertical space tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h18"/><path d="M12 11v8"/><path d="M8.5 15.5L12 19l3.5-3.5"/></svg></button>
-      <span class="tbDivider" aria-hidden="true"></span>
-      <button type="button" class="btn small hidden" id="splineDoneBtn" onclick="finishSpline()" style="flex:0 0 auto">Finish spline</button>
-      <button type="button" class="tbBoardBtn" id="boardBtn" aria-pressed="false" onclick="toggleBoard()" title="Floating board — infinite canvas for drafting"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Board</button>
-      <span class="tbDivider" aria-hidden="true"></span>
-      <button class="iconBtn" onclick="undoStroke()" aria-label="Undo" title="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
-      <button class="iconBtn" onclick="redoStroke()" aria-label="Redo" title="Redo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></button>
-      <span class="tbDivider" aria-hidden="true"></span>
-      <button type="button" class="tbMenuBtn" id="toolOptsBtn" aria-expanded="false" aria-haspopup="true" onclick="toggleToolOpts(this)">Pen options ▾</button>
-      <button type="button" class="tbMenuBtn" id="insertBtn" aria-expanded="false" aria-haspopup="true" onclick="toggleInsertMenu(this)">Insert ▾</button>
-      <button type="button" class="tbMenuBtn" id="pageOptsBtn" aria-expanded="false" aria-haspopup="true" onclick="togglePageMenu(this)">Page ▾</button>
+        <button class="tool active" data-tool="pen" aria-pressed="true" onclick="setTool('pen',this)" title="Pen, pressure sensitive" aria-label="Pen"><svg class="ic" aria-hidden="true"><use href="#ticon-pencil"></use></svg></button>
+        <button class="tool" data-tool="calligraphy" aria-pressed="false" onclick="setTool('calligraphy',this)" title="Calligraphy pen, nib angle changes width" aria-label="Calligraphy pen"><svg class="ic" aria-hidden="true"><use href="#ticon-feather"></use></svg></button>
+        <button class="tool" data-tool="highlighter" aria-pressed="false" onclick="setTool('highlighter',this)" title="Highlighter, separate layer" aria-label="Highlighter"><svg class="ic" aria-hidden="true"><use href="#ticon-highlighter"></use></svg></button>
+        <button class="tool" data-tool="eraser" aria-pressed="false" onclick="setTool('eraser',this)" title="Eraser, touch a stroke to delete it" aria-label="Eraser"><svg class="ic" aria-hidden="true"><use href="#ticon-eraser"></use></svg></button>
+        <button class="tool" data-tool="hand" aria-pressed="false" onclick="setTool('hand',this)" title="Hand, scroll the page" aria-label="Hand tool"><svg class="ic" aria-hidden="true"><use href="#ticon-hand-stop"></use></svg></button>
+        <button class="tool" data-tool="select" aria-pressed="false" onclick="setTool('select',this)" title="Select, drag a box around strokes" aria-label="Select strokes"><svg class="ic" aria-hidden="true"><use href="#ticon-pointer"></use></svg></button>
+        <button class="tool" data-tool="text" aria-pressed="false" onclick="setTool('text',this)" title="Text, tap the page to place typed text" aria-label="Text tool"><svg class="ic" aria-hidden="true"><use href="#ticon-typography"></use></svg></button>
+        <span class="tbDivider" aria-hidden="true"></span>
+        <button class="tool" data-tool="line" aria-pressed="false" onclick="setTool('line',this)" title="Straight line" aria-label="Line tool"><svg class="ic" aria-hidden="true"><use href="#ticon-line"></use></svg></button>
+        <button class="tool" data-tool="rect" aria-pressed="false" onclick="setTool('rect',this)" title="Rectangle" aria-label="Rectangle tool"><svg class="ic" aria-hidden="true"><use href="#ticon-rectangle"></use></svg></button>
+        <button class="tool" data-tool="ellipse" aria-pressed="false" onclick="setTool('ellipse',this)" title="Ellipse or circle" aria-label="Ellipse tool"><svg class="ic" aria-hidden="true"><use href="#ticon-circle"></use></svg></button>
+        <button class="tool" data-tool="arrow" aria-pressed="false" onclick="setTool('arrow',this)" title="Arrow" aria-label="Arrow tool"><svg class="ic" aria-hidden="true"><use href="#ticon-arrow-up-right"></use></svg></button>
+        <button class="tool" data-tool="spline" aria-pressed="false" onclick="setTool('spline',this)" title="Spline, tap points to draw a smooth curve" aria-label="Spline tool"><svg class="ic" aria-hidden="true"><use href="#ticon-wave-sine"></use></svg></button>
+        <button class="tool" data-tool="compass" aria-pressed="false" onclick="setTool('compass',this)" title="Compass, drag out from the centre" aria-label="Compass tool"><svg class="ic" aria-hidden="true"><use href="#ticon-compass"></use></svg></button>
+        <button class="tool" data-tool="lasso" aria-pressed="false" onclick="setTool('lasso',this)" title="Lasso select, draw a free loop around strokes" aria-label="Lasso select"><svg class="ic" aria-hidden="true"><use href="#ticon-lasso"></use></svg></button>
+        <button class="tool" data-tool="vspace" aria-pressed="false" onclick="setTool('vspace',this)" title="Vertical space, drag down to make room" aria-label="Vertical space tool"><svg class="ic" aria-hidden="true"><use href="#ticon-arrows-vertical"></use></svg></button>
+        <span class="tbDivider" aria-hidden="true"></span>
+        <button type="button" class="btn small hidden" id="splineDoneBtn" onclick="finishSpline()">Finish spline</button>
+        <button type="button" class="tbBoardBtn" id="boardBtn" aria-pressed="false" onclick="toggleBoard()" title="Floating board, an infinite canvas for drafting"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-layout-board"></use></svg> Board</button>
+        <span class="tbDivider" aria-hidden="true"></span>
+        <button class="iconBtn" onclick="undoStroke()" aria-label="Undo" title="Undo"><svg class="ic" aria-hidden="true"><use href="#ticon-undo"></use></svg></button>
+        <button class="iconBtn" onclick="redoStroke()" aria-label="Redo" title="Redo"><svg class="ic" aria-hidden="true"><use href="#ticon-redo"></use></svg></button>
+        <span class="tbDivider" aria-hidden="true"></span>
+        <button type="button" class="tbMenuBtn" id="toolOptsBtn" aria-expanded="false" aria-haspopup="true" onclick="toggleToolOpts(this)">Pen options <svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg></button>
+        <button type="button" class="tbMenuBtn" id="insertBtn" aria-expanded="false" aria-haspopup="true" onclick="toggleInsertMenu(this)">Insert <svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg></button>
+        <button type="button" class="tbMenuBtn" id="pageOptsBtn" aria-expanded="false" aria-haspopup="true" onclick="togglePageMenu(this)">Page <svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg></button>
       </div>
       <div class="tbRow tbRowOpts" id="tbOptsRow" aria-label="Size and colour">
-      <span class="sizeGroup" id="brushSizeGroup"><span class="tool-label" style="display:block">Size</span>
-      <canvas id="sizePreview" width="64" height="30" style="width:52px;height:24px" aria-hidden="true"></canvas>
-      <input type="range" min="1" max="16" value="4" id="brushSize" oninput="updateSizeUI()" aria-label="Brush size"/>
-      <span id="sizeWord" class="sizeWord">Medium</span></span>
-      <span id="swatchBox" style="display:contents">
-      <button class="swatch active" style="background:#1b2a4a" onclick="setColor('#1b2a4a',this)" aria-label="Navy ink"></button>
-      <button class="swatch" style="background:#2456c8" onclick="setColor('#2456c8',this)" aria-label="Blue"></button>
-      <button class="swatch" style="background:#b23a2e" onclick="setColor('#b23a2e',this)" aria-label="Red"></button>
-      <button class="swatch" style="background:#2e7d46" onclick="setColor('#2e7d46',this)" aria-label="Green"></button>
-      <button class="swatch" style="background:#7b4ba8" onclick="setColor('#7b4ba8',this)" aria-label="Purple"></button>
-      <button class="swatch" style="background:#c26d1e" onclick="setColor('#c26d1e',this)" aria-label="Orange"></button>
-      <button class="swatch" style="background:#0e7d86" onclick="setColor('#0e7d86',this)" aria-label="Teal"></button>
-      <button class="swatch" style="background:#d1497a" onclick="setColor('#d1497a',this)" aria-label="Pink"></button>
-      </span>
-      <input type="color" class="colorPick" id="customColor" value="#1b2a4a" title="Custom colour" oninput="setColor(this.value,null)" aria-label="Custom colour"/>
+        <span class="sizeGroup" id="brushSizeGroup"><span class="tool-label">Size</span>
+        <canvas id="sizePreview" width="64" height="30" aria-hidden="true"></canvas>
+        <input type="range" min="1" max="16" value="4" id="brushSize" oninput="updateSizeUI()" aria-label="Brush size"/>
+        <span id="sizeWord" class="sizeWord">Medium</span></span>
+        <span id="swatchBox" style="display:contents">
+        <button class="swatch active" style="background:#18202B" onclick="setColor('#18202B',this)" aria-label="Ink"></button>
+        <button class="swatch" style="background:#2C4A6E" onclick="setColor('#2C4A6E',this)" aria-label="Blue"></button>
+        <button class="swatch" style="background:#A83A2C" onclick="setColor('#A83A2C',this)" aria-label="Vermilion"></button>
+        <button class="swatch" style="background:#3F5C46" onclick="setColor('#3F5C46',this)" aria-label="Green"></button>
+        <button class="swatch" style="background:#57425F" onclick="setColor('#57425F',this)" aria-label="Purple"></button>
+        <button class="swatch" style="background:#A9652B" onclick="setColor('#A9652B',this)" aria-label="Orange"></button>
+        <button class="swatch" style="background:#2B5F5B" onclick="setColor('#2B5F5B',this)" aria-label="Teal"></button>
+        <button class="swatch" style="background:#9A4A60" onclick="setColor('#9A4A60',this)" aria-label="Rose"></button>
+        </span>
+        <input type="color" class="colorPick" id="customColor" value="#18202B" title="Custom colour" oninput="setColor(this.value,null)" aria-label="Custom colour"/>
       </div>
-      <div class="statusBar" id="editorStatus" aria-live="polite"><span>Page <b id="statusPage">1 / 1</b></span><span>Layer <b id="statusLayer">Ink</b></span><span>Zoom <b id="statusZoom">100%</b></span><span>Tool <b id="statusTool">Pen</b></span><span style="flex:1"></span><span id="statusHint">One finger draws · Two fingers scroll</span></div>
+      <div class="statusBar" id="editorStatus" aria-live="polite"><span>Page <b id="statusPage">1 / 1</b></span><span>Layer <b id="statusLayer">Ink</b></span><span>Zoom <b id="statusZoom">100%</b></span><span>Tool <b id="statusTool">Pen</b></span><span class="statusSpacer"></span><span id="statusHint">One finger draws. Two fingers scroll.</span></div>
+
       <div class="toolPop" id="toolOptsPop" role="menu" aria-label="Tool options">
         <h5 id="toolOptsTitle">Pen options</h5>
         <div class="toolOptSection" data-tools="pen calligraphy highlighter spline line rect ellipse arrow compass">
           <div class="popRow"><span class="tool-label">Style</span><select id="strokeStyleSel" class="shapeSel" onchange="S.strokeStyle=this.value" title="Stroke style"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option><option value="dashdot">Dash-dot</option></select></div>
-          <div class="popRow"><span class="tool-label">Smooth</span><input type="range" min="0" max="90" value="28" id="stabilizeRange" style="flex:1;min-width:110px" oninput="S.stabilize=+this.value" aria-label="Smooth — input stabilisation"/></div>
-          <div class="popRow"><label><input type="checkbox" id="snapTgl" onchange="S.snapGrid=this.checked"/> Snap to grid</label><label><input type="checkbox" id="recognizerTgl"/> Shape recogniser</label><label><input type="checkbox" id="fillTgl"/> Fill shape</label></div>
-          <div class="popRow"><span class="tool-label">Pen button</span><select id="stylusBtnSel" class="shapeSel" title="Stylus barrel button / eraser end"><option value="eraser">Eraser</option><option value="select">Select</option><option value="none">Nothing</option></select></div>
+          <div class="popRow"><span class="tool-label">Smooth</span><input type="range" min="0" max="90" value="28" id="stabilizeRange" oninput="S.stabilize=+this.value" aria-label="Input stabilisation"/></div>
+          <div class="popRow popChecks"><label><input type="checkbox" id="snapTgl" onchange="S.snapGrid=this.checked"/> Snap to grid</label><label><input type="checkbox" id="recognizerTgl"/> Shape recogniser</label><label><input type="checkbox" id="fillTgl"/> Fill shape</label></div>
+          <div class="popRow"><span class="tool-label">Pen button</span><select id="stylusBtnSel" class="shapeSel" title="Stylus barrel button or eraser end"><option value="eraser">Eraser</option><option value="select">Select</option><option value="none">Nothing</option></select></div>
         </div>
         <div class="toolOptSection" data-tools="eraser">
-          <div class="popRow"><span class="tool-label">Eraser</span><select id="eraserModeSel" class="shapeSel" onchange="S.eraserMode=this.value;updateSizeUI()" title="How the eraser works"><option value="stroke" selected>Whole stroke — touch &amp; it's gone</option><option value="split">Cut — erases only where you rub</option><option value="whiteout">Whiteout — paints over</option></select></div>
-          <p class="kbd" style="line-height:1.5;margin:6px 0 0">Whole-stroke is the default: touch a stroke and the whole stroke is deleted. Size above sets how big the touch zone is.</p>
+          <div class="popRow"><span class="tool-label">Eraser</span><select id="eraserModeSel" class="shapeSel" onchange="S.eraserMode=this.value;updateSizeUI()" title="How the eraser works"><option value="stroke" selected>Whole stroke, touch and it is gone</option><option value="split">Cut, erases only where you rub</option><option value="whiteout">Whiteout, paints over</option></select></div>
+          <p class="kbd">Whole stroke is the default. The size slider sets the touch zone.</p>
         </div>
         <div class="toolOptSection" data-tools="text">
-          <div class="popRow"><span class="tool-label">Text font</span><select id="textFontSel" class="shapeSel" title="Font for text placed with the Text tool"><option value="Newsreader, serif">Serif</option><option value="system-ui, sans-serif">Sans</option><option value="Caveat, cursive">Handwritten</option><option value="ui-monospace, monospace">Mono</option></select></div>
-          <p class="kbd" style="line-height:1.5;margin:6px 0 0">Tap the page to place text. Size follows the Size slider.</p>
+          <div class="popRow"><span class="tool-label">Text font</span><select id="textFontSel" class="shapeSel" title="Font for text placed with the Text tool"><option value="Newsreader, serif">Serif</option><option value="system-ui, sans-serif">Sans</option><option value="Newsreader, serif">Editorial</option><option value="ui-monospace, monospace">Mono</option></select></div>
+          <p class="kbd">Tap the page to place text. Size follows the Size slider.</p>
         </div>
         <div class="toolOptSection" data-tools="hand select lasso vspace">
-          <p class="kbd" style="line-height:1.6;margin:0">Hand: one finger scrolls the page. Select / Lasso: drag around strokes, then drag inside the box to move them. Vertical space: drag down to push everything below the line down. With any drawing tool, two fingers always scroll.</p>
+          <p class="kbd">Hand: one finger scrolls. Select and Lasso: drag around strokes, then drag inside the box to move them. Vertical space: drag down to push everything below the line down. With any drawing tool, two fingers always scroll.</p>
           <div class="popRow"><label><input type="checkbox" id="snapTgl2" onchange="S.snapGrid=this.checked;var a=document.getElementById('snapTgl');if(a)a.checked=this.checked"/> Snap to grid</label></div>
         </div>
         <div class="toolOptSection" data-tools="spline">
-          <div class="popRow"><span class="kbd">Tap points on the page, then use the Finish spline button in the top row — or double-tap the last point.</span></div>
+          <div class="popRow"><span class="kbd">Tap points on the page, then use Finish spline in the top row, or double-tap the last point.</span></div>
         </div>
       </div>
       <div class="toolPop" id="insertPop" role="menu" aria-label="Insert">
         <h5>Insert on this page</h5>
-        <div class="popRow"><label class="btn small" for="pageImgInput">Insert image</label><input id="pageImgInput" type="file" accept="image/*" class="hidden" onchange="insertPageImage(event)"/><button class="btn small" onclick="closeAllToolPops();insertTable()">Insert table</button><button class="btn small" onclick="closeAllToolPops();addSticky()">Sticky note</button></div>
-        <div class="popRow"><button class="btn small" id="setSquareBtn" onclick="toggleSetSquare()">Set square</button><button class="btn small" onclick="closeAllToolPops();openTexModal()">LaTeX equation</button><button class="btn small" id="hwBtn" onclick="handwritingToText()">Handwriting → Text</button></div>
+        <div class="popRow"><label class="btn small" for="pageImgInput"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-photo"></use></svg> Image</label><input id="pageImgInput" type="file" accept="image/*" class="hidden" onchange="insertPageImage(event)"/><button class="btn small" onclick="closeAllToolPops();insertTable()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-table"></use></svg> Table</button><button class="btn small" onclick="closeAllToolPops();addSticky()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-note"></use></svg> Sticky note</button></div>
+        <div class="popRow"><button class="btn small" id="setSquareBtn" onclick="toggleSetSquare()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-ruler"></use></svg> Set square</button><button class="btn small" onclick="closeAllToolPops();openTexModal()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-math-function"></use></svg> LaTeX equation</button><button class="btn small" id="hwBtn" onclick="handwritingToText()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-text-recognition"></use></svg> Handwriting to text</button></div>
       </div>
       <div class="toolPop" id="pagePop" role="menu" aria-label="Page options">
         <h5>Page</h5>
-        <div class="popRow"><span class="tool-label">Template</span><select id="templateSel" onchange="setTemplate(this.value)" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600;min-height:36px"><option value="blank">Blank</option><option value="lined" selected>Lined</option><option value="grid">Grid</option><option value="dotted">Dotted</option><option value="music">Music staff</option><option value="cornell">Cornell notes</option><option value="checklist">Checklist</option></select></div>
+        <div class="popRow"><span class="tool-label">Template</span><select id="templateSel" class="shapeSel" onchange="setTemplate(this.value)"><option value="blank">Blank</option><option value="lined" selected>Lined</option><option value="grid">Grid</option><option value="dotted">Dotted</option><option value="music">Music staff</option><option value="cornell">Cornell notes</option><option value="checklist">Checklist</option></select></div>
         <div class="popRow"><span class="tool-label">Page colour</span><select id="pageBgSel" class="shapeSel" onchange="setPageBg(this.value)"><option value="#fffdf6">Paper</option><option value="#ffffff">White</option><option value="#f6e8c8">Cream</option><option value="#e8f0e4">Pale green</option><option value="#e3ecf7">Pale blue</option><option value="#2b2f36">Dark slate</option></select></div>
-        <div class="popRow"><span class="tool-label">Zoom</span><button class="btn small" onclick="editorZoomBy(0.8)" aria-label="Zoom out">−</button><span class="kbd" id="zoomLabel">100%</span><button class="btn small" onclick="editorZoomBy(1.25)" aria-label="Zoom in">+</button><button class="btn small" onclick="editorZoomBy(0)">Reset</button></div>
-        <div class="popRow"><label class="btn small" for="gplImport">Palette .gpl</label><input id="gplImport" type="file" accept=".gpl" class="hidden" onchange="importGpl(event)"/><span class="tool-label">Toolbar</span><select id="toolbarLayoutSel" class="shapeSel" onchange="setToolbarLayout(this.value)"><option value="">Comfortable</option><option value="compact">Compact</option><option value="minimal">Minimal</option></select></div>
-        <div class="popRow"><button class="btn small" onclick="closeAllToolPops();openTimer()">Focus timer</button></div>
+        <div class="popRow"><span class="tool-label">Zoom</span><button class="btn small" onclick="editorZoomBy(0.8)" aria-label="Zoom out"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-out"></use></svg></button><span class="kbd" id="zoomLabel">100%</span><button class="btn small" onclick="editorZoomBy(1.25)" aria-label="Zoom in"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-in"></use></svg></button><button class="btn small" onclick="editorZoomBy(0)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-reset"></use></svg> Reset</button></div>
+        <div class="popRow"><label class="btn small" for="gplImport"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-palette"></use></svg> Palette .gpl</label><input id="gplImport" type="file" accept=".gpl" class="hidden" onchange="importGpl(event)"/><span class="tool-label">Toolbar</span><select id="toolbarLayoutSel" class="shapeSel" onchange="setToolbarLayout(this.value)"><option value="">Comfortable</option><option value="compact">Compact</option><option value="minimal">Minimal</option></select></div>
+        <div class="popRow"><button class="btn small" onclick="closeAllToolPops();openTimer()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-clock"></use></svg> Focus timer</button></div>
       </div>
     </div>
 
@@ -191,17 +344,16 @@
       <aside class="panel side open" id="pagesPanel">
         <h4>Pages</h4>
         <div id="pageList"></div>
-        <button class="btn" style="width:100%;justify-content:center;margin-top:8px" onclick="addPage()">+ Add page</button>
-        <h4 style="margin-top:18px">Layers</h4>
-        <label style="display:flex;gap:8px;align-items:center;padding:8px 0"><input type="checkbox" id="layerInkTgl" checked onchange="toggleLayer('ink',this.checked)"/> Ink layer</label>
-        <label style="display:flex;gap:8px;align-items:center;padding:8px 0"><input type="checkbox" id="layerHiTgl" checked onchange="toggleLayer('hi',this.checked)"/> Highlight layer</label>
-        <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn small" onclick="selectLayerStrokes('ink')">Select ink layer</button><button class="btn small" onclick="selectLayerStrokes('hi')">Select highlight layer</button></div>
-        <details class="helpBox"><summary>How the tools work</summary>
-        <p class="kbd" style="line-height:1.6;margin-top:8px">Advanced layer selection: pick a whole layer's strokes at once, then move, rotate, copy or delete them together with the selection bar under the page.</p>
-        <p class="kbd" style="line-height:1.6">Stylus &amp; mouse draw with real pressure. One finger draws with the tool you picked; drag with two fingers to scroll the page without putting the tool down. The Hand tool scrolls with one finger. A selected tool stays selected until you pick a different tool.</p>
-        <h4 style="margin-top:18px">Drawing tools</h4>
-        <p class="kbd" style="line-height:1.6">Shapes: drag with Line, Rectangle, Ellipse or Arrow. Tick <b>Fill shape</b> to fill rectangles and ellipses. Tick <b>Shape recogniser</b> and a rough straight pen stroke snaps to a line, a closed loop snaps to an ellipse. <b>Select</b>: drag a box around strokes, then drag inside it to move them, or duplicate / delete them from the bar under the page. <b>Text</b>: tap the page to place typed text right on the paper — tap it again to edit, empty it to remove it. <b>Insert image</b> drops a picture on the page; drag it to move, drag its corner dot to resize. Zoom and page colour are under Page in the toolbar above.</p>
-        <p class="kbd" style="line-height:1.6;margin-top:8px"><b>Spline</b> joins tapped points with a smooth curve. <b>Compass</b> draws a true circle from its centre. <b>Lasso</b> selects with a free loop; <b>Vertical space</b> pushes everything below a line down. Selections can be rotated in 15° steps, resized, flipped, copied and pasted across pages. <b>Style</b> gives pen and shapes dashed, dotted or dash-dot strokes; the <b>Eraser</b> deletes any whole stroke you touch — use Eraser options to switch it to cutting strokes or whiteout instead. The <b>Size</b> slider names each thickness in plain words and previews the stroke at its real width, so you can see how thick the next stroke will be before you draw it. <b>Smooth</b> is input stabilization for shaky hands, <b>Snap to grid</b> aligns shapes and moved selections, and the <b>Set square</b> is a draggable, rotatable guide. <b>LaTeX equation</b> places rendered maths on the page. The pen's eraser end or barrel button borrows the tool picked under <b>Pen button</b>. Load a <b>.gpl</b> palette to replace the colour swatches, and export any notebook as <b>.xopp</b> to open it in other handwriting apps — or open a .xopp here.</p>
+        <button class="btn addPageBtn" onclick="addPage()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-plus"></use></svg> Add page</button>
+        <h4 class="panelSub">Layers</h4>
+        <label class="checkRow"><input type="checkbox" id="layerInkTgl" checked onchange="toggleLayer('ink',this.checked)"/> Ink layer</label>
+        <label class="checkRow"><input type="checkbox" id="layerHiTgl" checked onchange="toggleLayer('hi',this.checked)"/> Highlight layer</label>
+        <div class="panelBtnRow"><button class="btn small" onclick="selectLayerStrokes('ink')">Select ink</button><button class="btn small" onclick="selectLayerStrokes('hi')">Select highlight</button></div>
+        <details class="helpBox"><summary>Using the tools</summary>
+        <p>Stylus and mouse draw with pressure. One finger draws with the selected tool; two fingers scroll. Hand scrolls with one finger.</p>
+        <p><b>Shapes</b> drag with Line, Rectangle, Ellipse or Arrow. <b>Select</b> drag a box, then drag inside to move. <b>Text</b> tap the page to place typed text. <b>Insert</b> adds images, tables, stickies and equations.</p>
+        <p><b>Spline</b> joins tapped points. <b>Compass</b> draws a true circle. <b>Lasso</b> selects with a free loop. <b>Vertical space</b> pushes content down. Selections can be rotated, resized, flipped, copied and pasted across pages.</p>
+        <p><b>Eraser</b> removes whole strokes by default; switch to Cut or Whiteout in Pen options. <b>Style</b> gives strokes dashed, dotted or dash-dot lines. Load a <b>.gpl</b> palette to replace the swatches. Export a notebook as <b>.xopp</b> to open it in other handwriting apps.</p>
         </details>
       </aside>
 
@@ -219,17 +371,17 @@
             <div id="setSquare" class="setSquare hidden">
               <div class="sqBody" id="sqBody"></div>
               <div class="sqHole"></div>
-              <div class="sqBtns"><button type="button" onclick="rotateSetSquare(-15)" title="Rotate −15°">↺</button><button type="button" onclick="rotateSetSquare(15)" title="Rotate +15°">↻</button><button type="button" onclick="toggleSetSquare(false)" title="Hide set square">×</button></div>
+              <div class="sqBtns"><button type="button" onclick="rotateSetSquare(-15)" title="Rotate minus 15 degrees"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-rotate-clockwise"></use></svg></button><button type="button" onclick="rotateSetSquare(15)" title="Rotate plus 15 degrees"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-rotate-clockwise"></use></svg></button><button type="button" onclick="toggleSetSquare(false)" title="Hide set square"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-x"></use></svg></button></div>
             </div>
             <div id="floatingBoard" class="board hidden">
-              <div class="boardHead" id="boardHead"><span>Floating board — infinite canvas</span><span><button class="btn small" onclick="cycleBoardColor()">Colour</button> <button class="btn small" id="boardFsBtn" onclick="toggleBoardFullscreen()">Expand</button> <button class="btn small" onclick="toggleBoard(false)">Close</button></span></div>
+              <div class="boardHead" id="boardHead"><span><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-grip-vertical"></use></svg> Floating board, infinite canvas</span><span class="boardHeadActions"><button class="btn small" onclick="cycleBoardColor()">Colour</button> <button class="btn small" id="boardFsBtn" onclick="toggleBoardFullscreen()">Expand</button> <button class="btn small" onclick="toggleBoard(false)">Close</button></span></div>
               <div class="boardTools">
-                <button class="btn small" id="boardPenBtn" onclick="setBoardTool('pen')">Pen</button>
-                <button class="btn small" id="boardPanBtn" onclick="setBoardTool('pan')">Pan</button>
-                <button class="btn small" onclick="boardZoom(1.25)">＋</button>
-                <button class="btn small" onclick="boardZoom(0.8)">－</button>
+                <button class="btn small" id="boardPenBtn" onclick="setBoardTool('pen')"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-pencil"></use></svg> Pen</button>
+                <button class="btn small" id="boardPanBtn" onclick="setBoardTool('pan')"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-hand-stop"></use></svg> Pan</button>
+                <button class="btn small" onclick="boardZoom(1.25)" aria-label="Zoom in"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-in"></use></svg></button>
+                <button class="btn small" onclick="boardZoom(0.8)" aria-label="Zoom out"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-out"></use></svg></button>
                 <button class="btn small" onclick="boardClear()">Clear</button>
-                <span class="kbd" style="color:#555">Drag edges to resize • pinch to zoom</span>
+                <span class="kbd">Drag edges to resize. Pinch to zoom.</span>
               </div>
               <div class="boardCanvasWrap">
                 <canvas id="boardCanvas" width="720" height="460"></canvas>
@@ -245,14 +397,16 @@
             </div>
             <div id="stickyLayer"></div>
           </div></div>
-          <div id="selBar"><span class="kbd" id="selInfo">Selection</span><button class="btn small" onclick="duplicateSelection()">Duplicate</button><button class="btn small" onclick="copySelection()">Copy</button><button class="btn small" onclick="pasteSelection()">Paste</button><button class="btn small" onclick="rotateSelection(-15)">Rotate −15°</button><button class="btn small" onclick="rotateSelection(15)">Rotate +15°</button><button class="btn small" onclick="scaleSelection(0.85)">Smaller</button><button class="btn small" onclick="scaleSelection(1.18)">Bigger</button><button class="btn small" onclick="flipSelection('x')">Flip ↔</button><button class="btn small" onclick="flipSelection('y')">Flip ↕</button><button class="btn small" onclick="bringSelectionFront()">Bring to front</button><button class="btn small danger" onclick="deleteSelection()">Delete selected</button><button class="btn small" onclick="clearSelection()">Clear</button><span class="kbd">Drag inside the blue box to move the selected strokes. Copy and paste work across pages of this notebook.</span></div>
-          <textarea id="noteText" class="textArea" placeholder="Type here, or write above and tap Handwriting → Text. Use [[links]] — e.g. [[Slow Reading]] — to link notebooks; links and backlinks are live."></textarea>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
-            <span class="badge">Audio-synced notes</span>
-            <button class="btn small" id="recBtn" onclick="toggleRecord()">● Record</button>
-            <button class="btn small hidden" id="playSyncBtn" onclick="playSyncedAudio()">▶ Play with ink sync</button>
-            <span class="kbd" id="recStatus">Record while you write — on playback, ink reappears in time with the audio.</span>
-            <span style="flex:1"></span><span class="kbd" id="wordCount">0 words</span>
+          <div id="selBar"><span class="kbd" id="selInfo">Selection</span><button class="btn small" onclick="duplicateSelection()">Duplicate</button><button class="btn small" onclick="copySelection()">Copy</button><button class="btn small" onclick="pasteSelection()">Paste</button><button class="btn small" onclick="rotateSelection(-15)">Rotate left</button><button class="btn small" onclick="rotateSelection(15)">Rotate right</button><button class="btn small" onclick="scaleSelection(0.85)">Smaller</button><button class="btn small" onclick="scaleSelection(1.18)">Bigger</button><button class="btn small" onclick="flipSelection('x')"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-flip-horizontal"></use></svg> Flip</button><button class="btn small" onclick="flipSelection('y')"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-flip-vertical"></use></svg> Flip</button><button class="btn small" onclick="bringSelectionFront()">Bring to front</button><button class="btn small danger" onclick="deleteSelection()">Delete</button><button class="btn small" onclick="clearSelection()">Clear</button><span class="kbd">Drag inside the blue box to move the selected strokes. Copy and paste work across pages.</span></div>
+          <div class="noteBlock">
+            <div class="noteBlockHead"><span class="runningHead">Written notes</span><span class="kbd" id="wordCount">0 words</span></div>
+            <textarea id="noteText" class="textArea" placeholder="Type here, or write above and use Handwriting to text. Link notebooks with [[Title]]."></textarea>
+          </div>
+          <div class="studioRow">
+            <span class="runningHead">Audio</span>
+            <button class="btn small" id="recBtn" onclick="toggleRecord()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-microphone"></use></svg> Record</button>
+            <button class="btn small hidden" id="playSyncBtn" onclick="playSyncedAudio()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-player-play"></use></svg> Play with ink sync</button>
+            <span class="kbd" id="recStatus">Record while you write. On playback, ink reappears in time with the audio.</span>
           </div>
           <div id="tableHost"></div>
         </div>
@@ -262,10 +416,10 @@
       <aside class="panel side open">
         <h4>Links &amp; backlinks</h4>
         <div id="linksList"><p class="kbd">Type [[Title]] in the note to link another notebook.</p></div>
-        <h4 style="margin-top:16px">Split screen</h4>
-        <p class="kbd" style="line-height:1.6">Read the current book beside this notebook — handy on tablet and desktop.</p>
-        <button class="btn" style="width:100%;justify-content:center" onclick="toggleSplit()">Toggle split view</button>
-        <h4 style="margin-top:16px">This notebook</h4>
+        <h4 class="panelSub">Split screen</h4>
+        <p class="kbd">Read the current book beside this notebook on tablet and desktop.</p>
+        <button class="btn panelWide" onclick="toggleSplit()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-columns"></use></svg> Toggle split view</button>
+        <h4 class="panelSub">This notebook</h4>
         <div class="listRow"><span>Pages</span><b id="statEditorPages">1</b></div>
         <div class="listRow"><span>Strokes on page</span><b id="statPageStrokes">0</b></div>
         <div class="listRow"><span>Session writing</span><b id="statWrite2">0m</b></div>
@@ -273,50 +427,50 @@
     </div>
   </section>
 
-  <!-- READER -->
-  <section id="view-reader" class="hidden">
+  <!-- Reader -->
+  <section id="view-reader" class="hidden" aria-label="Reader">
     <div class="readerTop">
-      <button class="iconBtn" style="font-size:18px" onclick="showView('library')" aria-label="Back to library">←</button>
-      <div class="seg" role="tablist"><button class="active" id="modeScrollBtn" onclick="setReaderMode('scroll')">Scroll</button><button id="modePageBtn" onclick="setReaderMode('page')">Page</button></div>
-      <button class="btn" id="sideToggle" onclick="toggleReaderSide()">☰ Contents</button>
-      <button class="btn" id="bookmarkBtn" onclick="toggleBookmark()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> Bookmark</button>
-      <button class="btn" id="readerMoreBtn" aria-expanded="false" onclick="toggleReaderMore(this)">More ▾</button>
-      <span style="flex:1"></span><span class="kbd" id="resumeLabel"></span>
+      <button class="iconBtn" onclick="showView('library')" aria-label="Back to library" title="Back to library"><svg class="ic" aria-hidden="true"><use href="#ticon-arrow-left"></use></svg></button>
+      <div class="seg" role="tablist" aria-label="Reading mode"><button class="active" id="modeScrollBtn" onclick="setReaderMode('scroll')">Scroll</button><button id="modePageBtn" onclick="setReaderMode('page')">Page</button></div>
+      <button class="btn" id="sideToggle" onclick="toggleReaderSide()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-list"></use></svg> Contents</button>
+      <button class="btn" id="bookmarkBtn" onclick="toggleBookmark()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-bookmark"></use></svg> Bookmark</button>
+      <button class="btn" id="readerMoreBtn" aria-expanded="false" onclick="toggleReaderMore(this)"><span id="readerMoreLabel">More</span> <svg class="ic ic-sm moreChevron" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg></button>
+      <span class="readerResume" id="resumeLabel"></span>
     </div>
     <div class="readerTop moreRow" id="readerMore">
       <span class="tool-label">Theme</span>
-      <select id="themeSel" onchange="setReaderTheme(this.value)" style="border:1px solid var(--line);border-radius:999px;padding:0 12px;background:var(--card);color:var(--ink);font-weight:600"><option value="">Paper</option><option value="sepia">Sepia</option><option value="dark">Night</option></select>
-      <button class="btn small" onclick="readerFont(-1)">A−</button>
-      <button class="btn small" onclick="readerFont(1)">A+</button>
-      <span class="tool-label">On selected text</span>
+      <select id="themeSel" onchange="setReaderTheme(this.value)" aria-label="Reading theme"><option value="">Default</option><option value="sepia">Sepia</option><option value="dark">Night</option></select>
+      <button class="btn small" onclick="readerFont(-1)" aria-label="Decrease reading font size">A−</button>
+      <button class="btn small" onclick="readerFont(1)" aria-label="Increase reading font size">A+</button>
+      <span class="tool-label">Selected text</span>
       <button class="btn" onclick="highlightSelection()">Highlight</button>
       <button class="btn" onclick="underlineSelection()">Underline</button>
       <button class="btn" onclick="strikeSelection()">Strikethrough</button>
-      <button class="btn" onclick="lookupSelection()">Dictionary / Wiki</button>
-      <button class="btn" onclick="openOcrPanel()">OCR</button>
-      <button class="btn" onclick="toggleTtsBar()">Listen — text to speech</button>
+      <button class="btn" onclick="lookupSelection()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-world"></use></svg> Dictionary / Wiki</button>
+      <button class="btn" onclick="openOcrPanel()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-scan"></use></svg> OCR</button>
+      <button class="btn" onclick="toggleTtsBar()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-volume"></use></svg> Listen</button>
     </div>
 
-    <button type="button" class="annotateFab hidden" id="annotateFab" onclick="annotateCurrentPdf()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg> Annotate this PDF</button>
+    <button type="button" class="annotateFab hidden" id="annotateFab" onclick="annotateCurrentPdf()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-pencil"></use></svg> Annotate this PDF</button>
     <div id="readerGrid">
       <aside class="panel" id="readerSide">
         <h4>Contents</h4>
         <div id="tocList"><p class="kbd">Open a book to see its contents.</p></div>
-        <details class="helpBox" id="bookmarkDetails"><summary>Bookmarks</summary><div id="bookmarkList"><p class="kbd">No bookmarks yet</p></div></details>
-        <details class="helpBox" id="annoDetails"><summary>Annotations</summary><div id="annoList"><p class="kbd">Select text → Highlight selection</p></div></details>
-        <details class="helpBox"><summary>Thumbnails</summary><div id="thumbList"><p class="kbd">—</p></div></details>
+        <details class="helpBox" id="bookmarkDetails"><summary><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-bookmark"></use></svg> Bookmarks</summary><div id="bookmarkList"><p class="kbd">No bookmarks yet</p></div></details>
+        <details class="helpBox" id="annoDetails"><summary><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-highlighter"></use></svg> Annotations</summary><div id="annoList"><p class="kbd">Select text, then choose Highlight</p></div></details>
+        <details class="helpBox"><summary><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-layout-grid"></use></svg> Thumbnails</summary><div id="thumbList"><p class="kbd">No pages yet</p></div></details>
       </aside>
-      <div>
+      <div class="readerColumn">
         <article class="reader" id="readerArticle">
-          <span class="badge" id="readerBadge">Reader</span>
+          <span class="readerBadge" id="readerBadge">Reader</span>
           <h2 id="readerTitle">Nothing open</h2>
-          <div id="readerBody"><p>Open a book from the library — or import a PDF or EPUB — and it will open here in reading mode first.</p></div>
+          <div id="readerBody"><p>Open a book from the library, or import a PDF or EPUB, and it will open here in reading mode first.</p></div>
           <div id="dictBox" class="resultBox hidden"></div>
           <div id="ocrBox" class="resultBox hidden">
-            <div class="cardHead"><b>OCR — recognise print on this page</b><button class="btn small cardClose" type="button" onclick="closeReaderCards()" aria-label="Close OCR panel">✕ Close</button></div>
-            <p class="kbd" style="line-height:1.6">Runs on-device with Tesseract.js. Language data downloads on first use for the language you pick. Best on clear print; handwriting is not what this is for.</p>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0">
-              <select id="ocrLang" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600">
+            <div class="cardHead"><b>OCR, read print on this page</b><button class="btn small cardClose" type="button" onclick="closeReaderCards()" aria-label="Close OCR panel"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-x"></use></svg> Close</button></div>
+            <p class="kbd">Runs on this device with Tesseract.js. Language data downloads on first use for the language you pick. Best on clear print; handwriting is not what this is for.</p>
+            <div class="ocrControls">
+              <select id="ocrLang" aria-label="OCR language">
                 <option value="eng">English</option><option value="ben">Bengali</option><option value="hin">Hindi</option><option value="urd">Urdu</option><option value="ara">Arabic</option><option value="fra">French</option><option value="deu">German</option><option value="spa">Spanish</option><option value="jpn">Japanese</option><option value="chi_sim">Chinese (simplified)</option>
               </select>
               <button class="btn small primary" id="ocrRunBtn" onclick="runOCR()">Recognise this page</button>
@@ -326,89 +480,86 @@
             <progress id="ocrProgress" class="hidden" value="0" max="1"></progress>
             <p class="kbd" id="ocrStatus"></p>
             <p id="ocrText"></p>
-            <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small hidden" id="ocrCopyBtn" onclick="copyOcrText()">Copy text</button><button class="btn small hidden" id="ocrNoteBtn" onclick="ocrToNote()">Add to a notebook note</button></div>
+            <div class="cardBtnRow"><button class="btn small hidden" id="ocrCopyBtn" onclick="copyOcrText()">Copy text</button><button class="btn small hidden" id="ocrNoteBtn" onclick="ocrToNote()">Add to a notebook note</button></div>
           </div>
         </article>
 
         <div id="pdfView" class="hidden">
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
-            <b id="pdfName" style="font-family:Newsreader,serif;font-size:18px">PDF</b>
-            <span class="kbd" id="pdfMeta"></span>
-            <span style="flex:1"></span>
-            <button class="btn small" onclick="annotateCurrentPdf()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg> Annotate this PDF</button>
-            <button class="btn small" onclick="closePdf()">Close PDF</button>
+          <div class="pdfHead">
+            <div><b id="pdfName">PDF</b><span class="kbd" id="pdfMeta"></span></div>
+            <div class="pdfHeadActions">
+              <button class="btn small" onclick="annotateCurrentPdf()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-pencil"></use></svg> Annotate</button>
+              <button class="btn small" onclick="closePdf()">Close PDF</button>
+            </div>
           </div>
-          <p class="kbd" id="pdfStatus" style="line-height:1.6">Loading PDF…</p>
+          <p class="kbd" id="pdfStatus">Loading PDF…</p>
           <div id="pdfPages"></div>
         </div>
 
         <div class="ttsBar hidden" id="ttsBar">
-          <b style="font-size:13px">Listen</b>
-          <button class="btn primary" id="ttsBtn" onclick="toggleTTS()">▶ Play</button>
-          <label class="kbd" for="accentSel">Accent</label>
-          <select id="accentSel"></select>
-          <label class="kbd" for="genderSel">Voice</label>
-          <select id="genderSel"><option value="">Any</option><option value="female">Female</option><option value="male">Male</option></select>
-          <label class="kbd">Speed</label>
-          <input type="range" id="ttsRate" min="0.7" max="1.4" step="0.1" value="1" style="width:90px"/>
-          <button class="btn" onclick="toggleParallel()">Parallel Read</button>
-          <span class="kbd" id="voiceHint">Loading voices that actually work…</span>
+          <b class="ttsTitle"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-headphones"></use></svg> Listen</b>
+          <button class="btn primary" id="ttsBtn" onclick="toggleTTS()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-player-play"></use></svg> Play</button>
+          <span class="ttsField"><label class="kbd" for="accentSel">Accent</label><select id="accentSel"></select></span>
+          <span class="ttsField"><label class="kbd" for="genderSel">Voice</label><select id="genderSel"><option value="">Any</option><option value="female">Female</option><option value="male">Male</option></select></span>
+          <span class="ttsField ttsSpeed"><label class="kbd" for="ttsRate">Speed</label><input type="range" id="ttsRate" min="0.7" max="1.4" step="0.1" value="1" aria-label="Speech speed"/></span>
+          <button class="btn" onclick="toggleParallel()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-language"></use></svg> Parallel Read</button>
+          <span class="kbd ttsHint" id="voiceHint">Loading voices that work on this device…</span>
+          <button class="btn small ttsClose" type="button" onclick="toggleTtsBar()" aria-label="Hide listen controls" title="Hide listen controls"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-x"></use></svg></button>
         </div>
-        <div id="parallelBox" class="hidden" style="margin-top:12px">
+        <div id="parallelBox" class="parallelBox hidden">
           <div id="parallelGrid">
-            <div class="panel"><h4>Original</h4><p id="parallelOrig" style="font-family:Newsreader,serif;line-height:1.7"></p></div>
+            <div class="panel"><h4>Original</h4><p id="parallelOrig" class="parallelText"></p></div>
             <div class="panel">
               <h4>Translation</h4>
-              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-                <select id="parLang" style="border:1px solid var(--line);border-radius:999px;padding:0 10px;background:var(--bg);color:var(--ink);font-weight:600"><option value="bn">Bengali</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option><option value="ar">Arabic</option><option value="hi">Hindi</option><option value="ur">Urdu</option></select>
+              <div class="parallelControls">
+                <select id="parLang" aria-label="Translation language"><option value="bn">Bengali</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option><option value="ar">Arabic</option><option value="hi">Hindi</option><option value="ur">Urdu</option></select>
                 <button class="btn small primary" onclick="translateParallel()">Translate this page</button>
               </div>
-              <p id="parallelTrans" style="font-family:Newsreader,serif;line-height:1.7">Pick a language and translate — the original stays beside it.</p>
-              <h4 style="margin-top:14px">My notes on this page</h4>
-              <textarea id="parallelNotes" style="width:100%;height:80px;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);color:var(--ink)" placeholder="Write while you read…" oninput="saveParallelNotes()"></textarea>
+              <p id="parallelTrans" class="parallelText">Pick a language and translate. The original stays beside it.</p>
+              <h4 class="panelSub">My notes on this page</h4>
+              <textarea id="parallelNotes" class="parallelNotes" placeholder="Write while you read…" oninput="saveParallelNotes()"></textarea>
             </div>
           </div>
         </div>
-        <div style="display:flex;justify-content:space-between;margin-top:12px;align-items:center"><button class="btn" onclick="changePage(-1)">← Prev</button><span class="kbd" id="pageLabel">—</span><button class="btn" onclick="changePage(1)">Next →</button></div>
+        <div class="readerPager"><button class="btn" onclick="changePage(-1)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-chevron-left"></use></svg> Prev</button><span class="kbd" id="pageLabel">Not started</span><button class="btn" onclick="changePage(1)">Next <svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-chevron-right"></use></svg></button></div>
       </div>
     </div>
   </section>
 </main>
 
-<div id="newModal" class="modal" role="dialog" aria-modal="true">
+<div id="newModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="newModalTitle">
   <div class="modalCard">
-    <h3 style="margin:0;font-size:16px;font-weight:600">New notebook</h3>
-    <label class="kbd">Title</label><input id="newTitle" placeholder="e.g. Biology — Semester 2"/>
-    <label class="kbd">Cover</label><select id="newColor"><option value="#b4552d">Rust</option><option value="#7d8c6f">Sage</option><option value="#4a5a74">Slate</option><option value="#6d4a63">Plum</option><option value="#c1922e">Ochre</option><option value="#2e6f6a">Teal</option><option value="#232c42">Ink</option><option value="#c08552">Rose</option></select>
-    <label class="kbd">Template</label><select id="newTemplate"><option value="lined">Lined</option><option value="blank">Blank</option><option value="grid">Grid</option><option value="dotted">Dotted</option><option value="music">Music staff</option><option value="cornell">Cornell notes</option><option value="checklist">Checklist</option></select>
-    <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1;justify-content:center" onclick="closeModal('newModal')">Cancel</button><button class="btn primary" style="flex:1;justify-content:center" onclick="createNotebook()">Create</button></div>
+    <h3 id="newModalTitle">New notebook</h3>
+    <label class="fieldLabel" for="newTitle">Title</label><input id="newTitle" placeholder="e.g. Biology, Semester 2"/>
+    <label class="fieldLabel" for="newColor">Cover</label><select id="newColor"><option value="#b4552d">Rust</option><option value="#7d8c6f">Sage</option><option value="#4a5a74">Slate</option><option value="#6d4a63">Plum</option><option value="#c1922e">Ochre</option><option value="#2e6f6a">Teal</option><option value="#232c42">Ink</option><option value="#c08552">Rose</option></select>
+    <label class="fieldLabel" for="newTemplate">Template</label><select id="newTemplate"><option value="lined">Lined</option><option value="blank">Blank</option><option value="grid">Grid</option><option value="dotted">Dotted</option><option value="music">Music staff</option><option value="cornell">Cornell notes</option><option value="checklist">Checklist</option></select>
+    <div class="modalActions"><button class="btn" onclick="closeModal('newModal')">Cancel</button><button class="btn primary" onclick="createNotebook()">Create notebook</button></div>
   </div>
 </div>
 
-<div id="confirmModal" class="modal" role="dialog" aria-modal="true">
+<div id="confirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
   <div class="modalCard">
-    <h3 style="margin:0;font-size:16px;font-weight:600" id="confirmTitle">Delete?</h3>
-    <p class="kbd" id="confirmText" style="line-height:1.6;margin-top:8px"></p>
-    <div style="display:flex;gap:8px;margin-top:14px"><button class="btn" style="flex:1;justify-content:center" onclick="closeModal('confirmModal')">Cancel</button><button class="btn danger" style="flex:1;justify-content:center" onclick="doConfirm()">Delete</button></div>
+    <h3 id="confirmTitle">Delete?</h3>
+    <p class="kbd" id="confirmText"></p>
+    <div class="modalActions"><button class="btn" onclick="closeModal('confirmModal')">Cancel</button><button class="btn danger" onclick="doConfirm()">Delete</button></div>
   </div>
 </div>
 
-<div id="texModal" class="modal" role="dialog" aria-modal="true">
+<div id="texModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="texModalTitle">
   <div class="modalCard">
-    <h3 style="margin:0;font-size:16px;font-weight:600">LaTeX equation</h3>
-    <p class="kbd" style="line-height:1.6;margin-top:6px">Rendered on the page with KaTeX. Drag it to move it; tap it again later with the Text tool nearby — or use the × on it to remove it.</p>
-    <label class="kbd">Template</label>
+    <h3 id="texModalTitle">LaTeX equation</h3>
+    <p class="kbd">Rendered on the page with KaTeX. Drag it to move it, or use the × on it to remove it.</p>
+    <label class="fieldLabel" for="texTemplate">Template</label>
     <select id="texTemplate" onchange="applyTexTemplate(this.value)"><option value="">Blank</option><option value="frac">Fraction</option><option value="sqrt">Square root</option><option value="int">Integral</option><option value="sum">Summation</option><option value="matrix">2×2 matrix</option><option value="pyth">Pythagoras</option></select>
-    <label class="kbd">TeX</label>
-    <textarea id="texInput" rows="3" style="width:100%;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--bg);color:var(--ink);font-family:ui-monospace,monospace;font-size:14px" placeholder="e.g. \frac{-b \pm \sqrt{b^2-4ac}}{2a}"></textarea>
-    <div class="sizeRow"><label class="kbd" for="texSize" style="flex:0 0 auto">Size</label>
-    <input type="range" id="texSize" min="14" max="54" value="26"/></div>
-    <div id="texPreview" style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:8px;overflow:auto;background:#fff;color:#111"></div>
-    <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1;justify-content:center" onclick="closeModal('texModal')">Cancel</button><button class="btn primary" style="flex:1;justify-content:center" onclick="insertTex()">Place on page</button></div>
+    <label class="fieldLabel" for="texInput">TeX</label>
+    <textarea id="texInput" rows="3" placeholder="e.g. \frac{-b \pm \sqrt{b^2-4ac}}{2a}"></textarea>
+    <div class="sizeRow"><label class="kbd" for="texSize">Size</label><input type="range" id="texSize" min="14" max="54" value="26"/></div>
+    <div id="texPreview"></div>
+    <div class="modalActions"><button class="btn" onclick="closeModal('texModal')">Cancel</button><button class="btn primary" onclick="insertTex()">Place on page</button></div>
   </div>
 </div>
 
-<div id="toast" class="toast"></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script src="app.js"></script>
 </body>
