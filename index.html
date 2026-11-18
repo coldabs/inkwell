@@ -411,9 +411,29 @@
           <option value="off">Off — scroll each on its own</option>
         </select>
         <span class="prOffsetWrap" id="prOffsetWrap"><label class="kbd" for="prOffset" title="Use this when the two books do not start on the same chapter or page — e.g. 2 means the right book's chapter / page 3 lines up with the left book's 1"><span class="prLong">Right is ahead by</span><span class="prShort">Offset</span></label><input id="prOffset" type="number" step="1" value="0" inputmode="numeric" onchange="prSetOffset(this.value)" aria-label="Right book is ahead by this many chapters or pages"/></span>
+        <button class="btn small" type="button" id="prInkBtn" aria-pressed="false" onclick="prToggleInk()" title="Draw on the PDF pages — pen, highlighter, eraser"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg> Annotate</button>
+        <span class="popWrap"><button class="btn small" type="button" id="prMarksBtn" aria-expanded="false" aria-haspopup="true" onclick="prToggleMarks(this)" title="Highlights, underlines and strikethroughs in the book in use"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg> Marks <span class="prCount" id="prMarksCount"></span></button><div class="prMarksPop hidden" id="prMarksPop" role="dialog" aria-label="Marks in the book in use"></div></span>
         <span class="prZoom" role="group" aria-label="Zoom"><button class="btn small" type="button" onclick="prZoomBy(1/1.2)" aria-label="Zoom out" title="Zoom out (Ctrl + scroll, or pinch)">−</button><button class="btn small prZoomLabel" type="button" id="prZoomLabel" onclick="prZoomBy(0)" title="Reset zoom to 100%">100%</button><button class="btn small" type="button" onclick="prZoomBy(1.2)" aria-label="Zoom in" title="Zoom in (Ctrl + scroll, or pinch)">+</button></span>
         <span class="prSpacer"></span>
         <button class="btn small" type="button" onclick="closeParallelRead()">Close</button>
+      </div>
+      <div class="prInkBar hidden" id="prInkBar" role="toolbar" aria-label="Handwriting tools">
+        <div class="seg" role="group" aria-label="Tool">
+          <button type="button" data-tool="pen" onclick="prSetInkTool('pen')">Pen</button>
+          <button type="button" data-tool="highlighter" onclick="prSetInkTool('highlighter')">Highlighter</button>
+          <button type="button" data-tool="eraser" onclick="prSetInkTool('eraser')">Eraser</button>
+        </div>
+        <span class="prInkSwatches" id="prInkSwatches" role="group" aria-label="Colour"></span>
+        <div class="seg" role="group" aria-label="Size">
+          <button type="button" data-size="thin" onclick="prSetInkSize('thin')">Thin</button>
+          <button type="button" data-size="medium" onclick="prSetInkSize('medium')">Medium</button>
+          <button type="button" data-size="thick" onclick="prSetInkSize('thick')">Thick</button>
+        </div>
+        <button class="btn small" type="button" id="prUndoBtn" onclick="prInkUndo()" title="Undo (Ctrl+Z)">Undo</button>
+        <button class="btn small" type="button" id="prRedoBtn" onclick="prInkRedo()" title="Redo (Ctrl+Y)">Redo</button>
+        <span class="prSpacer"></span>
+        <span class="kbd prInkHint">Ink is kept in the PDF’s annotation notebook too</span>
+        <button class="btn small primary" type="button" onclick="prToggleInk(false)">Done</button>
       </div>
       <div class="prMain">
         <div class="prRailBox"><div class="prRailLabel" id="prRailLabel">Page</div><div class="prRailTrack"><div class="prRail" id="prRail" role="navigation"></div></div></div>
@@ -458,6 +478,13 @@
     <div id="texPreview" style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:8px;overflow:auto;background:#fff;color:#111"></div>
     <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1;justify-content:center" onclick="closeModal('texModal')">Cancel</button><button class="btn primary" style="flex:1;justify-content:center" onclick="insertTex()">Place on page</button></div>
   </div>
+</div>
+
+<div class="prSelBar hidden" id="prSelBar" role="toolbar" aria-label="Mark the selected text">
+  <button type="button" onpointerdown="event.preventDefault()" onclick="annotateSelection('highlight')"><mark class="prSelSample">Highlight</mark></button>
+  <button type="button" onpointerdown="event.preventDefault()" onclick="annotateSelection('underline')"><span style="text-decoration:underline;text-decoration-color:#2456c8;text-decoration-thickness:2px">Underline</span></button>
+  <button type="button" onpointerdown="event.preventDefault()" onclick="annotateSelection('strike')"><span style="text-decoration:line-through;text-decoration-color:#b23a2e;text-decoration-thickness:2px">Strikethrough</span></button>
+  <button type="button" onpointerdown="event.preventDefault()" onclick="lookupSelection();prHideSelBar()">Look up</button>
 </div>
 
 <div id="toast" class="toast"></div>

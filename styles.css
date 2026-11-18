@@ -709,3 +709,47 @@ html.themeAnim,html.themeAnim *,html.themeAnim *::before,html.themeAnim *::after
 @media (max-width:700px){
   #view-reader .themeToggle,#view-editor .themeToggle{display:none}
 }
+
+/* --- Parallel Read: annotations --- */
+/* handwriting sits on each PDF page; it only catches the pointer in Annotate mode, so text stays selectable otherwise */
+.prInk{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#parallelRead.prInking .prInk{pointer-events:auto;cursor:crosshair;touch-action:none;z-index:3}
+#parallelRead.prInking .pdfLink,#parallelRead.prInking .textLayer{pointer-events:none}
+#prInkBtn[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:transparent}
+.prInkBar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--bg-1);border:1px solid var(--border-subtle);border-radius:var(--r-lg);padding:6px 10px;animation:inkPopIn var(--dur-fast) var(--ease)}
+.prInkBar.hidden{display:none!important}
+.prInkSwatches{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:32px}
+.prInkSwatches .swatch.active{box-shadow:0 0 0 2px var(--fg-1)}
+.prInkHint{white-space:nowrap}
+/* marks: count badge, list, selection bar */
+.prCount:empty{display:none}
+.prCount{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--selected-bg);color:var(--fg-1);font-size:11px;font-weight:600}
+.prMarksPop{position:absolute;right:0;top:calc(100% + 6px);width:min(380px,calc(100vw - 24px));max-height:60vh;overflow:auto;background:var(--bg-1);border:1px solid var(--border-subtle);border-radius:var(--r-md);box-shadow:var(--shadow-pop);padding:10px;z-index:60;animation:inkPopIn var(--dur-fast) var(--ease)}
+.prMarksPop.hidden{display:none!important}
+.prMarksHead{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:2px 4px 8px;border-bottom:1px solid var(--border-subtle);font-size:13px}
+.prMarksHead b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prMarksList{display:flex;flex-direction:column;gap:2px;padding-top:6px}
+.prMarkRow{display:grid;grid-template-columns:10px minmax(0,1fr);column-gap:10px;row-gap:2px;width:100%;min-height:40px;text-align:left;border:0;background:transparent;border-radius:var(--r-sm);padding:8px;color:var(--fg-1);font-size:13px;line-height:1.4;cursor:pointer;transition:background-color var(--dur-fast) var(--ease)}
+.prMarkRow:hover{background:var(--hover-bg)}
+.prMarkRow:active{background:var(--active-bg)}
+.prMarkRow .kbd{grid-column:2}
+.prMarkText{overflow-wrap:anywhere}
+.prMarkKind{width:10px;height:10px;border-radius:3px;margin-top:5px;background:#ffe98a;box-shadow:inset 0 0 0 1px color-mix(in srgb,#000 12%,transparent)}
+.prMarkKind.underline{background:#2456c8}
+.prMarkKind.strike{background:#b23a2e}
+.prMarksFoot{padding-top:8px;margin-top:6px;border-top:1px solid var(--border-subtle)}
+.prSelBar{position:fixed;left:0;top:0;z-index:70;display:flex;gap:2px;padding:4px;background:var(--bg-1);border:1px solid var(--border-subtle);border-radius:var(--r-md);box-shadow:var(--shadow-pop);animation:inkPopIn var(--dur-fast) var(--ease)}
+.prSelBar.hidden{display:none!important}
+.prSelBar button{border:0;background:transparent;color:var(--fg-1);border-radius:var(--r-sm);padding:0 10px;min-height:34px;font-size:13px;font-weight:500;white-space:nowrap;cursor:pointer;transition:background-color var(--dur-fast) var(--ease)}
+.prSelBar button:hover{background:var(--hover-bg)}
+.prSelBar button:active{background:var(--active-bg)}
+.prSelSample{padding:0 2px}
+@media (pointer:coarse){
+  .prSelBar button,.prInkBar .seg button{min-height:44px}
+  .prMarkRow{min-height:44px}
+}
+@media (max-width:700px){
+  .prInkBar{padding:6px 8px;gap:6px}
+  .prInkHint{display:none}
+  .prInkBar .seg button{padding:6px 9px}
+}
