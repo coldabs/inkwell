@@ -1,7 +1,7 @@
 /* Inkwell service worker: offline app shell + runtime-cached CDN libraries.
    User data lives in IndexedDB; this worker never touches it.
    Bump VERSION whenever the shell files change. */
-var VERSION = 'v3-2026-11-19';
+var VERSION = 'v4-2026-11-19';
 var SHELL_CACHE = 'inkwell-shell-' + VERSION;
 var RUNTIME_CACHE = 'inkwell-runtime-' + VERSION;
 var APP_SHELL = [
