@@ -137,7 +137,7 @@ function serializeLibrary(){
           board:p.board?{color:p.board.color,strokes:p.board.strokes,view:p.board.view,geom:p.board.geom||null}:null,
           audio:(p.audio&&p.audio.blob)?{blob:p.audio.blob,dur:p.audio.dur}:null,
           bgPdf:p.bgPdf?{page:p.bgPdf.page,bookTitle:p.bgPdf.bookTitle,imgData:bgPdfImgData(p.bgPdf),w:(bgPdfSize(p.bgPdf)||[])[0]||null,h:(bgPdfSize(p.bgPdf)||[])[1]||null}:null }))};
-      if(it.kind==='pdf') return {id:it.id,kind:'pdf',title:it.title,color:it.color,updated:it.updated,sample:!!it.sample,fileName:it.fileName,numPages:it.numPages,page:it.page,mode:it.mode,bookmarks:it.bookmarks||[],annotations:it.annotations||[],textCache:it.textCache||{},parallelNotes:it.parallelNotes||{},parallelWith:it.parallelWith||null,parallelSync:it.parallelSync||'unit',parallelOffset:it.parallelOffset||0,parallelZoom:it.parallelZoom||1};
+      if(it.kind==='pdf') return {id:it.id,kind:'pdf',title:it.title,color:it.color,updated:it.updated,sample:!!it.sample,fileName:it.fileName,numPages:it.numPages,page:it.page,mode:it.mode,bookmarks:it.bookmarks||[],annotations:it.annotations||[],textCache:it.textCache||{},parallelNotes:it.parallelNotes||{},parallelWith:it.parallelWith||null,parallelSync:it.parallelSync||'unit',parallelOffset:it.parallelOffset||0,parallelZoom:it.parallelZoom||1,ocrPages:it.ocrPages||{}};
       return {id:it.id,kind:'epub',title:it.title,color:it.color,updated:it.updated,sample:!!it.sample,ch:it.ch||0,mode:it.mode||'scroll',bookmarks:it.bookmarks||[],annotations:it.annotations||[],parallelNotes:it.parallelNotes||{},parallelWith:it.parallelWith||null,parallelSync:it.parallelSync||'unit',parallelOffset:it.parallelOffset||0,parallelZoom:it.parallelZoom||1,parallelInk:it.parallelInk||{},chapters:it.chapters||[]};
     })};
 }
@@ -206,7 +206,7 @@ async function restoreLibrary(token){
       if(nb.cur>=nb.pages.length) nb.cur=nb.pages.length-1; if(nb.cur<0) nb.cur=0;
       items.push(nb);
     } else if(raw.kind==='pdf'){
-      let b={id:raw.id,kind:'pdf',title:raw.title||'PDF',color:raw.color||'#4a5a74',updated:raw.updated||'',sample:!!raw.sample,fileName:raw.fileName||raw.title,numPages:raw.numPages||0,page:raw.page||1,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],textCache:raw.textCache||{},parallelNotes:raw.parallelNotes||{},parallelWith:raw.parallelWith||null,parallelSync:raw.parallelSync||'unit',parallelOffset:+raw.parallelOffset||0,parallelZoom:+raw.parallelZoom||1,doc:null,fileData:null};
+      let b={id:raw.id,kind:'pdf',title:raw.title||'PDF',color:raw.color||'#4a5a74',updated:raw.updated||'',sample:!!raw.sample,fileName:raw.fileName||raw.title,numPages:raw.numPages||0,page:raw.page||1,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],textCache:raw.textCache||{},parallelNotes:raw.parallelNotes||{},parallelWith:raw.parallelWith||null,parallelSync:raw.parallelSync||'unit',parallelOffset:+raw.parallelOffset||0,parallelZoom:+raw.parallelZoom||1,ocrPages:raw.ocrPages||{},doc:null,fileData:null};
       try{
         let fd=await idbGet('pdf:'+raw.id);
         if(fd) b.fileData=fd;
@@ -2551,7 +2551,7 @@ async function pdfFillTextCache(book,isLive){
   for(let n=1;n<=book.numPages;n++){
     if(!isLive()) return;
     if(book.textCache[n]) continue;
-    try{ let tc=await (await book.doc.getPage(n)).getTextContent(); book.textCache[n]=tc.items.map(i=>i.str||'').join(' ').replace(/\s+/g,' ').trim(); }catch(e){}
+    try{ let tc=await (await book.doc.getPage(n)).getTextContent(); book.textCache[n]=tc.items.map(i=>i.str||'').join(' ').replace(/\s+/g,' ').trim()||(book.ocrPages&&book.ocrPages[n]?book.ocrPages[n].text||'':''); }catch(e){}
     if(n%8===0) await new Promise(r=>setTimeout(r,30));
   }
   scheduleSave();
@@ -2575,7 +2575,7 @@ async function renderPdfTextLayer(page,cssVp,holder,book,pageNum){
       full+=item.str+' ';
       requestAnimationFrame(()=>{ let w=item.width*cssVp.scale; let ow=span.offsetWidth; if(ow>2 && w>2) span.style.transform='scaleX('+(w/ow)+')'; });
     });
-    if(book.textCache) book.textCache[pageNum]=full.trim();
+    if(!full.trim()&&book.ocrPages&&book.ocrPages[pageNum]&&book.ocrPages[pageNum].words&&book.ocrPages[pageNum].words.length){let o=book.ocrPages[pageNum];o.words.forEach(w=>{if(!w.t)return;let s=document.createElement('span');s.textContent=w.t;s.style.left=(w.x*cssVp.width)+'px';s.style.top=(w.y*cssVp.height)+'px';s.style.fontSize=Math.max(4,w.h*cssVp.height)+'px';s.dataset.pg=pageNum;s.dataset.ocr='1';layer.appendChild(s);requestAnimationFrame(()=>{let tw=w.w*cssVp.width,ow=s.offsetWidth;if(ow>2&&tw>2)s.style.transform='scaleX('+(tw/ow)+')';});});full=o.text||o.words.map(w=>w.t).join(' ');} if(book.textCache) book.textCache[pageNum]=full.trim();
     /* put this page's saved highlights / underlines back, they used to vanish after a reload */
     (book.annotations||[]).forEach(a=>{ if(a.where==='PDF page '+pageNum) wrapTextOnce(layer,a.text,a.kind||'highlight'); });
   }catch(e){ /* text layer is best-effort; page image still reads */ }
@@ -2842,7 +2842,7 @@ async function lookupSelection(){
 }
 
 /* --- OCR: Tesseract.js on-device --- */
-let lastOcrText='';
+let lastOcrText='';let ocrWorker=null,ocrCancelled=false;function cancelOcr(){ocrCancelled=true;let w=ocrWorker;ocrWorker=null;if(w)w.terminate().catch(()=>{});let st=$('ocrStatus'),pr=$('ocrProgress'),btn=$('ocrRunBtn'),cb=$('ocrCancelBtn');if(pr)pr.classList.add('hidden');if(btn)btn.disabled=false;if(cb)cb.classList.add('hidden');if(st)st.textContent='OCR cancelled. You can run it again.';}
 function openOcrPanel(){ prLeave(); let box=$('ocrBox'); /* P3: move the panel to the top of the article so it opens on-screen, not past the end of the book */ let art=$('readerArticle'); if(art && box.parentNode!==art) art.appendChild(box); if(art) art.insertBefore(box, $('readerBody')); box.classList.remove('hidden'); box.scrollIntoView({behavior:smoothOrInstant(),block:'nearest'}); }
 async function ocrSourceCanvas(){
   let b=curBook();
@@ -2858,21 +2858,21 @@ async function ocrSourceCanvas(){
   let nb=curNb(); if(nb){ return composePage(curPageObj(), 'blank'); }
   return null;
 }
-async function runOcrOn(source,label){
+async function saveOcrToPage(book,pageNum,text,words){if(!book||book.kind!=='pdf'||!book.doc)return '';try{let pg=await book.doc.getPage(pageNum);let tc=await pg.getTextContent();if(tc.items.some(i=>(i.str||'').trim()))return 'real';}catch(e){}if(!book.ocrPages)book.ocrPages={};book.ocrPages[pageNum]={text:text,words:words||[],source:'ocr',lang:$('ocrLang').value,at:Date.now()};if(!book.textCache)book.textCache={};book.textCache[pageNum]=text;scheduleSave();ocrRedrawPage(book,pageNum);return 'saved';} async function runOcrOn(source,label){
   if(!window.Tesseract){ toast('OCR engine could not load. Check the connection.'); return; }
   let st=$('ocrStatus'), pr=$('ocrProgress'), btn=$('ocrRunBtn');
-  pr.classList.remove('hidden'); pr.value=0; btn.disabled=true; st.textContent='Starting OCR ('+label+')…';
+  pr.classList.remove('hidden'); pr.value=0; btn.disabled=true; ocrCancelled=false;let cancelBtn=$('ocrCancelBtn');if(cancelBtn)cancelBtn.classList.remove('hidden');let pdfBook=curBook(),pdfPage=(pdfBook&&pdfBook.kind==='pdf'&&label==='this page')?pdfBook.page:0;st.textContent='Starting OCR ('+label+')…';
   try{
-    let res=await Tesseract.recognize(source, $('ocrLang').value, { logger:m=>{ if(m.status==='recognizing text'){ pr.value=m.progress; st.textContent='Recognising… '+Math.round(m.progress*100)+'%'; } else if(m.status) st.textContent=m.status+'…'; } });
+    let res;if(window.Tesseract&&Tesseract.createWorker){ocrWorker=await Tesseract.createWorker($('ocrLang').value,1,{logger:m=>{if(m.status==='recognizing text'){pr.value=m.progress;st.textContent='Recognising… '+Math.round(m.progress*100)+'%';}else if(m.status)st.textContent=m.status+'…';}});if(ocrCancelled){await ocrWorker.terminate();ocrWorker=null;throw new Error('cancelled');}res=await ocrWorker.recognize(source);await ocrWorker.terminate();ocrWorker=null;}else{res=await Tesseract.recognize(source,$('ocrLang').value,{logger:m=>{if(m.status==='recognizing text'){pr.value=m.progress;st.textContent='Recognising… '+Math.round(m.progress*100)+'%';}else if(m.status)st.textContent=m.status+'…';}}});}
     lastOcrText=(res.data.text||'').trim();
-    $('ocrText').textContent= lastOcrText || 'No print text was recognised on this page.';
+    let ocrSaved='';if(lastOcrText&&pdfPage){let sw=source&&source.width||0,sh=source&&source.height||0,words=[];if(res&&res.data&&Array.isArray(res.data.words)&&sw&&sh)words=res.data.words.filter(w=>w&&w.text&&w.bbox).map(w=>({t:String(w.text).trim(),x:+(w.bbox.x0/sw).toFixed(4),y:+(w.bbox.y0/sh).toFixed(4),w:+((w.bbox.x1-w.bbox.x0)/sw).toFixed(4),h:+((w.bbox.y1-w.bbox.y0)/sh).toFixed(4)}));ocrSaved=await saveOcrToPage(pdfBook,pdfPage,lastOcrText,words);} $('ocrText').textContent= lastOcrText || 'No print text was recognised on this page.';
     $('ocrCopyBtn').classList.toggle('hidden', !lastOcrText);
     $('ocrNoteBtn').classList.toggle('hidden', !lastOcrText);
-    st.textContent= lastOcrText? 'Done. '+lastOcrText.split(/\s+/).length+' words recognised.' : 'Nothing recognised.';
-  }catch(err){ st.textContent='OCR failed ('+(err&&err.message?err.message:'error')+'). Language data downloads on first use, so check the connection and retry.'; }
-  pr.classList.add('hidden'); btn.disabled=false;
+    st.textContent= lastOcrText? 'Done. '+lastOcrText.split(/\s+/).length+' words recognised.'+(ocrSaved==='saved'?' Saved to this page, so you can select, highlight and search it after a reload.':ocrSaved==='real'?' This page already has real text, so the recognised text was not saved over it.':'') : 'Nothing recognised.';
+  }catch(err){ if(ocrCancelled||(err&&err.message==='cancelled'))st.textContent='OCR cancelled. You can run it again.';else st.textContent='OCR failed ('+(err&&err.message?err.message:'error')+'). Language data downloads on first use, so check the connection and retry.'; }
+  pr.classList.add('hidden');btn.disabled=false;let cb=$('ocrCancelBtn');if(cb)cb.classList.add('hidden');if(ocrWorker){ocrWorker.terminate().catch(()=>{});ocrWorker=null;}
 }
-async function runOCR(){ let src=await ocrSourceCanvas(); if(!src){ toast('Open a PDF page (or a notebook page) to OCR'); return; } runOcrOn(src,'this page'); }
+async function ocrRedrawPage(book,pageNum){if(!book||!book.doc)return;document.querySelectorAll('.pdfHolder[data-n="'+pageNum+'"]').forEach(h=>{if(!h.isConnected||h._drawing||h.clientWidth<10)return;h.querySelectorAll('.textLayer').forEach(x=>x.remove());book.doc.getPage(pageNum).then(pg=>{let v0=pg.getViewport({scale:1});renderPdfTextLayer(pg,pg.getViewport({scale:h.clientWidth/v0.width}),h,book,pageNum);}).catch(()=>{});});} async function runOCR(){ let src=await ocrSourceCanvas(); if(!src){ toast('Open a PDF page (or a notebook page) to OCR'); return; } runOcrOn(src,'this page'); }
 function ocrImageFile(e){ let f=e.target.files[0]; e.target.value=''; if(!f) return; let img=new Image(); img.onload=()=>runOcrOn(img,'image'); img.src=URL.createObjectURL(f); }
 function copyOcrText(){ if(navigator.clipboard) navigator.clipboard.writeText(lastOcrText).then(()=>toast('OCR text copied')); }
 function ocrToNote(){
