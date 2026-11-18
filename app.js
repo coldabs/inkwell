@@ -2785,7 +2785,7 @@ function annotateSelection(kind){
   }catch(e){ toast('Select a clean stretch inside one paragraph'); return; }
   b.annotations.push({text:text, where:where, kind:kind});
   sel.removeAllRanges();
-  renderReaderSide(); renderLibrary();
+  renderReaderSide(); renderLibrary(); scheduleSave();
   /* P7: open the Annotations panel so the new entry is visible. */
   let ad=$('annoDetails'); if(ad) ad.open=true;
   toast((kind==='highlight'?'Highlighted': kind==='underline'?'Underlined':'Struck through')+' & saved to annotations');
@@ -3477,7 +3477,7 @@ function prAnnotateSelection(kind){
   sel.removeAllRanges(); prHideSelBar();
   PRA.marksChanged=true;
   prSetActive(side); prUpdateMarksBtn();
-  if(b===curBook()) renderReaderSide(); else scheduleSave();
+  if(b===curBook()) renderReaderSide(); scheduleSave();
   toast((kind==='highlight'?'Highlighted': kind==='underline'?'Underlined':'Struck through')+' in “'+b.title+'”, saved to its annotations');
 }
 /* put an EPUB book's saved marks back on its chapters in a pane */
