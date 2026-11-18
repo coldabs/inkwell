@@ -280,6 +280,7 @@
       <div class="seg" role="tablist"><button class="active" id="modeScrollBtn" onclick="setReaderMode('scroll')">Scroll</button><button id="modePageBtn" onclick="setReaderMode('page')">Page</button></div>
       <button class="btn" id="sideToggle" onclick="toggleReaderSide()">☰ Contents</button>
       <button class="btn" id="bookmarkBtn" onclick="toggleBookmark()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> Bookmark</button>
+      <button class="btn" id="parallelBtn" aria-pressed="false" onclick="toggleParallelRead()" title="Parallel Read — this book beside a second book, scrolling together"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="7.5" height="16" rx="1.5"/><rect x="13.5" y="4" width="7.5" height="16" rx="1.5"/><path d="M6 9h2M6 12h2M16.5 9h2M16.5 12h2"/></svg> Parallel</button>
       <button class="btn" id="readerMoreBtn" aria-expanded="false" onclick="toggleReaderMore(this)">More ▾</button>
       <span style="flex:1"></span><span class="kbd" id="resumeLabel"></span>
     </div>
@@ -351,7 +352,7 @@
           <select id="genderSel"><option value="">Any</option><option value="female">Female</option><option value="male">Male</option></select>
           <label class="kbd">Speed</label>
           <input type="range" id="ttsRate" min="0.7" max="1.4" step="0.1" value="1" style="width:90px"/>
-          <button class="btn" onclick="toggleParallel()">Parallel Read</button>
+          <button class="btn" onclick="toggleParallel()" title="Translate this page, with the original beside it">Translate</button>
           <span class="kbd" id="voiceHint">Loading voices that actually work…</span>
         </div>
         <div id="parallelBox" class="hidden" style="margin-top:12px">
@@ -371,6 +372,29 @@
         </div>
         <div style="display:flex;justify-content:space-between;margin-top:12px;align-items:center"><button class="btn" onclick="changePage(-1)">← Prev</button><span class="kbd" id="pageLabel">—</span><button class="btn" onclick="changePage(1)">Next →</button></div>
       </div>
+    </div>
+
+    <!-- PARALLEL READ — two books side by side (stacked on a phone), scrolling together -->
+    <div id="parallelRead" class="hidden" aria-label="Parallel Read">
+      <div class="prBar">
+        <b style="font-size:14px">Parallel Read</b>
+        <label class="kbd" for="prRight">Beside it</label>
+        <select id="prRight" onchange="prPickRight(this.value)" aria-label="Second book"></select>
+        <label class="kbd" for="prSync">Sync</label>
+        <select id="prSync" onchange="prSetSync(this.value)" aria-label="How the two books scroll together">
+          <option value="unit">By chapter / page</option>
+          <option value="percent">By overall position</option>
+          <option value="off">Off — scroll each on its own</option>
+        </select>
+        <span class="prOffsetWrap" id="prOffsetWrap"><label class="kbd" for="prOffset" title="Use this when the two books do not start on the same chapter or page — e.g. 2 means the right book's chapter / page 3 lines up with the left book's 1">Right is ahead by</label><input id="prOffset" type="number" step="1" value="0" inputmode="numeric" onchange="prSetOffset(this.value)" aria-label="Right book is ahead by this many chapters or pages"/></span>
+        <span style="flex:1"></span>
+        <button class="btn small" type="button" onclick="closeParallelRead()">Close</button>
+      </div>
+      <div class="prGrid">
+        <div class="prCol"><div class="prHead"><b id="prTitleL"></b><span class="kbd" id="prPosL"></span></div><div class="prPane" id="prPaneL" tabindex="0" aria-label="Left book"></div></div>
+        <div class="prCol"><div class="prHead"><b id="prTitleR"></b><span class="kbd" id="prPosR"></span></div><div class="prPane" id="prPaneR" tabindex="0" aria-label="Right book"></div></div>
+      </div>
+      <p class="kbd" style="margin:0;line-height:1.5">Scroll either book and the other follows. Your place in both books is remembered. Highlighting, Listen and OCR work in the normal reader — tap Close to get back to it.</p>
     </div>
   </section>
 </main>

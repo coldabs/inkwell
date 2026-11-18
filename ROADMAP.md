@@ -18,7 +18,7 @@ Working rule: one feature at a time. A feature is only done when it is confirmed
 
 1. Full-text search across the whole library
 2. Reading themes and typography
-3. Parallel Read (two books, synced scroll)
+3. Parallel Read (two books, synced scroll) — built in the web preview (sync by chapter / page with an offset, by overall position, or off; pairing and places saved); waiting on the real-phone check
 4. OCR for scanned PDFs (Tesseract.js; most languages via on-demand language data; about 3–10s per page; print only)
 5. Sticky notes (typed notes pinned to a spot)
 6. Reading progress and statistics
