@@ -2425,6 +2425,46 @@ function renderEpubBook(){
    re-render (Scroll → Page switch, chapter jump) rebuilt the body from
    the raw chapter HTML and the marks vanished even though the annotation
    list kept them. Re-wrap the stored annotation texts after every render. */
+/* Cross-node re-wrap: a stored mark's text often spans several text nodes
+   (on a PDF each word or line is its own span in the text layer), so the
+   single-node wrapTextOnce misses it and the mark vanishes on re-render.
+   Whitespace is normalised on both sides, then the match is wrapped with
+   the same extract-contents fallback the live mark uses. */
+function wrapTextAcross(container,needle,kind){
+  if(!container||!needle) return false;
+  let want=String(needle).replace(/\s+/g,' ').trim(); if(!want) return false;
+  let walker=document.createTreeWalker(container,NodeFilter.SHOW_TEXT,{acceptNode:n=>{
+    if(!n.nodeValue) return NodeFilter.FILTER_REJECT;
+    if(n.parentElement && n.parentElement.closest('mark,[data-hl]')) return NodeFilter.FILTER_REJECT;
+    return NodeFilter.FILTER_ACCEPT;
+  }});
+  let nodes=[], full='', nd;
+  while((nd=walker.nextNode())){ nodes.push({node:nd,start:full.length,text:nd.nodeValue}); full+=nd.nodeValue; }
+  if(!full) return false;
+  let norm='', map=[];
+  for(let i=0;i<full.length;i++){
+    let ch=full[i];
+    if(/\s/.test(ch)){ if(norm.length && norm[norm.length-1]!==' '){ norm+=' '; map.push(i); } }
+    else { norm+=ch; map.push(i); }
+  }
+  while(norm.endsWith(' ')){ norm=norm.slice(0,-1); map.pop(); }
+  let idx=norm.indexOf(want); if(idx<0) return false;
+  let s0=map[idx], e0=map[idx+want.length-1]+1, sn=null, so=0, en=null, eo=0;
+  for(let r of nodes){
+    let re=r.start+r.text.length;
+    if(!sn && s0>=r.start && s0<re){ sn=r.node; so=s0-r.start; }
+    if(sn && e0>r.start && e0<=re){ en=r.node; eo=e0-r.start; break; }
+  }
+  if(!sn||!en) return false;
+  let range=document.createRange(); range.setStart(sn,so); range.setEnd(en,eo);
+  let wrapEl;
+  if(kind==='underline'){ wrapEl=document.createElement('span'); wrapEl.style.cssText='text-decoration:underline;text-decoration-color:#2456c8;text-decoration-thickness:2px'; }
+  else if(kind==='strike'){ wrapEl=document.createElement('span'); wrapEl.style.cssText='text-decoration:line-through;text-decoration-color:#b23a2e;text-decoration-thickness:2px'; }
+  else wrapEl=document.createElement('mark');
+  wrapEl.setAttribute('data-hl','1');
+  try{ range.surroundContents(wrapEl); return true; }
+  catch(e){ try{ let frag=range.extractContents(); wrapEl.appendChild(frag); range.insertNode(wrapEl); return true; }catch(e2){ return false; } }
+}
 function wrapTextOnce(container,needle,kind){
   if(!container||!needle) return false;
   let walker=document.createTreeWalker(container,NodeFilter.SHOW_TEXT,{acceptNode:n=>{
@@ -2447,7 +2487,7 @@ function reapplyAnnotations(){
   (b.annotations||[]).forEach(a=>{
     let m=/Chapter\s+(\d+)/.exec(a.where||''); let ci=m? (+m[1]-1) : b.ch;
     let container= b.mode==='page'? (ci===b.ch? $('readerBody') : null) : document.querySelector('[data-ch="'+ci+'"]');
-    if(container) wrapTextOnce(container,a.text,a.kind||'highlight');
+    if(container) (wrapTextAcross(container,a.text,a.kind||'highlight')||wrapTextOnce(container,a.text,a.kind||'highlight'));
   });
 }
 /* P3: lookup / OCR cards, closable, and never left behind on a new page */
@@ -2577,7 +2617,7 @@ async function renderPdfTextLayer(page,cssVp,holder,book,pageNum){
     });
     if(!full.trim()&&book.ocrPages&&book.ocrPages[pageNum]&&book.ocrPages[pageNum].words&&book.ocrPages[pageNum].words.length){let o=book.ocrPages[pageNum];o.words.forEach(w=>{if(!w.t)return;let s=document.createElement('span');s.textContent=w.t;s.style.left=(w.x*cssVp.width)+'px';s.style.top=(w.y*cssVp.height)+'px';s.style.fontSize=Math.max(4,w.h*cssVp.height)+'px';s.dataset.pg=pageNum;s.dataset.ocr='1';layer.appendChild(s);requestAnimationFrame(()=>{let tw=w.w*cssVp.width,ow=s.offsetWidth;if(ow>2&&tw>2)s.style.transform='scaleX('+(tw/ow)+')';});});full=o.text||o.words.map(w=>w.t).join(' ');} if(book.textCache) book.textCache[pageNum]=full.trim();
     /* put this page's saved highlights / underlines back, they used to vanish after a reload */
-    (book.annotations||[]).forEach(a=>{ if(a.where==='PDF page '+pageNum) wrapTextOnce(layer,a.text,a.kind||'highlight'); });
+    (book.annotations||[]).forEach(a=>{ if(a.where==='PDF page '+pageNum) (wrapTextAcross(layer,a.text,a.kind||'highlight')||wrapTextOnce(layer,a.text,a.kind||'highlight')); });
   }catch(e){ /* text layer is best-effort; page image still reads */ }
 }
 /* Draw the linked annotation notebook's ink on a PDF page in reading mode.
@@ -2776,10 +2816,33 @@ function wrapRangeAsMark(range,kind){
   catch(e2){ let frag=range.extractContents(); wrapEl.appendChild(frag); range.insertNode(wrapEl); } /* a selection crossing element boundaries */
   return wrapEl;
 }
+/* A tap on a toolbar button collapses the live selection on a phone, so by
+   the time Highlight / Dictionary / Listen runs there is nothing to act on.
+   Keep the last real selection made inside the reader (or a Parallel Read
+   pane) and hand it back when the live one is gone. */
+let lastReaderSel=null;
+document.addEventListener('selectionchange',()=>{
+  let sel=window.getSelection(); if(!sel||!sel.rangeCount||sel.isCollapsed) return;
+  let text=sel.toString().trim(); if(!text) return;
+  let node=sel.getRangeAt(0).commonAncestorContainer, el=node.nodeType===1? node : node.parentElement;
+  if(!el||!el.closest||!el.closest('#readerBody, #pdfPages, .prPane')) return;
+  try{ lastReaderSel={range:sel.getRangeAt(0).cloneRange(), text:text}; }catch(e){}
+});
+function readerSelection(){
+  let sel=window.getSelection();
+  if(sel&&sel.rangeCount&&!sel.isCollapsed&&sel.toString().trim()) return sel;
+  if(lastReaderSel&&lastReaderSel.range){
+    try{
+      let node=lastReaderSel.range.commonAncestorContainer;
+      if(node&&(node.isConnected===undefined||node.isConnected)){ sel.removeAllRanges(); sel.addRange(lastReaderSel.range.cloneRange()); return sel; }
+    }catch(e){}
+  }
+  return sel;
+}
 function annotateSelection(kind){
   let b=curBook(); if(!b){ toast('Open a book first'); return; }
   if(PR.on){ prAnnotateSelection(kind); return; } /* Parallel Read: the mark goes to whichever book the text was selected in */
-  let sel=window.getSelection(); let text=sel.toString().trim();
+  let sel=readerSelection(); let text=sel.toString().trim();
   if(!text){ toast('Select some text in the book first'); return; }
   let where='';
   try{
@@ -2837,7 +2900,7 @@ function normalizeLookupWord(raw){
   return '';
 }
 async function lookupSelection(){
-  let w=normalizeLookupWord(window.getSelection().toString());
+  let w=normalizeLookupWord(readerSelection().toString());
   let box=$('dictBox');
   if(!w){ toast('Select a word in the text first'); return; }
   /* P3: park the card right after the paragraph the word sits in, so it
@@ -2939,13 +3002,25 @@ let speaking=false;
 function currentReadableText(){
   let b=curBook(); if(!b) return '';
   if(b.kind==='epub') return b.chapters[b.ch].text;
-  if(b.kind==='pdf') return b.textCache[b.page]||'';
+  if(b.kind==='pdf') return (b.textCache&&b.textCache[b.page])||'';
   return '';
 }
-function toggleTTS(){
+/* Read one PDF page's text on demand (Listen): the background text cache may
+   not have reached this page yet, so do not make the user wait for it. */
+async function pdfPageText(b,n){
+  if(!b||b.kind!=='pdf'||!b.doc) return '';
+  if(b.textCache&&b.textCache[n]) return b.textCache[n];
+  try{
+    let tc=await b.doc.getPage(n).getTextContent();
+    let t=tc.items.map(i=>i.str||'').join(' ').replace(/\s+/g,' ').trim();
+    if(!b.textCache) b.textCache={}; b.textCache[n]=t; scheduleSave();
+    return t;
+  }catch(e){ return ''; }
+}
+async function toggleTTS(){
   if(!('speechSynthesis' in window)){ toast('Speech is not supported in this browser'); return; }
   if(speaking){ speechSynthesis.cancel(); speaking=false; setBtnContent('ttsBtn','player-play','Play'); return; }
-  let text=currentReadableText();
+  let text=currentReadableText(); if(!text){ let b=curBook(); if(b&&b.kind==='pdf') text=await pdfPageText(b,b.page); }
   if(!text){ toast('No readable text here yet. For PDFs, let the page finish rendering first.'); return; }
   let val=$('accentSel').value||''; let parts=val.split('|'); let lang=parts[0], gender=parts[1];
   let genderPref=$('genderSel').value;
@@ -3485,7 +3560,7 @@ function prSideOfNode(node){
   return pane.id==='prPaneL'? 'L' : pane.id==='prPaneR'? 'R' : null;
 }
 function prAnnotateSelection(kind){
-  let sel=window.getSelection(), text=sel.toString().trim();
+  let sel=readerSelection(), text=sel.toString().trim();
   if(!text || !sel.rangeCount){ toast('Select some text in one of the books first'); return; }
   let range=sel.getRangeAt(0), node=range.commonAncestorContainer, el=node.nodeType===1? node : node.parentElement;
   let side=prSideOfNode(el); if(!side){ toast('Select text inside one of the two books'); return; }
@@ -3505,7 +3580,7 @@ function prAnnotateSelection(kind){
 function prReapplyEpubMarks(P){
   (P.book.annotations||[]).forEach(a=>{
     let m=/Chapter\s+(\d+)/.exec(a.where||''); if(!m) return;
-    let sec=P.el.querySelector('section[data-unit="'+(+m[1]-1)+'"]'); if(sec) wrapTextOnce(sec,a.text,a.kind||'highlight');
+    let sec=P.el.querySelector('section[data-unit="'+(+m[1]-1)+'"]'); if(sec) (wrapTextAcross(sec,a.text,a.kind||'highlight')||wrapTextOnce(sec,a.text,a.kind||'highlight'));
   });
 }
 /* the little bar beside a selection */
