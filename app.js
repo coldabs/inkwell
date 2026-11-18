@@ -10,6 +10,66 @@ let pendingConfirm=null;
 function askConfirm(title,text,fn){$('confirmTitle').textContent=title;$('confirmText').textContent=text;pendingConfirm=fn;$('confirmModal').classList.add('open')}
 function doConfirm(){closeModal('confirmModal');if(pendingConfirm){let f=pendingConfirm;pendingConfirm=null;f()}}
 
+/* ============ appearance: Light / Dark / System ============
+   The choice is saved in this browser. index.html applies it before the
+   first paint (no flash); here it is applied again on change, followed
+   live in System mode when the device switches, and kept in step across
+   open tabs. <html data-appearance> = the choice, data-theme = what shows. */
+const APPEARANCE_KEY='inkwell-appearance';
+const APPEARANCE_NAMES={light:'Light',dark:'Dark',system:'System'};
+const THEME_ICONS={
+  light:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  dark:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>',
+  system:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>'
+};
+const appearanceMQ= window.matchMedia? window.matchMedia('(prefers-color-scheme: dark)') : null;
+function prefersReducedMotion(){ return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+function smoothOrInstant(){ return prefersReducedMotion()? 'auto' : 'smooth'; }
+function getAppearance(){ let v=document.documentElement.getAttribute('data-appearance'); return (v==='light'||v==='dark'||v==='system')? v : 'system'; }
+function systemIsDark(){ return !!(appearanceMQ && appearanceMQ.matches); }
+function applyTheme(animate){
+  let r=document.documentElement, pref=getAppearance();
+  let next= (pref==='dark' || (pref==='system' && systemIsDark()))? 'dark' : 'light';
+  if(r.getAttribute('data-theme')!==next){
+    /* a short colour cross-fade so the switch never flickers (skipped for reduced motion) */
+    if(animate && !prefersReducedMotion()){ r.classList.add('themeAnim'); clearTimeout(applyTheme.t); applyTheme.t=setTimeout(()=>r.classList.remove('themeAnim'),320); }
+    r.setAttribute('data-theme',next);
+  }
+  let m=$('themeColorMeta'); if(m) m.setAttribute('content', next==='dark'? '#222222' : '#FFFFFF');
+  updateAppearanceUI();
+}
+function setAppearance(pref){
+  if(['light','dark','system'].indexOf(pref)<0) pref='system';
+  document.documentElement.setAttribute('data-appearance',pref);
+  try{ localStorage.setItem(APPEARANCE_KEY,pref); }catch(e){}
+  applyTheme(true);
+}
+function cycleAppearance(){
+  let order=['light','dark','system'];
+  setAppearance(order[(order.indexOf(getAppearance())+1)%3]);
+  let p=getAppearance();
+  toast('Appearance: '+APPEARANCE_NAMES[p]+(p==='system'? ' — following your device ('+document.documentElement.getAttribute('data-theme')+')' : ''));
+}
+function updateAppearanceUI(){
+  let pref=getAppearance(), shown=document.documentElement.getAttribute('data-theme')||'light';
+  document.querySelectorAll('.segmented [data-appearance]').forEach(b=>{ let on=b.dataset.appearance===pref; b.setAttribute('aria-checked',on?'true':'false'); b.tabIndex= on? 0 : -1; });
+  let label='Appearance: '+APPEARANCE_NAMES[pref]+(pref==='system'? ' ('+shown+')' : '')+' — change';
+  document.querySelectorAll('.themeToggle').forEach(b=>{ b.innerHTML=THEME_ICONS[pref]; b.setAttribute('aria-label',label); b.title=label; });
+  let h=$('appearanceHint'); if(h) h.textContent= pref==='system'? 'Follows your device — currently '+shown+'.' : (pref==='dark'? 'Always dark.' : 'Always light.');
+}
+if(appearanceMQ){ let follow=()=>{ if(getAppearance()==='system') applyTheme(true); }; if(appearanceMQ.addEventListener) appearanceMQ.addEventListener('change',follow); else if(appearanceMQ.addListener) appearanceMQ.addListener(follow); }
+/* another open Inkwell tab changed the appearance */
+window.addEventListener('storage',e=>{ if(e.key===APPEARANCE_KEY && e.newValue){ document.documentElement.setAttribute('data-appearance',e.newValue); applyTheme(true); } });
+/* arrow keys move the choice in the Light / Dark / System group */
+document.addEventListener('keydown',e=>{
+  let g=e.target.closest && e.target.closest('.segmented'); if(!g) return;
+  if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].indexOf(e.key)<0) return;
+  e.preventDefault();
+  let bs=[...g.querySelectorAll('[data-appearance]')], i=bs.indexOf(e.target), d=(e.key==='ArrowLeft'||e.key==='ArrowUp')? -1 : 1;
+  let n=bs[(i+d+bs.length)%bs.length]; setAppearance(n.dataset.appearance); n.focus();
+});
+applyTheme(false);
+
 /* ============ architecture note (P12) ============
    This app stays one classic script on purpose: the markup calls these
    functions from inline onclick/onchange/oninput handlers, so they
@@ -1070,7 +1130,7 @@ function renderCanvasImages(){
     wrap.style.left=(im.x/CW*100)+'%'; wrap.style.top=(im.y/PH*100)+'%'; wrap.style.width=(im.w/CW*100)+'%'; wrap.style.height=(im.h/PH*100)+'%';
     let imgEl=document.createElement('img'); imgEl.src=im.src; imgEl.alt='Inserted image on this page'; wrap.appendChild(imgEl);
     let grip=document.createElement('span'); grip.className='canvasImgGrip'; grip.textContent='↘'; wrap.appendChild(grip);
-    let del=document.createElement('button'); del.className='miniBtn'; del.textContent='×'; del.title='Remove image'; del.style.cssText='position:absolute;top:-10px;left:-10px;z-index:3;background:#fff'; del.onclick=e=>{ e.stopPropagation(); p.images=p.images.filter(x=>x!==im); bumpV(p); renderCanvasImages(); renderPages(); };
+    let del=document.createElement('button'); del.className='miniBtn'; del.textContent='×'; del.title='Remove image'; del.style.cssText='position:absolute;top:-10px;left:-10px;z-index:3'; del.classList.add('onPage'); del.onclick=e=>{ e.stopPropagation(); p.images=p.images.filter(x=>x!==im); bumpV(p); renderCanvasImages(); renderPages(); };
     wrap.appendChild(del);
     wrap.addEventListener('pointerdown',e=>{
       if(e.target===grip||e.target===del) return; e.stopPropagation(); wrap.setPointerCapture(e.pointerId);
@@ -1969,7 +2029,7 @@ function renderTexLayer(){
     let d=document.createElement('div'); d.className='texEl';
     d.style.left=(t.x/CW*100)+'%'; d.style.top=(t.y/PH*100)+'%';
     texRenderInto(d, t.tex, Math.max(10,(t.size||26)*scale), pageInkColor(t.color,p));
-    let del=document.createElement('button'); del.className='miniBtn'; del.textContent='×'; del.title='Remove equation'; del.style.cssText='position:absolute;top:-10px;left:-12px;z-index:3;background:#fff'; /* P9: was top-right, sitting on the superscript — now top-left, clear of the maths */
+    let del=document.createElement('button'); del.className='miniBtn'; del.textContent='×'; del.title='Remove equation'; del.style.cssText='position:absolute;top:-10px;left:-12px;z-index:3'; del.classList.add('onPage'); /* P9: was top-right, sitting on the superscript — now top-left, clear of the maths */
     del.onclick=e=>{ e.stopPropagation(); p.texs=p.texs.filter(x=>x!==t); bumpV(p); renderTexLayer(); renderPages(); };
     d.appendChild(del);
     d.addEventListener('pointerdown',e=>{
@@ -2392,7 +2452,7 @@ function reapplyAnnotations(){
 /* P3: lookup / OCR cards — closable, and never left behind on a new page */
 function closeReaderCards(){ let d=$('dictBox'); if(d) d.classList.add('hidden'); let o=$('ocrBox'); if(o) o.classList.add('hidden'); }
 function jumpToChapter(i){ let b=curBook(); if(!b||b.kind!=='epub') return; closeReaderCards(); b.ch=Math.max(0,Math.min(b.chapters.length-1,i));
-  if(b.mode==='page') renderEpubBook(); else { let el=document.querySelector('[data-ch="'+b.ch+'"]'); if(el) el.scrollIntoView({behavior:'smooth'}); updateResume(); }
+  if(b.mode==='page') renderEpubBook(); else { let el=document.querySelector('[data-ch="'+b.ch+'"]'); if(el) el.scrollIntoView({behavior:smoothOrInstant()}); updateResume(); }
   renderReaderSide(); }
 
 /* ============ PDF pages: sharp, lazy drawing — shared by the reader and Parallel Read ============
@@ -2586,7 +2646,7 @@ function jumpToPdfPage(n,instant){
   let b=curBook(); if(!b||b.kind!=='pdf') return; closeReaderCards();
   b.page=Math.max(1,Math.min(b.numPages,n));
   if(b.mode==='page'){ renderPdfBook(); window.scrollTo({top:0}); }
-  else { let el=document.querySelector('.pdfPage[data-page="'+b.page+'"]'); if(el){ pdfJumpGuard(); el.scrollIntoView({behavior: instant? 'auto':'smooth'}); } updateResume(); }
+  else { let el=document.querySelector('.pdfPage[data-page="'+b.page+'"]'); if(el){ pdfJumpGuard(); el.scrollIntoView({behavior: instant? 'auto':smoothOrInstant()}); } updateResume(); }
 }
 let pdfResizeT=null;
 window.addEventListener('resize',()=>{
@@ -2732,7 +2792,7 @@ async function lookupSelection(){
      whole book (where it sat in Scroll mode), and give it a close button. */
   try{ let sel=window.getSelection(); if(sel.rangeCount){ let node=sel.getRangeAt(0).commonAncestorContainer; let el=node.nodeType===1? node : node.parentElement; let block=el && el.closest? (el.closest('p,li,div')||el) : null; if(block && block.parentNode) block.parentNode.insertBefore(box, block.nextSibling); } }catch(e){}
   let closeBtn='<div class="cardHead"><span></span><button class="btn small cardClose" type="button" onclick="closeReaderCards()" aria-label="Close lookup">✕ Close</button></div>';
-  box.classList.remove('hidden'); box.innerHTML=closeBtn+'<b>'+esc(w)+'</b><p class="kbd">Looking it up…</p>'; box.scrollIntoView({behavior:'smooth',block:'nearest'});
+  box.classList.remove('hidden'); box.innerHTML=closeBtn+'<b>'+esc(w)+'</b><p class="kbd">Looking it up…</p>'; box.scrollIntoView({behavior:smoothOrInstant(),block:'nearest'});
   let html=closeBtn+'<b style="font-size:18px">'+esc(w)+'</b>';
   try{
     let r=await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(w.toLowerCase()));
@@ -2751,7 +2811,7 @@ async function lookupSelection(){
 
 /* --- OCR: Tesseract.js on-device --- */
 let lastOcrText='';
-function openOcrPanel(){ prLeave(); let box=$('ocrBox'); /* P3: move the panel to the top of the article so it opens on-screen, not past the end of the book */ let art=$('readerArticle'); if(art && box.parentNode!==art) art.appendChild(box); if(art) art.insertBefore(box, $('readerBody')); box.classList.remove('hidden'); box.scrollIntoView({behavior:'smooth',block:'nearest'}); }
+function openOcrPanel(){ prLeave(); let box=$('ocrBox'); /* P3: move the panel to the top of the article so it opens on-screen, not past the end of the book */ let art=$('readerArticle'); if(art && box.parentNode!==art) art.appendChild(box); if(art) art.insertBefore(box, $('readerBody')); box.classList.remove('hidden'); box.scrollIntoView({behavior:smoothOrInstant(),block:'nearest'}); }
 async function ocrSourceCanvas(){
   let b=curBook();
   if(S.view==='reader' && b && b.kind==='epub'){ toast('This book already has real text — OCR is for scanned PDF pages and images'); return null; }
@@ -2937,7 +2997,8 @@ setInterval(()=>{ if(S.view==='editor') S.stats.writeSec++; if(S.view==='reader'
    Each book's reading place and zoom, and the left book's partner, sync
    mode and offset, are saved with the rest of the shelf. */
 const PR={on:false, token:0, panes:{}, raf:0, driver:null, posT:null, resizeT:null, suspend:false, lastW:0, railRaf:0, active:'L', railBook:null, railExpect:null, railActive:-1};
-const PR_RAIL_H=36, PR_ZOOM_MIN=0.6, PR_ZOOM_MAX=3;
+let PR_RAIL_H=40;   /* sidebar row pitch (row height + gap) — measured from the real rows, since it differs on touch screens */
+const PR_ZOOM_MIN=0.6, PR_ZOOM_MAX=3;
 let prPinch=null;
 function prOtherBooks(leftId){ return S.items.filter(i=>(i.kind==='pdf'||i.kind==='epub') && i.id!==leftId); }
 function toggleParallelRead(){ if(PR.on) closeParallelRead(); else openParallelRead(); }
@@ -3103,12 +3164,22 @@ function prBuildRail(P){
   rail.innerHTML='<div class="prRailPad" aria-hidden="true"></div>'+items+'<div class="prRailPad" aria-hidden="true"></div>';
   rail.setAttribute('aria-label',(isPdf?'Pages of ':'Chapters of ')+P.book.title);
   let lab=$('prRailLabel');
-  if(lab){ lab.textContent= isPdf? 'Page' : 'Ch.'; lab.title=(isPdf?'Pages of ':'Chapters of ')+P.book.title+' ('+(P.side==='L'?'first':'second')+' book)'; lab.dataset.side=P.side; }
+  if(lab){ lab.textContent= isPdf? 'Pages' : 'Chapters'; lab.title=(isPdf?'Pages of ':'Chapters of ')+P.book.title+' ('+(P.side==='L'?'first':'second')+' book)'; lab.dataset.side=P.side; }
   rail.scrollTop=0;
   prRailPads();
 }
 /* half a rail of padding above and below, so number k sits on the reading line when rail.scrollTop = k * PR_RAIL_H */
-function prRailPads(){ let rail=$('prRail'); if(!rail) return; let h=Math.round(rail.clientHeight/2); rail.querySelectorAll('.prRailPad').forEach(d=>{ d.style.height=h+'px'; }); }
+function prRailPads(){
+  let rail=$('prRail'); if(!rail) return;
+  let rows=rail.querySelectorAll('.prRailNum');
+  if(rows.length>1) PR_RAIL_H=rows[1].offsetTop-rows[0].offsetTop;
+  else if(rows.length===1){ let cs=getComputedStyle(rows[0]); PR_RAIL_H=rows[0].offsetHeight+parseFloat(cs.marginBottom||0); }
+  /* padding so the centre of row k sits mid-panel when rail.scrollTop = k * pitch; the bottom pad is one
+     row taller so the rail can scroll all the way to the end of the last page (p = n) */
+  let mid=rail.clientHeight/2, pads=rail.querySelectorAll('.prRailPad');
+  if(pads[0]) pads[0].style.height=Math.max(0,Math.round(mid-PR_RAIL_H/2))+'px';
+  if(pads[1]) pads[1].style.height=Math.max(0,Math.round(mid+PR_RAIL_H/2))+'px';
+}
 function prMarkRail(i){
   let rail=$('prRail'); if(!rail || PR.railActive===i) return; PR.railActive=i;
   rail.querySelectorAll('.prRailNum.active').forEach(b=>{ b.classList.remove('active'); b.removeAttribute('aria-current'); });
