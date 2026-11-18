@@ -2921,7 +2921,14 @@ async function prDrawPdfPage(book,n,holder,tok){
 /* room after the last chapter / page, so even a short last one can be
    scrolled up to the top of its pane — without it the pane runs out of
    scroll first, never reports the last unit, and sync stops one short */
-function prPadEnd(P){ let w=P.el.firstElementChild; if(w) w.style.paddingBottom=Math.max(0,P.el.clientHeight-24)+'px'; }
+/* Only as much room as the last unit actually needs: a page taller than
+   the pane needs none, so the end of a PDF is never a screen of blank. */
+function prPadEnd(P){
+  let w=P.el.firstElementChild; if(!w) return;
+  let us=w.querySelectorAll('[data-unit]'); let last=us[us.length-1];
+  let lastH= last? last.offsetHeight : 0;
+  w.style.paddingBottom=Math.max(0,P.el.clientHeight-lastH-24)+'px';
+}
 function prUnits(P){ return Array.from(P.el.querySelectorAll('[data-unit]')).map(u=>({top:u.offsetTop, h:u.offsetHeight})); }
 /* where a pane is: unit at its top edge, fraction into it, and whole-book fraction */
 function prPos(P){
