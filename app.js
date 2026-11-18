@@ -2843,7 +2843,7 @@ async function lookupSelection(){
 
 /* --- OCR: Tesseract.js on-device --- */
 let lastOcrText='';let ocrWorker=null,ocrCancelled=false;function cancelOcr(){ocrCancelled=true;let w=ocrWorker;ocrWorker=null;if(w)w.terminate().catch(()=>{});let st=$('ocrStatus'),pr=$('ocrProgress'),btn=$('ocrRunBtn'),cb=$('ocrCancelBtn');if(pr)pr.classList.add('hidden');if(btn)btn.disabled=false;if(cb)cb.classList.add('hidden');if(st)st.textContent='OCR cancelled. You can run it again.';}
-function openOcrPanel(){ prLeave(); let box=$('ocrBox'); /* P3: move the panel to the top of the article so it opens on-screen, not past the end of the book */ let art=$('readerArticle'); if(art && box.parentNode!==art) art.appendChild(box); if(art) art.insertBefore(box, $('readerBody')); box.classList.remove('hidden'); box.scrollIntoView({behavior:smoothOrInstant(),block:'nearest'}); }
+function openOcrPanel(){ prLeave(); let box=$('ocrBox'); /* P3: move the panel to the top of the article so it opens on-screen, not past the end of the book; for a PDF the article is hidden, so it goes to the top of the PDF view instead */ let b=curBook(); let host=(b&&b.kind==='pdf')?$('pdfView'):$('readerArticle'); if(host && box.parentNode!==host) host.appendChild(box); if(host){ let ref=(b&&b.kind==='pdf')?$('pdfPages'):$('readerBody'); if(ref&&ref.parentNode===host) host.insertBefore(box,ref); } box.classList.remove('hidden'); box.scrollIntoView({behavior:smoothOrInstant(),block:'nearest'}); }
 async function ocrSourceCanvas(){
   let b=curBook();
   if(S.view==='reader' && b && b.kind==='epub'){ toast('This book already has real text. OCR is for scanned PDF pages and images.'); return null; }
