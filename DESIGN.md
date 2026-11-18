@@ -46,7 +46,7 @@ Type scale: 11px labels, 13px controls, 15px body UI, 19px reading default, 28â€
 - Radius scale: 2px for inputs and small controls, 4px for buttons and paper edges, 6px for modals, 8px for covers. No pills.
 - Buttons are rectangular, with a 40px minimum height and a 44px touch target on mobile. Primary actions use ink; the single accent is reserved for "New notebook", the active filter rule, focus, and the bookmark state.
 - Icons are Tabler Icons outline, inline sprite, 1.7px stroke at 18px. Chosen by the owner. The set is consistent and relevant to the tools, not a decorative icon wall.
-- Shadows only on the paper sheet, the book covers and the modal. Toolbars, panels and sidebar rows sit flat.
+- Shadows only on the paper sheet, the book covers, the reading sheet, the action dock, and the modal. The dock is elevated because it floats over the scrolling shelf and is the only persistent chrome that overlaps content. Toolbars, panels and sidebar rows sit flat.
 - Texture: none. The warmth of the paper and the hairline do the work.
 
 ## Motion
