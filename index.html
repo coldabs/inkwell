@@ -238,7 +238,7 @@
   <section id="view-editor" class="hidden" aria-label="Notebook editor">
     <div class="editorTop">
       <button class="iconBtn" onclick="showView('library')" aria-label="Back to library" title="Back to library"><svg class="ic" aria-hidden="true"><use href="#ticon-arrow-left"></use></svg></button>
-      <div class="titleField">
+      <button type="button" class="btn small hidden" id="backToReadingBtn" onclick="backToReading()">← Back to reading</button><div class="titleField">
         <label class="srOnly" for="noteTitle">Notebook title</label>
         <input id="noteTitle" value="Untitled notebook" oninput="syncTitle()"/>
       </div>
@@ -304,7 +304,7 @@
         </span>
         <input type="color" class="colorPick" id="customColor" value="#18202B" title="Custom colour" oninput="setColor(this.value,null)" aria-label="Custom colour"/>
       </div>
-      <div class="statusBar" id="editorStatus" aria-live="polite"><span>Page <b id="statusPage">1 / 1</b></span><span>Layer <b id="statusLayer">Ink</b></span><span>Zoom <b id="statusZoom">100%</b></span><span>Tool <b id="statusTool">Pen</b></span><span class="statusSpacer"></span><span id="statusHint">One finger draws. Two fingers scroll.</span></div>
+      <div class="statusBar" id="editorStatus" aria-live="polite"><span>Page <b id="statusPage">1 / 1</b></span><span>Layer <b id="statusLayer">Ink</b></span><span><button type="button" class="btn small" onclick="editorZoomBy(0.8)" aria-label="Zoom out">−</button> Zoom <b id="statusZoom">100%</b> <button type="button" class="btn small" onclick="editorZoomBy(1.25)" aria-label="Zoom in">+</button></span><span>Tool <b id="statusTool">Pen</b></span><span class="statusSpacer"></span><span id="statusHint">One finger draws. Two fingers scroll.</span></div>
 
       <div class="toolPop" id="toolOptsPop" role="menu" aria-label="Tool options">
         <h5 id="toolOptsTitle">Pen options</h5>
@@ -437,7 +437,7 @@
     <div class="readerTop">
       <button class="iconBtn" onclick="showView('library')" aria-label="Back to library" title="Back to library"><svg class="ic" aria-hidden="true"><use href="#ticon-arrow-left"></use></svg></button>
       <div class="seg" role="tablist" aria-label="Reading mode"><button class="active" id="modeScrollBtn" onclick="setReaderMode('scroll')">Scroll</button><button id="modePageBtn" onclick="setReaderMode('page')">Page</button></div>
-      <button class="btn" id="sideToggle" onclick="toggleReaderSide()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-list"></use></svg> Contents</button>
+      <span class="prZoom hidden" id="readerZoomGroup"><button type="button" class="btn" onclick="readerZoomBy(0.8)" title="Zoom out" aria-label="Zoom out">−</button><button type="button" class="btn prZoomLabel" id="readerZoomLabel" onclick="readerZoomBy(0)" title="Reset zoom">100%</button><button type="button" class="btn" onclick="readerZoomBy(1.25)" title="Zoom in" aria-label="Zoom in">+</button></span><button class="btn" id="sideToggle" onclick="toggleReaderSide()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-list"></use></svg> Contents</button>
       <button class="btn" id="bookmarkBtn" onclick="toggleBookmark()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-bookmark"></use></svg> Bookmark</button>
       <button class="btn" id="parallelBtn" aria-pressed="false" onclick="toggleParallelRead()" title="Open this book beside a second book" aria-label="Parallel Read"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-columns"></use></svg> Parallel Read</button>
       <button class="btn" id="readerMoreBtn" aria-expanded="false" onclick="toggleReaderMore(this)"><span id="readerMoreLabel">More</span> <svg class="ic ic-sm moreChevron" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg></button>
