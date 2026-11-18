@@ -716,6 +716,10 @@ html.themeAnim,html.themeAnim *,html.themeAnim *::before,html.themeAnim *::after
 /* only a book whose Annotate is on takes the pen; the other keeps text selection and links */
 .prCol.prInkOn .prInk{pointer-events:auto;cursor:crosshair;touch-action:none;z-index:3}
 .prCol.prInkOn .pdfLink,.prCol.prInkOn .textLayer{pointer-events:none}
+/* EPUB chapters carry their own ink layer; while annotating, text is not selected and one finger draws */
+.prEpub section[data-unit]{position:relative}
+.prCol.prInkOn .prEpub{-webkit-user-select:none;user-select:none;touch-action:none;cursor:crosshair}
+.prCol.prInkOn .prEpub a{pointer-events:none}
 .prInkBar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--bg-1);border:1px solid var(--border-subtle);border-radius:var(--r-lg);padding:6px 10px;animation:inkPopIn var(--dur-fast) var(--ease)}
 .prInkBar.hidden{display:none!important}
 .prInkSwatches{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:32px}

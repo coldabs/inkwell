@@ -160,7 +160,7 @@ function serializeLibrary(){
           audio:(p.audio&&p.audio.blob)?{blob:p.audio.blob,dur:p.audio.dur}:null,
           bgPdf:p.bgPdf?{page:p.bgPdf.page,bookTitle:p.bgPdf.bookTitle,imgData:bgPdfImgData(p.bgPdf),w:(bgPdfSize(p.bgPdf)||[])[0]||null,h:(bgPdfSize(p.bgPdf)||[])[1]||null}:null }))};
       if(it.kind==='pdf') return {id:it.id,kind:'pdf',title:it.title,color:it.color,updated:it.updated,sample:!!it.sample,fileName:it.fileName,numPages:it.numPages,page:it.page,mode:it.mode,bookmarks:it.bookmarks||[],annotations:it.annotations||[],textCache:it.textCache||{},parallelNotes:it.parallelNotes||{},parallelWith:it.parallelWith||null,parallelSync:it.parallelSync||'unit',parallelOffset:it.parallelOffset||0,parallelZoom:it.parallelZoom||1};
-      return {id:it.id,kind:'epub',title:it.title,color:it.color,updated:it.updated,sample:!!it.sample,ch:it.ch||0,mode:it.mode||'scroll',bookmarks:it.bookmarks||[],annotations:it.annotations||[],parallelNotes:it.parallelNotes||{},parallelWith:it.parallelWith||null,parallelSync:it.parallelSync||'unit',parallelOffset:it.parallelOffset||0,parallelZoom:it.parallelZoom||1,chapters:it.chapters||[]};
+      return {id:it.id,kind:'epub',title:it.title,color:it.color,updated:it.updated,sample:!!it.sample,ch:it.ch||0,mode:it.mode||'scroll',bookmarks:it.bookmarks||[],annotations:it.annotations||[],parallelNotes:it.parallelNotes||{},parallelWith:it.parallelWith||null,parallelSync:it.parallelSync||'unit',parallelOffset:it.parallelOffset||0,parallelZoom:it.parallelZoom||1,parallelInk:it.parallelInk||{},chapters:it.chapters||[]};
     })};
 }
 async function saveNow(){
@@ -241,7 +241,7 @@ async function restoreLibrary(token){
       }catch(e){}
       items.push(b);
     } else if(raw.kind==='epub'){
-      items.push({id:raw.id,kind:'epub',title:raw.title||'Book',color:raw.color||'#2e6f6a',updated:raw.updated||'',sample:!!raw.sample,ch:raw.ch||0,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],parallelNotes:raw.parallelNotes||{},parallelWith:raw.parallelWith||null,parallelSync:raw.parallelSync||'unit',parallelOffset:+raw.parallelOffset||0,parallelZoom:+raw.parallelZoom||1,chapters:raw.chapters||[]});
+      items.push({id:raw.id,kind:'epub',title:raw.title||'Book',color:raw.color||'#2e6f6a',updated:raw.updated||'',sample:!!raw.sample,ch:raw.ch||0,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],parallelNotes:raw.parallelNotes||{},parallelWith:raw.parallelWith||null,parallelSync:raw.parallelSync||'unit',parallelOffset:+raw.parallelOffset||0,parallelZoom:+raw.parallelZoom||1,parallelInk:(raw.parallelInk&&typeof raw.parallelInk==='object')? raw.parallelInk : {},chapters:raw.chapters||[]});
     }
    }catch(e){ /* one damaged item must not cost the whole shelf */ }
   }
@@ -3079,7 +3079,7 @@ async function prRenderBoth(){
   /* the rail shows the book in use — keep the side that was active (e.g. after picking a new partner), else the first book */
   let act= PR.panes[PR.active]? PR.active : (PL? 'L' : 'R');
   if(PR.panes[act]) prSetActive(act,true); else { $('prRail').innerHTML=''; PR.railBook=null; }
-  ['L','R'].forEach(s=>{ let P=PR.panes[s]; if(P && P.book.kind==='pdf' && (keepInk[s]===P.book.id || PRA.pending[s])) prSetInk(s,true,true); else PRA.pending[s]=false; });
+  { let want=!!(keepInk.L || keepInk.R || PRA.pending.L || PRA.pending.R); PRA.pending={L:false,R:false}; if(want) prToggleInk(true,true); }
   $('parallelRead').classList.toggle('prInking',PRA.ink); $('prInkBar').classList.toggle('hidden',!PRA.ink);
   if(!PRA.inkOn[PRA.barSide]) PRA.barSide= PRA.inkOn.L? 'L' : PRA.inkOn.R? 'R' : null;
   if(PRA.ink) prRenderInkBar();
@@ -3095,6 +3095,7 @@ async function prBuildPane(side,book,tok){
     let wrap=document.createElement('div'); wrap.className='prEpub';
     wrap.innerHTML=(book.chapters||[]).map((c,i)=>'<section data-unit="'+i+'"><h3>'+esc(c.title)+'</h3>'+c.html+'</section>').join('');
     el.innerHTML=''; el.appendChild(wrap); prReapplyEpubMarks(P); prApplyZoom(P); prPadEnd(P);
+    requestAnimationFrame(()=>{ if(tok===PR.token) prRefreshInk(P); }); /* its handwriting, once the chapters are laid out */
     return P;
   }
   /* PDF: placeholders sized to each page's own shape (final layout from
@@ -3276,7 +3277,7 @@ function prJump(side,k){
 function prApplyZoom(P){
   let w=P&&P.el.firstElementChild; if(!w) return;
   if(P.book.kind==='pdf') w.style.width=(P.zoom*100)+'%';
-  else w.style.setProperty('--pr-zoom',String(P.zoom));
+  else { w.style.setProperty('--pr-zoom',String(P.zoom)); requestAnimationFrame(()=>prRefreshInk(P)); } /* chapters re-flow: redraw their ink */
 }
 function prShowZoom(){
   let P=PR.panes[PR.active], lab=$('prZoomLabel'); if(!lab) return;
@@ -3528,7 +3529,7 @@ $('prMarksPop').addEventListener('click',e=>{
 });
 document.addEventListener('click',e=>{ if(!e.target.closest('#prMarksPop,#prMarksBtn')) prCloseMarks(); });
 
-/* ---------- handwriting on PDF pages ("Annotate this PDF", right in Parallel Read) ----------
+/* ---------- handwriting on both books ("Annotate", right in Parallel Read) ----------
    The same drawing tools as the editor, on the page itself: pen, calligraphy
    pen, highlighter, eraser (whole stroke, or cut only where you rub), line,
    rectangle, ellipse, arrow (optionally filled), the size slider with its
@@ -3566,58 +3567,77 @@ function prInkGeom(book,n,pg){
   let PH=Math.max(400,Math.min(2200,Math.round(CW*sz[1]/sz[0]))), s=Math.min(CW/sz[0],PH/sz[1]), dw=sz[0]*s, dh=sz[1]*s;
   return {ox:(CW-dw)/2, oy:(PH-dh)/2, dw:dw, dh:dh};
 }
+/* Annotate works on EVERY book in Parallel Read: PDF pages and EPUB chapters alike.
+   A "surface" is one PDF page (.pdfHolder; ink kept in the PDF's annotation notebook, in the
+   editor's page coordinates) or one EPUB chapter (its <section>; ink kept on the book itself in
+   book.parallelInk, in coordinates scaled to the chapter's width, CW units across). */
+function prSurfSel(P){ return P.book.kind==='pdf'? '.pdfHolder' : 'section[data-unit]'; }
+function prSurfN(h){ return h.dataset.n? +h.dataset.n : (+h.dataset.unit)+1; }   /* page / chapter number, 1-based */
+function prSurfReady(P,h){ return P.book.kind==='pdf'? !!h._drawn : true; }
+function prSurfFor(P,n){ return P.el.querySelector(P.book.kind==='pdf'? '.pdfHolder[data-n="'+n+'"]' : 'section[data-unit="'+(n-1)+'"]'); }
+function prInkPageOf(P,n,create){
+  if(P.book.kind==='pdf') return prInkPage(P.book,n,create);
+  let book=P.book;
+  if(!book.parallelInk || typeof book.parallelInk!=='object'){ if(!create) return null; book.parallelInk={}; }
+  let pg=book.parallelInk[n];
+  if(!pg && create){ pg=book.parallelInk[n]={ink:[],hi:[]}; scheduleSave(); }
+  if(pg){ if(!Array.isArray(pg.ink)) pg.ink=[]; if(!Array.isArray(pg.hi)) pg.hi=[]; }
+  return pg||null;
+}
+function prGeomOf(P,n,pg,h){
+  if(P.book.kind==='pdf') return prInkGeom(P.book,n,pg);
+  let r=h.getBoundingClientRect(), w=Math.max(1,r.width);
+  return {ox:0, oy:0, dw:CW, dh:CW*Math.max(1,r.height)/w};
+}
 function prRenderInk(P,holder){
-  if(!P || P.book.kind!=='pdf' || !holder || !holder.isConnected) return;
-  let n=+holder.dataset.n, pg=prInkPage(P.book,n,false);
+  if(!P || !holder || !holder.isConnected) return;
+  let n=prSurfN(holder), pg=prInkPageOf(P,n,false);
   let live= PRA.stroke && PRA.strokeHolder===holder ? PRA.stroke : null;
-  let cv=holder.querySelector('canvas.prInk');
+  let cv=holder.querySelector(':scope > canvas.prInk');
   let hasInk= pg && ((pg.ink&&pg.ink.length)||(pg.hi&&pg.hi.length));
   if(!hasInk && !live && !PRA.inkOn[P.side]){ if(cv) cv.remove(); return; }
-  let r=holder.getBoundingClientRect(); if(r.width<10) return;
+  let r=holder.getBoundingClientRect(); if(r.width<10 || r.height<4) return;
+  if(P.book.kind!=='pdf' && !live){ /* long chapters: keep canvases only near what is on screen */
+    let pr=P.el.getBoundingClientRect();
+    if(r.bottom<pr.top-1500 || r.top>pr.bottom+1500){ if(cv) cv.remove(); return; }
+  }
   let dpr=Math.min(2,window.devicePixelRatio||1);
+  dpr=Math.max(0.25,Math.min(dpr, Math.sqrt(16e6/(r.width*r.height)), 16000/r.height, 16000/r.width)); /* stay within canvas limits */
   if(!cv){ cv=document.createElement('canvas'); cv.className='prInk'; cv.setAttribute('aria-hidden','true'); holder.appendChild(cv); }
-  let W=Math.round(r.width*dpr), Hh=Math.round(r.height*dpr);
+  let W=Math.max(1,Math.round(r.width*dpr)), Hh=Math.max(1,Math.round(r.height*dpr));
   if(cv.width!==W || cv.height!==Hh){ cv.width=W; cv.height=Hh; }
   let x=cv.getContext('2d'); x.setTransform(1,0,0,1,0,0); x.clearRect(0,0,W,Hh);
-  let g=prInkGeom(P.book,n,pg), kx=W/g.dw, ky=Hh/g.dh;
+  let g=prGeomOf(P,n,pg,holder), kx=W/g.dw, ky=Hh/g.dh;
   x.setTransform(kx,0,0,ky,-g.ox*kx,-g.oy*ky); x.lineCap='round'; x.lineJoin='round';
   if(pg){ (pg.hi||[]).forEach(st=>drawStroke(x,st)); (pg.ink||[]).forEach(st=>drawStroke(x,st)); }
   if(live) drawStroke(x,live);
 }
-function prAllHolders(){ let out=[]; ['L','R'].forEach(s=>{ let P=PR.panes[s]; if(P && P.book.kind==='pdf') P.el.querySelectorAll('.pdfHolder').forEach(h=>out.push({P:P,h:h})); }); return out; }
-function prRedrawInkFor(book,n){ ['L','R'].forEach(s=>{ let P=PR.panes[s]; if(!P || P.book!==book) return; let h=P.el.querySelector('.pdfHolder[data-n="'+n+'"]'); if(h && h._drawn) prRenderInk(P,h); }); }
-/* the PDF to annotate by default: the book in use if it is a PDF, otherwise the other one */
-function prInkSide(){ let a=PR.panes[PR.active]; if(a && a.book.kind==='pdf') return PR.active; let o=PR.active==='L'?'R':'L'; return (PR.panes[o] && PR.panes[o].book.kind==='pdf')? o : null; }
-/* ONE "Annotate this PDF" button for Parallel Read. It follows the book you are using (the one
-   with the blue edge, which also owns the page-number rail): scroll, tap or click the other PDF and
-   the button now annotates that one. Each book still has its own on/off ("Annotating · Stop" in its
-   header), so both PDFs can be annotated at once. If the book in use is an EPUB, the button targets
-   the PDF beside it. The pen bar works on the book you are drawing on (its name is shown in the bar). */
+/* redraw every ready surface of a book pane (on/off, zoom, scrolling a long EPUB, resize) */
+function prRefreshInk(P){ if(!P || !PR.on || !P.el.isConnected) return; P.el.querySelectorAll(prSurfSel(P)).forEach(h=>{ if(prSurfReady(P,h)) prRenderInk(P,h); }); }
+function prRedrawInkFor(book,n){ ['L','R'].forEach(s=>{ let P=PR.panes[s]; if(!P || P.book!==book) return; let h=prSurfFor(P,n); if(h && prSurfReady(P,h)) prRenderInk(P,h); }); }
+{ let rafE={L:0,R:0};
+  ['L','R'].forEach(s=>$('prPane'+s).addEventListener('scroll',()=>{ let P=PR.panes[s]; if(!P || P.book.kind==='pdf' || rafE[s]) return; rafE[s]=requestAnimationFrame(()=>{ rafE[s]=0; prRefreshInk(PR.panes[s]); }); },{passive:true}));
+  window.addEventListener('resize',()=>{ if(PR.on) ['L','R'].forEach(s=>{ let P=PR.panes[s]; if(P && P.book.kind!=='pdf') requestAnimationFrame(()=>prRefreshInk(P)); }); });
+}
+/* ONE "Annotate" button for Parallel Read: it switches Annotate on for BOTH books at once,
+   PDF or EPUB, so you can draw on either one straight away. Done (or Esc) switches it off
+   for both. One undo / redo history covers both books, in the order you drew. */
 function prUpdateAnnotateFab(){
-  let t= PR.on? prInkSide() : null, tp= t? PR.panes[t] : null;
+  let has=!!(PR.on && (PR.panes.L || PR.panes.R)), on=!!(PRA.inkOn.L || PRA.inkOn.R), waiting=!!(PRA.pending.L || PRA.pending.R);
   let f=$('prAnnotateFab');
-  if(f){
-    f.classList.toggle('hidden', !PR.on || !tp || !!PRA.inkOn[t] || !!PRA.pending[t]);
-    if(tp){ f.title='Annotate “'+tp.book.title+'” — the '+(t==='L'?'left':'right')+' book'; f.setAttribute('aria-label',f.title); f.dataset.side=t; }
-  }
+  if(f) f.classList.toggle('hidden', !PR.on || on || waiting || (!has && !PR.suspend));
   ['L','R'].forEach(s=>{
-    let P=PR.panes[s], pdf=!!(PR.on && P && P.book.kind==='pdf'), on=!!PRA.inkOn[s];
-    let pill=$('prInkPill'+s); if(pill) pill.classList.toggle('hidden', !pdf || !on);
-    let el=$('prPane'+s), col=el && el.closest('.prCol'); if(col) col.classList.toggle('prInkOn', pdf && on);
+    let el=$('prPane'+s), col=el && el.closest('.prCol'); if(col) col.classList.toggle('prInkOn', !!(PR.on && PR.panes[s] && PRA.inkOn[s]));
   });
 }
-/* the blue "Annotate this PDF" button: annotate the PDF in use (or a given side) */
-function prAnnotateThisPdf(side){
-  if(PR.suspend){ let s=side || PR.active || 'L'; PRA.pending[s]=true; prUpdateAnnotateFab(); toast('Annotate starts as soon as this book has loaded'); return; } /* still loading: switch on when ready */
-  side= side || prInkSide();
-  if(!side){ toast('Handwriting works on PDF pages — neither book here is a PDF'); return; }
-  let P=PR.panes[side];
-  if(!P){ PRA.pending[side]=true; prUpdateAnnotateFab(); toast('Annotate starts as soon as this book has loaded'); return; }
-  prSetActive(side); prSetInk(side,true);
+/* the blue "Annotate" button */
+function prAnnotateThisPdf(){
+  if(PR.suspend || !(PR.panes.L || PR.panes.R)){ PRA.pending={L:true,R:true}; prUpdateAnnotateFab(); toast('Annotate starts as soon as the books have loaded'); return; } /* still loading: switch on when ready */
+  prToggleInk(true);
 }
 function prSetInk(side,on,quiet){
   let P=PR.panes[side];
-  if(on && (!P || P.book.kind!=='pdf')){ if(!quiet) toast('Handwriting works on PDF pages — EPUB text reflows, so ink could not stay in place'); return; }
+  if(on && !P) return;
   PRA.pending[side]=false;
   if(!on && PRA.strokeSide===side) prInkCancel();
   if(!on && PRA.erase && PRA.erase.side===side) PRA.erase=null;
@@ -3629,18 +3649,21 @@ function prSetInk(side,on,quiet){
   $('parallelRead').classList.toggle('prInking',any);
   $('prInkBar').classList.toggle('hidden',!any);
   if(any) prRenderInkBar();
-  if(P) P.el.querySelectorAll('.pdfHolder').forEach(h=>{ if(h._drawn) prRenderInk(P,h); });
+  if(P) prRefreshInk(P);
   prUpdateAnnotateFab();
-  if(on && !quiet) toast('Annotating “'+P.book.title+'” — one finger or a pen draws, two fingers scroll');
 }
-/* switch every book's Annotate (on: the PDF in use) — used by Esc and on leaving */
+/* Annotate on (both books) / off (both books): the button, Done, Esc, leaving */
 function prToggleInk(force,quiet){
   let on= typeof force==='boolean'? force : !(PRA.inkOn.L || PRA.inkOn.R);
-  if(on){ let s=prInkSide(); if(!s){ toast('Handwriting works on PDF pages — neither book here is a PDF'); return; } prSetInk(s,true,quiet); }
-  else { ['L','R'].forEach(s=>{ PRA.pending[s]=false; if(PRA.inkOn[s]) prSetInk(s,false,true); }); prUpdateAnnotateFab(); }
+  if(on){
+    let sides=['L','R'].filter(s=>PR.panes[s]); if(!sides.length) return;
+    sides.forEach(s=>prSetInk(s,true,true));
+    PRA.barSide= PR.panes[PR.active]? PR.active : sides[0]; prRenderInkBar();
+    if(!quiet) toast(sides.length>1? 'Annotate is on for both books: draw on either one. Two fingers scroll.' : 'Annotate is on: one finger or a pen draws, two fingers scroll.');
+  } else { ['L','R'].forEach(s=>{ if(PRA.inkOn[s]) prSetInk(s,false,true); }); PRA.pending={L:false,R:false}; prUpdateAnnotateFab(); }
 }
-/* the pen bar's Done: stop annotating the book it is working on */
-function prInkDone(){ let s=PRA.barSide; if(s) prSetInk(s,false,true); else prToggleInk(false,true); }
+/* the pen bar's Done: Annotate off for both books */
+function prInkDone(){ prToggleInk(false,true); }
 function prInkColor(){ return PRA.tool==='highlighter'? PRA.hiColor : PRA.penColor; }
 function prRenderInkBar(){
   let bar=$('prInkBar'); if(!bar) return;
@@ -3659,9 +3682,10 @@ function prRenderInkBar(){
   $('prInkStyle').value=PRA.style; $('prInkFill').checked=!!PRA.fill; $('prInkEraser').value=PRA.eraserMode;
   $('prInkSize').value=PRA.size; $('prInkSizeWord').textContent=sizeWord(PRA.size);
   prDrawSizePreview();
-  let BP=PR.panes[PRA.barSide], h=BP? prHist(BP.book) : {undo:[],redo:[]};
-  $('prUndoBtn').disabled=!h.undo.length; $('prRedoBtn').disabled=!h.redo.length;
-  let who=$('prInkWho'); if(who) who.textContent= BP? BP.book.title : '';
+  $('prUndoBtn').disabled=!PRA.undo.length; $('prRedoBtn').disabled=!PRA.redo.length;
+  let both=PR.panes.L && PR.panes.R && PRA.inkOn.L && PRA.inkOn.R, one=PR.panes[PRA.inkOn.L? 'L' : 'R'];
+  let who=$('prInkWho'); if(who) who.textContent= both? 'both books' : one? one.book.title : '';
+  let BP=PR.panes[PRA.barSide], ed=$('prOpenEditorBtn'); if(ed) ed.classList.toggle('hidden', !(BP && BP.book.kind==='pdf'));
 }
 /* the size preview: the next stroke at its real width (at 100% zoom), on page-coloured paper */
 function prDrawSizePreview(){
@@ -3678,7 +3702,8 @@ function prSetInkColor(c){ if(!/^#[0-9a-f]{6}$/i.test(c)) return; if(PRA.tool===
 $('prInkSwatches').addEventListener('click',e=>{ let b=e.target.closest('[data-color]'); if(b) prSetInkColor(b.dataset.color); });
 /* "Open in editor": the same notebook, at the page in use — for text, images, stickies, LaTeX, the board */
 function prOpenInEditor(){
-  let s=PRA.barSide || prInkSide(); if(!s || !PR.panes[s] || PR.panes[s].book.kind!=='pdf'){ toast('Open a PDF beside it first'); return; }
+  let s= PR.panes[PRA.barSide]&&PR.panes[PRA.barSide].book.kind==='pdf'? PRA.barSide : ['L','R'].find(x=>PR.panes[x] && PR.panes[x].book.kind==='pdf');
+  if(!s){ toast('The editor extras (text, images, stickies) are for PDF pages; your handwriting on this book stays here'); return; }
   let P=PR.panes[s], n=prPos(P).i+1, book=P.book;
   let nb=prInkNotebook(book,true); prInkPage(book,n,true);
   let i=nb.pages.findIndex(p=>p.bgPdf && p.bgPdf.page===n);
@@ -3688,7 +3713,7 @@ function prOpenInEditor(){
 }
 /* page coordinates (the notebook page's) of a pointer over a page */
 function prInkPoint(P,h,e){
-  let r=h.getBoundingClientRect(), n=+h.dataset.n, g=prInkGeom(P.book,n,prInkPage(P.book,n,false));
+  let r=h.getBoundingClientRect(), n=prSurfN(h), g=prGeomOf(P,n,prInkPageOf(P,n,false),h);
   let fx=(e.clientX-r.left)/r.width, fy=(e.clientY-r.top)/r.height, p;
   if(e.pointerType==='pen' && e.pressure>0) p=e.pressure;
   else if(PRA.last){ let d=Math.hypot(e.clientX-PRA.last.x,e.clientY-PRA.last.y); p=Math.max(0.25,Math.min(1,1.05-d/30)); } /* mouse / finger: faster = thinner */
@@ -3701,14 +3726,13 @@ function prInkCancel(){
   PRA.stroke=null; PRA.strokeHolder=null; PRA.strokeSide=null; PRA.strokePtr=null; PRA.erase=null; PRA.last=null;
   if(h && PR.panes[side]) prRenderInk(PR.panes[side],h);
 }
-function prHist(book){ if(!PRA.hist[book.id]) PRA.hist[book.id]={undo:[],redo:[]}; return PRA.hist[book.id]; }
-function prInkSnapshot(book,pg){ let h=prHist(book); h.undo.push({pg:pg, ink:cloneStrokes(pg.ink), hi:cloneStrokes(pg.hi)}); if(h.undo.length>80) h.undo.shift(); h.redo=[]; }
+/* one undo / redo history for both books, in the order things were drawn */
+function prInkSnapshot(book,pg,n){ PRA.undo.push({book:book, n:n, pg:pg, ink:cloneStrokes(pg.ink), hi:cloneStrokes(pg.hi)}); if(PRA.undo.length>120) PRA.undo.shift(); PRA.redo=[]; }
 function prInkStep(dir){
-  let P=PR.panes[PRA.barSide]; if(!P){ toast(dir<0? 'Nothing to undo' : 'Nothing to redo'); return; }
-  let h=prHist(P.book), from= dir<0? h.undo : h.redo, to= dir<0? h.redo : h.undo;
-  let s=from.pop(); if(!s){ toast(dir<0? 'Nothing to undo' : 'Nothing to redo'); return; }
-  to.push({pg:s.pg, ink:cloneStrokes(s.pg.ink), hi:cloneStrokes(s.pg.hi)});
-  s.pg.ink=s.ink; s.pg.hi=s.hi; bumpV(s.pg); prRedrawInkFor(P.book,s.pg.bgPdf.page); prRenderInkBar();
+  let from= dir<0? PRA.undo : PRA.redo, to= dir<0? PRA.redo : PRA.undo;
+  let st=from.pop(); if(!st){ toast(dir<0? 'Nothing to undo' : 'Nothing to redo'); return; }
+  to.push({book:st.book, n:st.n, pg:st.pg, ink:cloneStrokes(st.pg.ink), hi:cloneStrokes(st.pg.hi)});
+  st.pg.ink=st.ink; st.pg.hi=st.hi; bumpV(st.pg); prRedrawInkFor(st.book,st.n); prRenderInkBar();
 }
 function prInkUndo(){ prInkStep(-1); }
 function prInkRedo(){ prInkStep(1); }
@@ -3723,8 +3747,8 @@ function prStrokeHit(st,a,b,r){
   return false;
 }
 function prEraseAt(P,h,a,b){
-  let n=+h.dataset.n, pg=prInkPage(P.book,n,false); if(!pg) return;
-  let hit=false, snap=()=>{ if(!PRA.erase.snap){ prInkSnapshot(P.book,pg); PRA.erase.snap=true; } };
+  let n=prSurfN(h), pg=prInkPageOf(P,n,false); if(!pg) return;
+  let hit=false, snap=()=>{ if(!PRA.erase.snap){ prInkSnapshot(P.book,pg,n); PRA.erase.snap=true; } };
   if(PRA.eraserMode==='split'){
     /* cut mode: the editor's padded-box splitter — only the rubbed stretch goes, the rest of the stroke stays */
     let half=8+PRA.size;
@@ -3748,14 +3772,14 @@ function prEraseAt(P,h,a,b){
 }
 function prInkDown(side,e){
   if(!PR.on || !PRA.inkOn[side]) return; /* this book is not being annotated: it reads, selects and scrolls as usual */
-  let P=PR.panes[side]; if(!P || P.book.kind!=='pdf') return;
+  let P=PR.panes[side]; if(!P) return;
   PRA.ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY,type:e.pointerType,side:side});
   if(PRA.barSide!==side){ PRA.barSide=side; prRenderInkBar(); }
   let all=[...PRA.ptrs.values()], touches=all.filter(p=>p.type==='touch');
   if(e.pointerType==='touch' && all.some(p=>p.type==='pen')) return;            /* a palm resting while the pen draws */
   if(touches.length>=2){ prInkCancel(); PRA.pan={side:side, mid:prMid(touches)}; e.preventDefault(); return; } /* two fingers: scroll */
   if(PRA.pan) return;
-  let h=e.target.closest && e.target.closest('.pdfHolder'); if(!h || !h._drawn) return;
+  let h=e.target.closest && e.target.closest(prSurfSel(P)); if(!h || !P.el.contains(h) || !prSurfReady(P,h)) return;
   e.preventDefault();
   try{ P.el.setPointerCapture(e.pointerId); }catch(err){}
   PRA.last=null;
@@ -3797,8 +3821,8 @@ function prInkUp(e){
   PRA.stroke=null; PRA.strokeHolder=null; PRA.strokeSide=null; PRA.strokePtr=null; PRA.last=null;
   if(!P || !h) return;
   if(st.tool==='shape' && Math.hypot(st.points[1].x-st.points[0].x, st.points[1].y-st.points[0].y)<3){ prRenderInk(P,h); return; } /* a tap is not a shape */
-  let pg=prInkPage(P.book,+h.dataset.n,true);
-  prInkSnapshot(P.book,pg);
+  let n=prSurfN(h), pg=prInkPageOf(P,n,true);
+  prInkSnapshot(P.book,pg,n);
   (st.tool==='highlighter'? pg.hi : pg.ink).push(st); S.stats.strokes++; bumpV(pg);
   prRenderInk(P,h); prRenderInkBar();
 }
@@ -3818,7 +3842,7 @@ document.addEventListener('keydown',e=>{
 function prAnnotationsOnClose(silent){
   prToggleInk(false,true);
   prHideSelBar(); prCloseMarks(); PRA.ptrs.clear(); PRA.pan=null;
-  { let f=$('prAnnotateFab'); if(f) f.classList.add('hidden'); } ['L','R'].forEach(s=>{ let p=$('prInkPill'+s); if(p) p.classList.add('hidden'); });
+  { let f=$('prAnnotateFab'); if(f) f.classList.add('hidden'); }
   let changed=PRA.marksChanged; PRA.marksChanged=false;
   if(!changed || silent) return false;
   let b=curBook(); if(!b) return false;

@@ -26,7 +26,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"/>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <!-- ?v= makes every browser fetch the new file after an update instead of reusing an old saved copy; change it with each release -->
-<link rel="stylesheet" href="styles.css?v=2026-11-18-one-annotate-button">
+<link rel="stylesheet" href="styles.css?v=2026-11-18-annotate-both-books">
 </head>
 <body>
 <main class="layout" id="mainLayout">
@@ -417,7 +417,7 @@
         <span class="prSpacer"></span>
         <button class="btn small" type="button" onclick="closeParallelRead()">Close</button>
       </div>
-      <div class="prInkBar hidden" id="prInkBar" role="toolbar" aria-label="Annotate this PDF — drawing tools">
+      <div class="prInkBar hidden" id="prInkBar" role="toolbar" aria-label="Annotate both books — drawing tools">
         <span class="prInkWhoWrap"><span class="tool-label">Annotating</span><b class="prInkWho" id="prInkWho"></b></span>
         <div class="prInkTools" role="group" aria-label="Tool">
           <button type="button" class="tool" data-tool="pen" onclick="prSetInkTool('pen')" title="Pen — pressure sensitive" aria-label="Pen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
@@ -442,17 +442,17 @@
         <button class="btn small" type="button" id="prUndoBtn" onclick="prInkUndo()" title="Undo (Ctrl+Z)">Undo</button>
         <button class="btn small" type="button" id="prRedoBtn" onclick="prInkRedo()" title="Redo (Ctrl+Y)">Redo</button>
         <span class="prSpacer"></span>
-        <button class="btn small" type="button" onclick="prOpenInEditor()" title="Text, images, stickies, LaTeX and the floating board — on the same page, same ink">Open in editor</button>
+        <button class="btn small" type="button" id="prOpenEditorBtn" onclick="prOpenInEditor()" title="Text, images, stickies, LaTeX and the floating board — on the same page, same ink">Open in editor</button>
         <button class="btn small primary" type="button" onclick="prInkDone()" title="Stop annotating this book (Esc stops both)">Done</button>
       </div>
       
-      <!-- ONE "Annotate this PDF" button: it follows the PDF you are using (the book with the blue edge) -->
-      <button type="button" class="annotateFab hidden" id="prAnnotateFab" onclick="prAnnotateThisPdf()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg> Annotate this PDF</button>
+      <!-- ONE "Annotate" button: switches Annotate on for BOTH books (PDF or EPUB); Done / Esc switch it off -->
+      <button type="button" class="annotateFab hidden" id="prAnnotateFab" onclick="prAnnotateThisPdf()" title="Annotate both books: draw on either one" aria-label="Annotate both books"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg> Annotate</button>
       <div class="prMain">
         <div class="prRailBox"><div class="prRailLabel" id="prRailLabel">Page</div><div class="prRailTrack"><div class="prRail" id="prRail" role="navigation"></div></div></div>
         <div class="prGrid">
-          <div class="prCol"><div class="prHead"><b id="prTitleL"></b><button type="button" class="prInkPill hidden" id="prInkPillL" onclick="prSetInk('L',false)" title="Stop annotating this book">Annotating · Stop</button><span class="kbd" id="prPosL"></span></div><div class="prBody"><div class="prPane" id="prPaneL" tabindex="0" aria-label="First book"></div></div></div>
-          <div class="prCol"><div class="prHead"><b id="prTitleR"></b><button type="button" class="prInkPill hidden" id="prInkPillR" onclick="prSetInk('R',false)" title="Stop annotating this book">Annotating · Stop</button><span class="kbd" id="prPosR"></span></div><div class="prBody"><div class="prPane" id="prPaneR" tabindex="0" aria-label="Second book"></div></div></div>
+          <div class="prCol"><div class="prHead"><b id="prTitleL"></b><span class="kbd" id="prPosL"></span></div><div class="prBody"><div class="prPane" id="prPaneL" tabindex="0" aria-label="First book"></div></div></div>
+          <div class="prCol"><div class="prHead"><b id="prTitleR"></b><span class="kbd" id="prPosR"></span></div><div class="prBody"><div class="prPane" id="prPaneR" tabindex="0" aria-label="Second book"></div></div></div>
         </div>
       </div>
       <p class="kbd" style="margin:0;line-height:1.5">Scroll either book and the other follows. The page numbers on the left belong to the book you are using (the one with the coloured edge) — scroll them, or tap one, to move through it. Zoom the book under the pointer with Ctrl + scroll or a pinch, or the book in use with − / +. Highlighting, Listen and OCR work in the normal reader — tap Close to get back to it.</p>
@@ -502,6 +502,6 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="app.js?v=2026-11-18-one-annotate-button"></script>
+<script src="app.js?v=2026-11-18-annotate-both-books"></script>
 </body>
 </html>
