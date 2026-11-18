@@ -27,7 +27,7 @@
       <button class="searchBtn" type="button" aria-label="Search" onclick="document.getElementById('globalSearch').focus();onSearchInput()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.8-3.8"/></svg></button>
     </div>
 
-    <div class="chipRow" role="group" aria-label="Filter the shelf">
+    <div class="chipRow" id="chipRow" role="group" aria-label="Filter the shelf">
       <button class="chip active" data-filter="all" onclick="filterLib('all',this)">All notebooks</button>
       <button class="chip" data-filter="notebook" onclick="filterLib('notebook',this)">Notebooks</button>
       <button class="chip" data-filter="pdf" onclick="filterLib('pdf',this)">PDFs</button>
@@ -86,13 +86,14 @@
       <div style="flex:1;min-width:0">
         <input id="noteTitle" value="Untitled notebook" aria-label="Notebook title" style="width:100%;border:0;background:transparent;font-family:var(--hand);font-size:25px;font-weight:600;outline:none;color:var(--ink);min-height:28px;padding:0" oninput="syncTitle()"/>
       </div>
-      <button class="btn small edFocus" onclick="openTimer()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Focus</button>
+      <button class="btn small edFocus" onclick="openTimer()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> <span class="timerLabel">Focus 25:00</span></button>
       <span class="popWrap">
         <button class="btn small" id="exportBtn" aria-haspopup="true" aria-expanded="false" onclick="toggleExportMenu(this)">Export ▾</button>
         <span class="popMenu" id="exportPop">
           <button class="btn small" onclick="closeExportPop();exportPagePNG()">Page as PNG</button>
           <button class="btn small" onclick="closeExportPop();exportPageSVG()">Page as SVG</button>
           <button class="btn small" onclick="closeExportPop();exportNotebookPDF()">Notebook as PDF</button>
+          <button class="btn small" onclick="closeExportPop();exportNotebookTXT()">Notebook as .txt</button>
           <button class="btn small" onclick="closeExportPop();exportXopp()">Notebook as .xopp</button>
           <label class="btn small" for="xoppImport" title="Open a .xopp / .xoj notebook" onclick="closeExportPop()">Open a .xopp…</label>
           <button class="btn small" onclick="closeExportPop();exportBackup()">Backup everything</button>
@@ -301,8 +302,8 @@
       <aside class="panel" id="readerSide">
         <h4>Contents</h4>
         <div id="tocList"><p class="kbd">Open a book to see its contents.</p></div>
-        <details class="helpBox"><summary>Bookmarks</summary><div id="bookmarkList"><p class="kbd">No bookmarks yet</p></div></details>
-        <details class="helpBox"><summary>Annotations</summary><div id="annoList"><p class="kbd">Select text → Highlight selection</p></div></details>
+        <details class="helpBox" id="bookmarkDetails"><summary>Bookmarks</summary><div id="bookmarkList"><p class="kbd">No bookmarks yet</p></div></details>
+        <details class="helpBox" id="annoDetails"><summary>Annotations</summary><div id="annoList"><p class="kbd">Select text → Highlight selection</p></div></details>
         <details class="helpBox"><summary>Thumbnails</summary><div id="thumbList"><p class="kbd">—</p></div></details>
       </aside>
       <div>

@@ -10,6 +10,20 @@ let pendingConfirm=null;
 function askConfirm(title,text,fn){$('confirmTitle').textContent=title;$('confirmText').textContent=text;pendingConfirm=fn;$('confirmModal').classList.add('open')}
 function doConfirm(){closeModal('confirmModal');if(pendingConfirm){let f=pendingConfirm;pendingConfirm=null;f()}}
 
+/* ============ architecture note (P12) ============
+   This app stays one classic script on purpose: the markup calls these
+   functions from inline onclick/onchange/oninput handlers, so they
+   must remain globals — an ES-module conversion would break every
+   handler, and no automated test suite is added in this pass. The
+   hygiene that IS in place: a section banner per feature area, single
+   entry points where several callers used to diverge (closeAllPopovers
+   for popover dismissal, setTimerLabel for the focus countdown,
+   setSearchChrome for search-state chrome), and render-time helpers
+   (isDarkPage / pageInkColor) instead of scattered conditionals.
+   Global state remains the single store S plus small per-feature
+   module-level variables. Splitting the file, removing the global
+   store, modules and tests are all intentionally left undone. */
+
 /* ============ state ============ */
 const CW=1200, CH=800;
 let PH=CH; /* live height of the page being edited — portrait PDF pages grow it so the page fills the width instead of shrinking into the middle of a landscape sheet */
@@ -362,6 +376,9 @@ function toggleTtsBar(){ let b=$('ttsBar'); b.classList.toggle('hidden'); if(!b.
 function itemPages(it){ if(it.kind==='notebook') return it.pages.length; if(it.kind==='pdf') return it.numPages||0; if(it.kind==='epub') return it.chapters?it.chapters.length:0; return 1 }
 function renderLibrary(){
   let q=($('globalSearch').value||'').toLowerCase().trim();
+  /* P5: with no query in the box the shelf chrome is always restored,
+     whatever hid it while a search was in progress. */
+  if(!q){ let lg=$('libraryGrid'); if(lg) lg.classList.remove('hidden'); let cr0=$('chipRow'); if(cr0) cr0.classList.remove('hidden'); }
   let items=S.items.filter(n=>{
     if(S.filter!=='all' && n.kind!==S.filter) return false;
     if(!q) return true;
@@ -443,10 +460,20 @@ function updateStatsPanel(){
 }
 
 /* ============ library-wide search ============ */
+/* P5: while a search query is present, the shelf grid and the filter
+   chip row step aside entirely. renderLibrary() filters by title only,
+   so leaving the grid up let it flash "Nothing matches this filter"
+   behind the (full-text) results dropdown, which also covered the
+   chips. Both come back when the query is cleared or results close. */
+function setSearchChrome(active){
+  let g=$('libraryGrid'); if(g) g.classList.toggle('hidden',active);
+  let cr=$('chipRow'); if(cr) cr.classList.toggle('hidden',active);
+}
 function onSearchInput(){
   let q=($('globalSearch').value||'').trim().toLowerCase();
   let box=$('searchResults');
   if(S.view==='library') renderLibrary();
+  setSearchChrome(q.length>0);
   if(q.length<2){ box.classList.add('hidden'); S.searchResults=[]; $('libHint').style.visibility=''; return; }
   let res=[];
   S.items.forEach(it=>{
@@ -476,8 +503,8 @@ function onSearchInput(){
      it so the two never overlap/read through each other. */
   $('libHint').style.visibility='hidden';
 }
-function runSearchResult(i){ let r=S.searchResults[i]; $('searchResults').classList.add('hidden'); $('libHint').style.visibility=''; if(r&&r.act) r.act(); }
-document.addEventListener('click',e=>{ if(!e.target.closest('.searchWrap')){ $('searchResults').classList.add('hidden'); let lh=$('libHint'); if(lh) lh.style.visibility=''; } });
+function runSearchResult(i){ let r=S.searchResults[i]; $('searchResults').classList.add('hidden'); $('libHint').style.visibility=''; setSearchChrome(false); if(r&&r.act) r.act(); }
+document.addEventListener('click',e=>{ if(!e.target.closest('.searchWrap')){ $('searchResults').classList.add('hidden'); let lh=$('libHint'); if(lh) lh.style.visibility=''; setSearchChrome(false); } });
 
 /* ============ notebooks: create / open ============ */
 function openNewNotebook(){$('newModal').classList.add('open'); setTimeout(()=>$('newTitle').focus(),50)}
@@ -523,14 +550,22 @@ const bgX=bgC.getContext('2d'), hiX=hiC.getContext('2d'), inkX=inkC.getContext('
    music staff, Cornell notes and checklist layouts. One painter is shared
    by the live editor background and by page export/thumbnails so a page
    looks identical everywhere. */
-function paintTemplate(x,tpl){
-  let line='rgba(27,42,74,.16)';
+/* P1: Dark Slate pages (#2b2f36) need light ruling and light ink. The
+   mapping happens at render time only — stored stroke/text colours stay
+   as picked, so switching the page back to a light colour restores the
+   original navy exactly. Same idea as boardInkColor() for the board. */
+function isDarkPage(p){ return !!(p && String(p.bgColor||'').toLowerCase()==='#2b2f36'); }
+function pageInkColor(c,p){ if(isDarkPage(p) && String(c||'').toLowerCase()==='#1b2a4a') return '#f8fafc'; return c; }
+function paintTemplate(x,tpl,p){
+  let dark=isDarkPage(p);
+  let line= dark? 'rgba(248,250,252,.30)' : 'rgba(27,42,74,.16)';
+  let margin= dark? 'rgba(248,150,140,.55)' : 'rgba(178,64,54,.4)';
   x.save(); x.strokeStyle=line; x.fillStyle=line; x.lineWidth=1;
-  if(tpl==='lined'){ x.beginPath(); for(let y=64;y<CH;y+=42){ x.moveTo(28,y); x.lineTo(CW-28,y);} x.stroke(); x.strokeStyle='rgba(178,64,54,.4)'; x.beginPath(); x.moveTo(84,0); x.lineTo(84,CH); x.stroke(); }
+  if(tpl==='lined'){ x.beginPath(); for(let y=64;y<CH;y+=42){ x.moveTo(28,y); x.lineTo(CW-28,y);} x.stroke(); x.strokeStyle=margin; x.beginPath(); x.moveTo(84,0); x.lineTo(84,CH); x.stroke(); }
   if(tpl==='grid'){ x.beginPath(); for(let xx=28;xx<CW;xx+=36){ x.moveTo(xx,0); x.lineTo(xx,CH);} for(let y=28;y<CH;y+=36){ x.moveTo(0,y); x.lineTo(CW,y);} x.stroke(); }
   if(tpl==='dotted'){ for(let xx=34;xx<CW;xx+=36) for(let y=34;y<CH;y+=36){ x.beginPath(); x.arc(xx,y,1.6,0,7); x.fill(); } }
   if(tpl==='music'){ for(let g=0;g<4;g++){ let top=70+g*185; x.beginPath(); for(let l=0;l<5;l++){ x.moveTo(36,top+l*13); x.lineTo(CW-36,top+l*13);} x.stroke(); } }
-  if(tpl==='cornell'){ x.beginPath(); x.moveTo(330,28); x.lineTo(330,CH-190); x.stroke(); x.beginPath(); x.moveTo(28,CH-190); x.lineTo(CW-28,CH-190); x.stroke(); x.strokeStyle='rgba(178,64,54,.4)'; x.beginPath(); x.moveTo(28,64); x.lineTo(CW-28,64); x.stroke(); x.strokeStyle=line; x.beginPath(); for(let y=106;y<CH-190;y+=42){ x.moveTo(346,y); x.lineTo(CW-28,y);} x.stroke(); }
+  if(tpl==='cornell'){ x.beginPath(); x.moveTo(330,28); x.lineTo(330,CH-190); x.stroke(); x.beginPath(); x.moveTo(28,CH-190); x.lineTo(CW-28,CH-190); x.stroke(); x.strokeStyle=margin; x.beginPath(); x.moveTo(28,64); x.lineTo(CW-28,64); x.stroke(); x.strokeStyle=line; x.beginPath(); for(let y=106;y<CH-190;y+=42){ x.moveTo(346,y); x.lineTo(CW-28,y);} x.stroke(); }
   if(tpl==='checklist'){ for(let y=70;y<CH-20;y+=52){ x.strokeRect(36,y-17,20,20); x.beginPath(); x.moveTo(72,y+4); x.lineTo(CW-36,y+4); x.stroke(); } }
   x.restore();
 }
@@ -545,7 +580,7 @@ function drawBackground(){
     bgX.drawImage(img,(CW-w)/2,(PH-h)/2,w,h);
     return;
   }
-  paintTemplate(bgX, nb.template);
+  paintTemplate(bgX, nb.template, p);
 }
 function strokeRadius(p,size,tool,dirAng){
   if(tool==='calligraphy'){ let f=0.22+0.78*Math.abs(Math.sin((dirAng||0)-0.785)); return Math.max(0.7, size*1.7*f*(0.45+0.55*(p.p||0.5))); }
@@ -553,12 +588,13 @@ function strokeRadius(p,size,tool,dirAng){
 }
 const DASH_PATTERNS={dashed:[14,10],dotted:[1.5,9],dashdot:[16,8,2.5,8]};
 function dashFor(st){ return (st.style && st.style!=='solid' && DASH_PATTERNS[st.style])? DASH_PATTERNS[st.style].map(v=>v*(0.7+st.size*0.22)) : []; }
-function drawStroke(ctx,st){
+function drawStroke(ctx,st,p){
   let pts=st.points; if(!pts.length) return;
+  let col=pageInkColor(st.color,p); /* P1: navy ink renders light on Dark Slate pages */
   if(st.tool==='shape'){
     let a=pts[0], b=pts[pts.length-1]; if(!a||!b) return;
-    ctx.save(); ctx.strokeStyle=st.color; ctx.lineWidth=Math.max(1.5,st.size*1.4); ctx.lineCap='round'; ctx.lineJoin='round'; ctx.setLineDash(dashFor(st));
-    if(st.fill){ ctx.fillStyle=st.color; ctx.globalAlpha=0.28; }
+    ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=Math.max(1.5,st.size*1.4); ctx.lineCap='round'; ctx.lineJoin='round'; ctx.setLineDash(dashFor(st));
+    if(st.fill){ ctx.fillStyle=col; ctx.globalAlpha=0.28; }
     if(st.shape==='line'){ ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); }
     else if(st.shape==='rect'){ ctx.beginPath(); ctx.rect(Math.min(a.x,b.x),Math.min(a.y,b.y),Math.abs(b.x-a.x),Math.abs(b.y-a.y)); if(st.fill) ctx.fill(); ctx.stroke(); }
     else if(st.shape==='ellipse'){ ctx.beginPath(); ctx.ellipse((a.x+b.x)/2,(a.y+b.y)/2,Math.abs(b.x-a.x)/2,Math.abs(b.y-a.y)/2,0,0,Math.PI*2); if(st.fill) ctx.fill(); ctx.stroke(); }
@@ -566,23 +602,25 @@ function drawStroke(ctx,st){
     ctx.restore(); return;
   }
   if(st.tool==='poly'){
-    ctx.save(); ctx.strokeStyle=st.color; ctx.lineWidth=Math.max(1.5,st.size*1.4); ctx.lineCap='round'; ctx.lineJoin='round'; ctx.setLineDash(dashFor(st));
+    ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=Math.max(1.5,st.size*1.4); ctx.lineCap='round'; ctx.lineJoin='round'; ctx.setLineDash(dashFor(st));
     ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
-    if(st.fill){ ctx.closePath(); ctx.fillStyle=st.color; ctx.globalAlpha=0.28; ctx.fill(); ctx.globalAlpha=1; }
+    if(st.fill){ ctx.closePath(); ctx.fillStyle=col; ctx.globalAlpha=0.28; ctx.fill(); ctx.globalAlpha=1; }
     ctx.stroke(); ctx.restore(); return;
   }
   if(st.tool==='highlighter'){
-    ctx.save(); ctx.globalCompositeOperation='multiply'; ctx.globalAlpha=0.42; ctx.strokeStyle=st.color; ctx.lineWidth=st.size*4.5;
+    /* P1: 'multiply' darkens against the page, so on Dark Slate the
+       highlight vanishes into it — 'screen' lightens instead. */
+    ctx.save(); ctx.globalCompositeOperation= isDarkPage(p)? 'screen':'multiply'; ctx.globalAlpha=0.42; ctx.strokeStyle=col; ctx.lineWidth=st.size*4.5;
     ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y); ctx.stroke(); ctx.restore(); return;
   }
   if(st.style && st.style!=='solid' && (st.tool==='pen'||st.tool==='calligraphy')){
     /* Dashed/dotted pen strokes are drawn as a dashed centreline — a filled
        outline cannot dash. Pressure still drives the line width. */
-    ctx.save(); ctx.strokeStyle=st.color; ctx.setLineDash(dashFor(st)); ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.save(); ctx.strokeStyle=col; ctx.setLineDash(dashFor(st)); ctx.lineCap='round'; ctx.lineJoin='round';
     for(let i=1;i<pts.length;i++){ ctx.lineWidth=Math.max(0.8, st.size*(0.5+1.5*((pts[i-1].p||0.5)+(pts[i].p||0.5))/2)); ctx.beginPath(); ctx.moveTo(pts[i-1].x,pts[i-1].y); ctx.lineTo(pts[i].x,pts[i].y); ctx.stroke(); }
     ctx.restore(); return;
   }
-  if(pts.length===1){ ctx.fillStyle=st.color; ctx.beginPath(); ctx.arc(pts[0].x,pts[0].y,Math.max(1.1,st.size*0.6),0,7); ctx.fill(); return; }
+  if(pts.length===1){ ctx.fillStyle=col; ctx.beginPath(); ctx.arc(pts[0].x,pts[0].y,Math.max(1.1,st.size*0.6),0,7); ctx.fill(); return; }
   let left=[],right=[];
   for(let i=0;i<pts.length;i++){
     let p=pts[i], pa=pts[Math.max(0,i-1)], pb=pts[Math.min(pts.length-1,i+1)];
@@ -591,7 +629,7 @@ function drawStroke(ctx,st){
     let taper=Math.min(1,(Math.min(i,pts.length-1-i)/4)+0.18); if(pts.length>4) r*=taper;
     left.push({x:p.x-dy*r,y:p.y+dx*r}); right.push({x:p.x+dy*r,y:p.y-dx*r});
   }
-  ctx.fillStyle=st.color; ctx.beginPath();
+  ctx.fillStyle=col; ctx.beginPath();
   ctx.moveTo(left[0].x,left[0].y);
   for(let i=1;i<left.length-1;i++){ ctx.quadraticCurveTo(left[i].x,left[i].y,(left[i].x+left[i+1].x)/2,(left[i].y+left[i+1].y)/2); }
   ctx.lineTo(left[left.length-1].x,left[left.length-1].y);
@@ -603,7 +641,7 @@ function redrawLayer(which){
   let ctx= which==='ink'? inkX:hiX, arr= which==='ink'? p.ink:p.hi;
   ctx.clearRect(0,0,CW,PH);
   let cutoff=(typeof redrawLayer.cutoff==='number')? redrawLayer.cutoff : null;
-  arr.forEach(st=>{ if(cutoff!==null && typeof st.t==='number' && st.t>cutoff) return; drawStroke(ctx,st); });
+  arr.forEach(st=>{ if(cutoff!==null && typeof st.t==='number' && st.t>cutoff) return; drawStroke(ctx,st,p); });
   $('statPageStrokes').textContent=p.ink.length+p.hi.length;
 }
 function redrawAll(){ syncPageHeight(); drawBackground(); redrawLayer('ink'); redrawLayer('hi'); }
@@ -611,12 +649,12 @@ function composePage(p, template, out){
   let cH=pageH(p); let c=out||document.createElement('canvas'); c.width=CW; c.height=cH; let x=c.getContext('2d');
   x.fillStyle=p.bgColor||'#fffdf6'; x.fillRect(0,0,CW,cH);
   if(p.bgPdf && p.bgPdf.img){ let img=p.bgPdf.img, s=Math.min(CW/img.width,cH/img.height), w=img.width*s,h=img.height*s; x.fillStyle='#fff'; x.fillRect((CW-w)/2,(cH-h)/2,w,h); x.drawImage(img,(CW-w)/2,(cH-h)/2,w,h); }
-  else paintTemplate(x, template);
+  else paintTemplate(x, template, p);
   (p.images||[]).forEach(im=>{ if(im._img && im._img.complete && im._img.naturalWidth) x.drawImage(im._img, im.x, im.y, im.w, im.h); });
-  p.hi.forEach(st=>drawStroke(x,st));
-  p.ink.forEach(st=>drawStroke(x,st));
-  (p.texts||[]).forEach(t=>{ x.fillStyle=t.color; x.font='600 '+(t.size||26)+'px '+(t.font||'Newsreader, serif'); let lines=String(t.text||'').split('\n'); lines.forEach((ln,i)=>x.fillText(ln, t.x, t.y+ (t.size||26) + i*((t.size||26)*1.35))); });
-  (p.texs||[]).forEach(t=>{ x.fillStyle=t.color||'#1b2a4a'; x.font='italic 600 '+(t.size||26)+'px Newsreader, serif'; x.fillText(t.tex, t.x, t.y+(t.size||26)); });
+  p.hi.forEach(st=>drawStroke(x,st,p));
+  p.ink.forEach(st=>drawStroke(x,st,p));
+  (p.texts||[]).forEach(t=>{ x.fillStyle=pageInkColor(t.color,p); x.font='600 '+(t.size||26)+'px '+(t.font||'Newsreader, serif'); let lines=String(t.text||'').split('\n'); lines.forEach((ln,i)=>x.fillText(ln, t.x, t.y+ (t.size||26) + i*((t.size||26)*1.35))); });
+  (p.texs||[]).forEach(t=>{ x.fillStyle=pageInkColor(t.color||'#1b2a4a',p); x.font='italic 600 '+(t.size||26)+'px Newsreader, serif'; x.fillText(t.tex, t.x, t.y+(t.size||26)); });
   return c;
 }
 
@@ -1008,7 +1046,7 @@ function renderCanvasTexts(){
   let p=curPageObj(); let host=$('pageTextLayer'); if(!host) return; host.innerHTML=''; if(!p) return;
   (p.texts||[]).forEach(t=>{
     let d=document.createElement('div'); d.className='canvasText'; d.contentEditable='true'; d.textContent=t.text;
-    d.style.left=(t.x/CW*100)+'%'; d.style.top=(t.y/PH*100)+'%'; d.style.color=t.color; if(t.font) d.style.fontFamily=t.font; let cwPx=inkC.getBoundingClientRect().width; let scale=cwPx? cwPx/CW : 0.55; d.style.fontSize=Math.max(10,(t.size||26)*scale)+'px';
+    d.style.left=(t.x/CW*100)+'%'; d.style.top=(t.y/PH*100)+'%'; d.style.color=pageInkColor(t.color,p); if(t.font) d.style.fontFamily=t.font; let cwPx=inkC.getBoundingClientRect().width; let scale=cwPx? cwPx/CW : 0.55; d.style.fontSize=Math.max(10,(t.size||26)*scale)+'px';
     d.addEventListener('input',()=>{ t.text=d.textContent; bumpV(p); });
     d.addEventListener('blur',()=>{ if(!d.textContent.trim()){ p.texts=p.texts.filter(x=>x!==t); renderCanvasTexts(); renderPages(); } });
     d.addEventListener('pointerdown',e=>e.stopPropagation());
@@ -1115,8 +1153,8 @@ function renderLive(){
   let p=curPageObj(); if(!p) return;
   let layer=curStroke._layer, ctx= layer==='ink'? inkX:hiX;
   ctx.clearRect(0,0,CW,PH);
-  p[layer].forEach(st=>drawStroke(ctx,st));
-  drawStroke(ctx,curStroke);
+  p[layer].forEach(st=>drawStroke(ctx,st,p));
+  drawStroke(ctx,curStroke,p);
 }
 /* Stylus button mapping: the pen's eraser end or barrel button temporarily
    swaps in the mapped tool for the length of that stroke, then the chosen
@@ -1579,6 +1617,10 @@ function eraseAt(pt){
   if(changed){ eraseChanged=true; bumpV(p); redrawLayer('ink'); redrawLayer('hi'); }
 }
 function setTool(t,el){
+  /* P4: switching to a different tool dismisses any open tool-options
+     popover — it used to stay open and silently re-label itself for the
+     new tool, so settings for one tool looked like another's. */
+  if(S.tool!==t) closeAllPopovers();
   /* Gap 2: tapping the already-selected tool must NOT turn it off or
      switch to Hand — it stays selected until a different tool is picked. */
   S.tool=t; document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));
@@ -1899,6 +1941,11 @@ function toggleSplit(){
   S.split=!S.split;
   $('stageWrap').classList.toggle('split',S.split);
   let pane=$('splitPane'); pane.classList.toggle('hidden',!S.split);
+  /* P3: Split View halves the page shell — re-clamp the floating
+     board's window to the new width so its Colour / Expand / Close
+     controls are never pushed past the shell's right edge. */
+  let fb=$('floatingBoard');
+  if(fb && !fb.classList.contains('hidden') && !boardFull){ applyBoardGeom(boardGeomFromEl()); queueBoardSize(); }
   if(S.split){
     let b=curBook()||S.items.find(i=>i.kind==='epub');
     if(b && b.kind==='epub'){ let c=b.chapters[b.ch]; pane.innerHTML='<span class="badge">'+esc(b.title)+'</span><h3>'+esc(c.title)+'</h3>'+c.html; }
@@ -1920,7 +1967,7 @@ function renderTexLayer(){
   (p.texs||[]).forEach(t=>{
     let d=document.createElement('div'); d.className='texEl';
     d.style.left=(t.x/CW*100)+'%'; d.style.top=(t.y/PH*100)+'%';
-    texRenderInto(d, t.tex, Math.max(10,(t.size||26)*scale), t.color);
+    texRenderInto(d, t.tex, Math.max(10,(t.size||26)*scale), pageInkColor(t.color,p));
     let del=document.createElement('button'); del.className='miniBtn'; del.textContent='×'; del.title='Remove equation'; del.style.cssText='position:absolute;top:-10px;left:-12px;z-index:3;background:#fff'; /* P9: was top-right, sitting on the superscript — now top-left, clear of the maths */
     del.onclick=e=>{ e.stopPropagation(); p.texs=p.texs.filter(x=>x!==t); bumpV(p); renderTexLayer(); renderPages(); };
     d.appendChild(del);
@@ -1976,6 +2023,9 @@ function importGpl(e){
 function setToolbarLayout(v){ let tb=$('mainToolbar'); tb.classList.remove('compact','minimal'); if(v) tb.classList.add(v); }
 function toggleMoreTools(btn){ togglePageMenu(btn); }
 function closeAllToolPops(){ document.querySelectorAll('.toolPop.open').forEach(el=>el.classList.remove('open')); ['toolOptsBtn','insertBtn','pageOptsBtn'].forEach(id=>{ var b=$(id); if(b) b.setAttribute('aria-expanded','false'); }); }
+/* One dismissal entry point for every popover in the editor (P4/P12
+   hygiene): tool-options popovers plus the Export menu. */
+function closeAllPopovers(){ closeAllToolPops(); closeExportPop(); }
 function toggleOnePop(id,btn){ var el=$(id); var willOpen=el && !el.classList.contains('open'); closeAllToolPops(); if(el && willOpen){ el.classList.add('open'); if(btn) btn.setAttribute('aria-expanded','true'); } return willOpen; }
 function toggleToolOpts(btn){ if(toggleOnePop('toolOptsPop',btn)) updateToolOptsUI(); }
 function toggleInsertMenu(btn){ toggleOnePop('insertPop',btn); }
@@ -1991,6 +2041,20 @@ function selectLayerStrokes(which){ let p=curPageObj(); if(!p) return; S.selecti
 
 /* ============ exports ============ */
 function exportPagePNG(){ let nb=curNb(); if(!nb) return; saveEditorToModel(); let c=composePage(curPageObj(), nb.template); c.toBlob(b=>{ download(nb.title.replace(/[^\w\- ]+/g,'')+' — page '+(nb.cur+1)+'.png', b); toast('PNG exported'); }); }
+/* P10: plain-text export of the whole notebook — typed notes plus the
+   text placed on each page, one headed section per page. The reader
+   already exported annotations as .txt; notebooks had no text option. */
+function exportNotebookTXT(){
+  let nb=curNb(); if(!nb) return; saveEditorToModel();
+  let body=nb.pages.map((p,i)=>{
+    let parts=['--- Page '+(i+1)+' ---'];
+    if(p.text && p.text.trim()) parts.push(p.text.trim());
+    (p.texts||[]).forEach(t=>{ let tx=String(t.text||'').trim(); if(tx) parts.push(tx); });
+    return parts.join('\n');
+  }).join('\n\n');
+  download(nb.title.replace(/[^\w\- ]+/g,'')+'.txt', new Blob([body],{type:'text/plain'}));
+  toast('Notebook exported as .txt');
+}
 function exportNotebookPDF(){
   let nb=curNb(); if(!nb) return; saveEditorToModel();
   if(!window.jspdf){ toast('PDF export library could not load — check connection'); return; }
@@ -2459,6 +2523,9 @@ function toggleBookmark(){
   if(b.bookmarks.some(x=>x.at===at)){ b.bookmarks=b.bookmarks.filter(x=>x.at!==at); toast('Bookmark removed'); }
   else { b.bookmarks.push({at:at,label:label}); toast('Bookmarked — '+label); }
   renderReaderSide();
+  /* P7: open the Bookmarks panel so the new bookmark is actually
+     visible — it used to land inside a collapsed <details>. */
+  let bd=$('bookmarkDetails'); if(bd) bd.open=true;
 }
 function changePage(d){
   let b=curBook(); if(!b){ toast('Open a book first'); return; }
@@ -2483,11 +2550,22 @@ function annotateSelection(kind){
     if(kind==='underline'){ wrapEl=document.createElement('span'); wrapEl.style.cssText='text-decoration:underline;text-decoration-color:#2456c8;text-decoration-thickness:2px'; }
     else if(kind==='strike'){ wrapEl=document.createElement('span'); wrapEl.style.cssText='text-decoration:line-through;text-decoration-color:#b23a2e;text-decoration-thickness:2px'; }
     else wrapEl=document.createElement('mark');
-    range.surroundContents(wrapEl);
+    try{ range.surroundContents(wrapEl); }
+    catch(e2){
+      /* P7: a selection crossing element boundaries makes
+         surroundContents() throw. Fall back to extracting the selected
+         contents into the wrapper and inserting that instead, so the
+         annotation is still made instead of silently dropped. */
+      let frag=range.extractContents();
+      wrapEl.appendChild(frag);
+      range.insertNode(wrapEl);
+    }
   }catch(e){ toast('Select a clean stretch inside one paragraph'); return; }
   b.annotations.push({text:text, where:where, kind:kind});
   sel.removeAllRanges();
   renderReaderSide(); renderLibrary();
+  /* P7: open the Annotations panel so the new entry is visible. */
+  let ad=$('annoDetails'); if(ad) ad.open=true;
   toast((kind==='highlight'?'Highlighted': kind==='underline'?'Underlined':'Struck through')+' & saved to annotations');
 }
 function highlightSelection(){ annotateSelection('highlight'); }
@@ -2500,8 +2578,23 @@ function exportAnnotations(){
 }
 
 /* --- dictionary / Wikipedia: live lookup --- */
+/* P9: normalise a messy selection to the word the reader means.
+   Take the LAST word of the selection, then strip punctuation from its
+   two ends only — inner characters (the apostrophe in "don't", the
+   hyphen in "well-known") are part of the word and stay. A token that
+   is pure punctuation (an em dash, a quote mark) is skipped for the
+   word before it. Written from that rule, not from the audit's regex:
+   its trailing alternative stripped word characters, not punctuation. */
+function normalizeLookupWord(raw){
+  let tokens=String(raw||'').trim().split(/\s+/).filter(Boolean);
+  for(let i=tokens.length-1;i>=0;i--){
+    let w=tokens[i].replace(/^[^\p{L}\p{N}]+/u,'').replace(/[^\p{L}\p{N}]+$/u,'');
+    if(w) return w;
+  }
+  return '';
+}
 async function lookupSelection(){
-  let w=(window.getSelection().toString().trim().split(/\s+/)[0]||'').replace(/[^A-Za-z'-]/g,'');
+  let w=normalizeLookupWord(window.getSelection().toString());
   let box=$('dictBox');
   if(!w){ toast('Select a word in the text first'); return; }
   /* P3: park the card right after the paragraph the word sits in, so it
@@ -2679,11 +2772,15 @@ function annotateCurrentPdf(){ let b=curBook(); if(b) annotatePdf(b.id); }
 
 /* ============ focus timer ============ */
 let timerSec=25*60, timerInt=null;
+/* P8: every Focus label updates together — the Library button
+   (#timerLabel) and the editor's Focus button (.timerLabel) — so the
+   countdown is visible in whichever view the timer was started from. */
+function setTimerLabel(txt){ document.querySelectorAll('#timerLabel, .timerLabel').forEach(el=>{ el.textContent=txt; }); }
 function openTimer(){
-  if(timerInt){ clearInterval(timerInt); timerInt=null; timerSec=25*60; $('timerLabel').textContent='Focus 25:00'; toast('Focus timer stopped'); return; }
+  if(timerInt){ clearInterval(timerInt); timerInt=null; timerSec=25*60; setTimerLabel('Focus 25:00'); toast('Focus timer stopped'); return; }
   toast('Focus timer started — 25 minutes');
-  timerInt=setInterval(()=>{ timerSec--; let m=Math.floor(timerSec/60),s=timerSec%60; $('timerLabel').textContent='Focus '+m+':'+String(s).padStart(2,'0');
-    if(timerSec<=0){ clearInterval(timerInt); timerInt=null; timerSec=25*60; $('timerLabel').textContent='Focus 25:00'; S.stats.focusDone++; updateStatsPanel(); toast('Focus session done — nice work'); } },1000);
+  timerInt=setInterval(()=>{ timerSec--; let m=Math.floor(timerSec/60),s=timerSec%60; setTimerLabel('Focus '+m+':'+String(s).padStart(2,'0'));
+    if(timerSec<=0){ clearInterval(timerInt); timerInt=null; timerSec=25*60; setTimerLabel('Focus 25:00'); S.stats.focusDone++; updateStatsPanel(); toast('Focus session done — nice work'); } },1000);
 }
 
 /* ============ session stats ticker ============ */

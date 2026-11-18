@@ -375,3 +375,29 @@ body.inEditor .layout{padding-top:12px}
   .editorWrap{margin-top:8px}
 }
 
+/* --- second audit fix pass (P1–P12) --- */
+/* P2: EPUB Night mode — lookup/OCR cards keep a readable close button
+   and link colour on the dark card instead of inheriting light-mode
+   button variables and the default dark-blue link. */
+.reader.dark .resultBox a{color:#93c5fd}
+.reader.dark .resultBox .cardClose{background:#2f362f;color:#e8e6df;border-color:#4b554b}
+/* P3: the floating board never exceeds its page shell, so in Split View
+   (where the shell halves) Colour / Expand / Close stay on the board
+   instead of being clipped past the right edge. The board's JS window
+   geometry re-clamps on split toggle as well (see toggleSplit). */
+.board{width:min(360px,calc(100% - 24px));max-width:calc(100% - 24px);right:12px}
+.boardHead{flex-wrap:wrap;gap:6px}
+/* P6: the reader sidebar sticks on desktop instead of scrolling away
+   with a long chapter in Scroll mode. */
+@media (min-width:861px){
+  #readerSide{position:sticky;top:68px;max-height:calc(100vh - 84px);overflow-y:auto}
+}
+/* P11: on phones the editor header sticks again (it was set static
+   globally by an earlier pass), so Back / Focus / Export stay reachable
+   without scrolling to the top; the tools bar sticks just below it.
+   Desktop keeps the earlier one-sticky-bar behaviour. */
+@media (max-width:860px){
+  .editorTop{position:sticky;top:0;z-index:20;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #mainToolbar{top:54px}
+}
+
