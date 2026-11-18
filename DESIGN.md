@@ -39,6 +39,7 @@ Type scale: 11px labels, 13px controls, 15px body UI, 19px reading default, 28â€
 - **Library:** a floating navigation bar carries the wordmark, search and theme controls over the shelf. Below it, a catalogue masthead, not a hero: shelf title, one line of description, then the filter line. The shelf is a grid of cloth-bound covers with real metadata.
 - **Editor:** the page is the focal point. Side rails are flat, separated by hairlines. The toolbar is an instrument rail, not a floating card. The paper sheet has the only substantial shadow because it is the only physical object.
 - **Reader:** one narrow measure, generous leading, a running head, and a single drop cap at the start of a book. Sidebar material is reference apparatus, set smaller and quieter than the reading column.
+- **Parallel Read:** two equal reading sheets with one page-number rail. The sheets stay equal because the comparison is between two texts, not a dashboard. The rail is reference apparatus, set smaller and quieter than either text.
 - **Modals:** rare, paper-white, one elevation, no glass.
 
 ## Components
