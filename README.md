@@ -11,6 +11,9 @@ Open-source handwriting notes and PDF / EPUB reader. All features free: no paywa
 - PDF import and annotation, EPUB reader with reflow
 - Text-select highlights, annotations, bookmarks, outline, thumbnails
 - Page management: rotate, delete, reorder, extract, merge, split
+- Parallel Read: two books side by side (stacked on a phone), scrolling together, with one page-number rail for the book in use, per-book zoom, text marks on either book and handwriting on PDF pages (shared with "Annotate this PDF")
+- Light and Dark appearance, remembered per browser, no flash on start; respects "reduce motion"
+- Sharp PDF pages on any screen (drawn denser than the display, redrawn on zoom), only the pages near the screen kept in memory
 - Read-aloud with named accents and male/female voices
 - Dictionary and Wikipedia lookup on long-press
 - Floating drafting board (infinite canvas overlay per page)

@@ -25,7 +25,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=2026-11-18-merge-parallel-read">
 </head>
 <body>
 <!-- Icons: Tabler Icons 3.52.0, MIT, https://tabler.io/icons -->
@@ -434,6 +434,7 @@
       <div class="seg" role="tablist" aria-label="Reading mode"><button class="active" id="modeScrollBtn" onclick="setReaderMode('scroll')">Scroll</button><button id="modePageBtn" onclick="setReaderMode('page')">Page</button></div>
       <button class="btn" id="sideToggle" onclick="toggleReaderSide()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-list"></use></svg> Contents</button>
       <button class="btn" id="bookmarkBtn" onclick="toggleBookmark()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-bookmark"></use></svg> Bookmark</button>
+      <button class="btn" id="parallelBtn" aria-pressed="false" onclick="toggleParallelRead()" title="Open this book beside a second book" aria-label="Parallel Read"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-columns"></use></svg> Parallel</button>
       <button class="btn" id="readerMoreBtn" aria-expanded="false" onclick="toggleReaderMore(this)"><span id="readerMoreLabel">More</span> <svg class="ic ic-sm moreChevron" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg></button>
       <span class="readerResume" id="resumeLabel"></span>
     </div>
@@ -502,7 +503,7 @@
           <span class="ttsField"><label class="kbd" for="accentSel">Accent</label><select id="accentSel"></select></span>
           <span class="ttsField"><label class="kbd" for="genderSel">Voice</label><select id="genderSel"><option value="">Any</option><option value="female">Female</option><option value="male">Male</option></select></span>
           <span class="ttsField ttsSpeed"><label class="kbd" for="ttsRate">Speed</label><input type="range" id="ttsRate" min="0.7" max="1.4" step="0.1" value="1" aria-label="Speech speed"/></span>
-          <button class="btn" onclick="toggleParallel()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-language"></use></svg> Parallel Read</button>
+          <button class="btn" onclick="toggleParallel()" title="Translate this page, with the original beside it"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-language"></use></svg> Translate</button>
           <span class="kbd ttsHint" id="voiceHint">Loading voices that work on this device…</span>
           <button class="btn small ttsClose" type="button" onclick="toggleTtsBar()" aria-label="Hide listen controls" title="Hide listen controls"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-x"></use></svg></button>
         </div>
@@ -523,6 +524,71 @@
         </div>
         <div class="readerPager"><button class="btn" onclick="changePage(-1)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-chevron-left"></use></svg> Prev</button><span class="kbd" id="pageLabel">Not started</span><button class="btn" onclick="changePage(1)">Next <svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-chevron-right"></use></svg></button></div>
       </div>
+    </div>
+
+    <!-- PARALLEL READ: two books side by side (stacked on a phone), scrolling together -->
+    <div id="parallelRead" class="hidden" aria-label="Parallel Read">
+      <div class="prBar">
+        <b class="prBarTitle">Parallel Read</b>
+        <label class="kbd prBarLabel" for="prRight">Beside it</label>
+        <select id="prRight" onchange="prPickRight(this.value)" aria-label="Second book"></select>
+        <label class="kbd prBarLabel" for="prSync">Sync</label>
+        <select id="prSync" onchange="prSetSync(this.value)" aria-label="How the two books scroll together">
+          <option value="unit">By chapter / page</option>
+          <option value="percent">By overall position</option>
+          <option value="off">Off, scroll each on its own</option>
+        </select>
+        <span class="prOffsetWrap" id="prOffsetWrap"><label class="kbd" for="prOffset" title="Use this when the two books do not start on the same chapter or page. For example, 2 means the right book's chapter or page 3 lines up with the left book's 1."><span class="prLong">Right is ahead by</span><span class="prShort">Offset</span></label><input id="prOffset" type="number" step="1" value="0" inputmode="numeric" onchange="prSetOffset(this.value)" aria-label="Right book is ahead by this many chapters or pages"/></span>
+                <span class="popWrap"><button class="btn small" type="button" id="prMarksBtn" aria-expanded="false" aria-haspopup="true" aria-label="Marks in the book in use" onclick="prToggleMarks(this)" title="Highlights, underlines and strikethroughs in the book in use"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-highlighter"></use></svg> <span class="prMarksText">Marks</span> <span class="prCount" id="prMarksCount"></span></button><div class="prMarksPop hidden" id="prMarksPop" role="dialog" aria-label="Marks in the book in use"></div></span>
+        <span class="prZoom" role="group" aria-label="Zoom"><button class="btn small" type="button" onclick="prZoomBy(1/1.2)" aria-label="Zoom out" title="Zoom out (Ctrl + scroll, or pinch)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-out"></use></svg></button><button class="btn small prZoomLabel" type="button" id="prZoomLabel" onclick="prZoomBy(0)" title="Reset zoom to 100%">100%</button><button class="btn small" type="button" onclick="prZoomBy(1.2)" aria-label="Zoom in" title="Zoom in (Ctrl + scroll, or pinch)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-in"></use></svg></button></span>
+        <span class="prSpacer"></span>
+        <button class="btn small" type="button" onclick="closeParallelRead()">Close</button>
+      </div>
+      <div class="prInkBar hidden" id="prInkBar" role="toolbar" aria-label="Annotate both books, drawing tools">
+        <span class="prInkWhoWrap"><span class="tool-label">Annotating</span><b class="prInkWho" id="prInkWho"></b></span>
+        <div class="prInkTools" role="group" aria-label="Tool">
+          <button type="button" class="tool" data-tool="pen" onclick="prSetInkTool('pen')" title="Pen, pressure sensitive" aria-label="Pen"><svg class="ic" aria-hidden="true"><use href="#ticon-pencil"></use></svg></button>
+          <button type="button" class="tool" data-tool="calligraphy" onclick="prSetInkTool('calligraphy')" title="Calligraphy pen, nib angle changes width" aria-label="Calligraphy pen"><svg class="ic" aria-hidden="true"><use href="#ticon-feather"></use></svg></button>
+          <button type="button" class="tool" data-tool="highlighter" onclick="prSetInkTool('highlighter')" title="Highlighter" aria-label="Highlighter"><svg class="ic" aria-hidden="true"><use href="#ticon-highlighter"></use></svg></button>
+          <button type="button" class="tool" data-tool="eraser" onclick="prSetInkTool('eraser')" title="Eraser" aria-label="Eraser"><svg class="ic" aria-hidden="true"><use href="#ticon-eraser"></use></svg></button>
+          <span class="tbDivider" aria-hidden="true"></span>
+          <button type="button" class="tool" data-tool="line" onclick="prSetInkTool('line')" title="Straight line" aria-label="Line"><svg class="ic" aria-hidden="true"><use href="#ticon-line"></use></svg></button>
+          <button type="button" class="tool" data-tool="rect" onclick="prSetInkTool('rect')" title="Rectangle" aria-label="Rectangle"><svg class="ic" aria-hidden="true"><use href="#ticon-rectangle"></use></svg></button>
+          <button type="button" class="tool" data-tool="ellipse" onclick="prSetInkTool('ellipse')" title="Ellipse or circle" aria-label="Ellipse"><svg class="ic" aria-hidden="true"><use href="#ticon-circle"></use></svg></button>
+          <button type="button" class="tool" data-tool="arrow" onclick="prSetInkTool('arrow')" title="Arrow" aria-label="Arrow"><svg class="ic" aria-hidden="true"><use href="#ticon-arrow-up-right"></use></svg></button>
+        </div>
+        <span class="sizeGroup prInkSizeGroup"><span class="tool-label">Size</span>
+          <canvas id="prInkSizePreview" width="64" height="30" style="width:52px;height:24px" aria-hidden="true"></canvas>
+          <input type="range" min="1" max="16" value="4" id="prInkSize" oninput="prSetInkSize(this.value)" aria-label="Size"/>
+          <span id="prInkSizeWord" class="sizeWord">Medium</span></span>
+        <span class="prInkSwatches" id="prInkSwatches" role="group" aria-label="Colour"></span>
+        <input type="color" class="colorPick" id="prInkCustom" value="#18202B" title="Custom colour" aria-label="Custom colour" oninput="prSetInkColor(this.value)"/>
+        <label class="prInkOpt" id="prInkStyleWrap"><span class="tool-label">Style</span><select id="prInkStyle" class="shapeSel" onchange="PRA.style=this.value;prRenderInkBar()" aria-label="Line style"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option><option value="dashdot">Dash-dot</option></select></label>
+        <label class="prInkOpt hidden" id="prInkFillWrap"><input type="checkbox" id="prInkFill" onchange="PRA.fill=this.checked"/> Fill shape</label>
+        <label class="prInkOpt hidden" id="prInkEraserWrap"><span class="tool-label">Eraser</span><select id="prInkEraser" class="shapeSel" onchange="PRA.eraserMode=this.value;prRenderInkBar()" aria-label="How the eraser works"><option value="stroke">Whole stroke, touch and it is gone</option><option value="split">Cut, erases only where you rub</option></select></label>
+        <button class="btn small" type="button" id="prUndoBtn" onclick="prInkUndo()" title="Undo (Ctrl+Z)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-undo"></use></svg> Undo</button>
+        <button class="btn small" type="button" id="prRedoBtn" onclick="prInkRedo()" title="Redo (Ctrl+Y)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-redo"></use></svg> Redo</button>
+        <span class="prSpacer"></span>
+        <button class="btn small" type="button" id="prOpenEditorBtn" onclick="prOpenInEditor()" title="Text, images, stickies, LaTeX and the floating board, on the same page, same ink">Open in editor</button>
+        <button class="btn small primary" type="button" onclick="prInkDone()" title="Stop annotating this book (Esc stops both)">Done</button>
+      </div>
+      
+      <!-- ONE "Annotate" button: switches Annotate on for BOTH books (PDF or EPUB); Done / Esc switch it off -->
+      <button type="button" class="annotateFab hidden" id="prAnnotateFab" onclick="prAnnotateThisPdf()" title="Annotate both books: draw on either one" aria-label="Annotate both books"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-pencil"></use></svg> Annotate</button>
+      <div class="prMain">
+        <div class="prRailBox"><div class="prRailLabel" id="prRailLabel">Page</div><div class="prRailTrack"><div class="prRail" id="prRail" role="navigation"></div></div></div>
+        <div class="prGrid">
+          <div class="prCol"><div class="prHead"><b id="prTitleL"></b><span class="kbd" id="prPosL"></span></div><div class="prBody"><div class="prPane" id="prPaneL" tabindex="0" aria-label="First book"></div></div></div>
+          <div class="prCol"><div class="prHead"><b id="prTitleR"></b><span class="kbd" id="prPosR"></span></div><div class="prBody"><div class="prPane" id="prPaneR" tabindex="0" aria-label="Second book"></div></div></div>
+        </div>
+      </div>
+      <p class="kbd prHelp">Scroll either book and the other follows. The page numbers on the left belong to the book you are using, the one with the coloured edge. Scroll them, or tap one, to move through it. Zoom the book under the pointer with Ctrl + scroll or a pinch, or the book in use with the zoom buttons. Highlighting, Listen and OCR work in the normal reader. Tap Close to get back to it.</p>
+    </div>
+    <div id="prSelBar" class="prSelBar hidden" role="toolbar" aria-label="Mark the selected text">
+      <button type="button" onpointerdown="event.preventDefault()" onclick="annotateSelection('highlight')"><mark class="prSelSample">Highlight</mark></button>
+      <button type="button" onpointerdown="event.preventDefault()" onclick="annotateSelection('underline')"><span class="prSelUnderline">Underline</span></button>
+      <button type="button" onpointerdown="event.preventDefault()" onclick="annotateSelection('strike')"><span class="prSelStrike">Strikethrough</span></button>
+      <button type="button" onpointerdown="event.preventDefault()" onclick="lookupSelection();prHideSelBar()">Look up</button>
     </div>
   </section>
 </main>
@@ -561,6 +627,6 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<script src="app.js"></script>
+<script src="app.js?v=2026-11-18-merge-parallel-read"></script>
 </body>
 </html>
