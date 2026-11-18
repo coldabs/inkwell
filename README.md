@@ -17,6 +17,10 @@ Open-source handwriting notes and PDF / EPUB reader. All features free — no pa
 - Focus timer, split screen, bidirectional links, handwriting-to-text
 - Audio-synced notes, export and backup
 
+## Design
+
+The interface follows the editorial ink direction in `DESIGN.md`: warm paper, dense ink, one vermilion accent, Newsreader for display and reading, Instrument Sans for the interface. Icons are Tabler Icons (MIT), inlined as a small SVG sprite so the page loads only the glyphs it uses.
+
 ## Status
 
 In active development. The web preview is the current build vehicle; the Android app is the main goal, with a website version alongside it. Phone first, tablet layouts throughout, PC later.
