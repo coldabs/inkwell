@@ -718,15 +718,15 @@ body.prOn #resumeLabel{display:none}
 }
 @media (max-width:700px){
   body.prOn .layout{padding-bottom:16px}
-  .prBar{gap:4px;padding:6px 8px}
-  .prBarTitle,.prBarLabel,.prMarksText{display:none}
-  #prRight{flex:1 1 52%}
-  #prSync{flex:1 1 30%}
-  .prBar select{min-width:0}
+  /* Phone: the book picker and Sync get labelled rows that wrap, so both are reachable without sideways scrolling; controls keep a 44px target. */.prBar{gap:6px;padding:8px;flex-wrap:wrap}
+  .prBarTitle,.prMarksText{display:none}.prBarLabel{display:inline}
+  #prRight{flex:1 1 180px}
+  #prSync{flex:1 1 140px}
+  .prBar select{min-width:0;min-height:44px}.prBar input{min-height:44px}.prBar .btn{min-height:44px}
   .prLong{display:none}
   .prShort{display:inline}
   .prOffsetWrap{flex:0 0 auto}
-  .prZoom .btn{min-width:30px;min-height:32px;padding:0 6px}
+  .prZoom .btn{min-width:44px;min-height:44px;padding:0 8px}
   .prZoom .prZoomLabel{min-width:48px}
   .prPane{padding:8px}
   .prMain>.prGrid{padding-left:8px}
@@ -741,8 +741,8 @@ body.prOn #resumeLabel{display:none}
   .prBar{gap:6px;padding:4px 8px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
   .prBar::-webkit-scrollbar{display:none}
   .prBar>*{flex:0 0 auto}
-  .prBar select{max-width:200px}
-  .prBarTitle,.prBarLabel,.prLong{display:none}
+  .prBar select{max-width:200px;min-height:44px}.prBar input{min-height:44px}
+  .prBarTitle,.prLong{display:none}.prBarLabel{display:inline}
   .prShort{display:inline}
   .prBody{height:calc(100vh - 116px);height:calc(100dvh - 116px);min-height:200px}
   .prHelp{display:none}
