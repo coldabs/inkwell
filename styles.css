@@ -544,6 +544,7 @@ mark{background:#F2D887;color:#1A1A1A;padding:0 2px;border-radius:2px}
   .titleField{flex:1 1 150px;min-width:120px}
   #noteTitle{font-size:20px}
   .toolbar{position:static;padding:6px;margin-top:8px}
+     #mainToolbar{position:relative}
   .tbRowTools{flex-wrap:wrap;overflow:visible;gap:3px}
   .tbRowTools .tool{width:44px;height:44px;min-height:44px}
   .tbRowTools .iconBtn{width:44px;height:44px;min-width:44px;min-height:44px}
