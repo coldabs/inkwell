@@ -1157,8 +1157,8 @@ function insertPageImage(e){
   r.onload=()=>{ let img=new Image(); img.onload=()=>{ let p=curPageObj(); if(!p) return; if(!p.images) p.images=[]; let w=Math.min(440, img.naturalWidth||440); let h=w*((img.naturalHeight||300)/(img.naturalWidth||440)); let im={id:uid(),x:90,y:90,w:w,h:h,src:String(r.result),_img:img}; p.images.push(im); bumpV(p); renderCanvasImages(); renderPages(); toast('Image on the page. Drag to move, drag the corner dot to resize, or use × to remove it.'); }; img.src=String(r.result); };
   r.readAsDataURL(f);
 }
-let editorZoom=1;
-function editorZoomBy(f){ editorZoom= f===0? 1 : Math.max(0.5, Math.min(2.5, editorZoom*f)); S.zoom=editorZoom; $('canvasShell').style.width=(editorZoom*100)+'%'; var zl=$('zoomLabel'); if(zl) zl.textContent=Math.round(editorZoom*100)+'%'; updateStatusBar(); }
+let editorZoom=1; let readerZoom=1; let readerZoomT=null;
+function editorZoomBy(f){ editorZoom= f===0? 1 : Math.max(0.5, Math.min(2.5, editorZoom*f)); S.zoom=editorZoom; $('canvasShell').style.width=(editorZoom*100)+'%'; var zl=$('zoomLabel'); if(zl) zl.textContent=Math.round(editorZoom*100)+'%'; var zs=$('zoomSlider'); if(zs) zs.value=Math.round(editorZoom*100); updateStatusBar(); } function editorZoomSlider(el){ editorZoom=Math.max(0.5,Math.min(2.5,(parseInt(el.value,10)||100)/100)); S.zoom=editorZoom; $('canvasShell').style.width=(editorZoom*100)+'%'; var zl2=$('zoomLabel'); if(zl2) zl2.textContent=Math.round(editorZoom*100)+'%'; var zs2=$('zoomSlider'); if(zs2) zs2.value=Math.round(editorZoom*100); updateStatusBar(); } function readerZoomBy(f){ readerZoom=prClampZoom(f===0?1:readerZoom*f); let b=curBook(); if(b) b.readerZoom=readerZoom; let host=$('pdfPages'); if(host) host.style.width=(readerZoom*100)+'%'; let zl3=$('readerZoomLabel'); if(zl3) zl3.textContent=Math.round(readerZoom*100)+'%'; clearTimeout(readerZoomT); readerZoomT=setTimeout(()=>{ if(host) pdfRefresh(host,pdfDrawIO); },120); } let readerPinch=null; function readerTouchStart(e){ if(!e.touches||e.touches.length!==2) return; let b=curBook(); if(!b||b.kind!=='pdf') return; let host=$('pdfPages'); if(!host) return; let a=e.touches[0],c=e.touches[1],r=host.getBoundingClientRect(); readerPinch={host:host,d0:Math.max(20,Math.hypot(a.clientX-c.clientX,a.clientY-c.clientY)),z0:readerZoom,s:1}; host.style.transformOrigin=((a.clientX+c.clientX)/2-r.left)+'px '+((a.clientY+c.clientY)/2-r.top)+'px'; } function readerTouchMove(e){ if(!readerPinch||!e.touches||e.touches.length!==2) return; let a=e.touches[0],c=e.touches[1]; let z=prClampZoom(readerPinch.z0*Math.hypot(a.clientX-c.clientX,a.clientY-c.clientY)/readerPinch.d0); readerPinch.s=z/readerPinch.z0; readerPinch.host.style.transform='scale('+readerPinch.s+')'; } function readerTouchEnd(e){ if(!readerPinch||(e.touches&&e.touches.length>=2)) return; let p=readerPinch; readerPinch=null; p.host.style.transform=''; p.host.style.transformOrigin=''; if(Math.abs(p.s-1)>0.02) readerZoomBy(p.s); } (function(){ let pv=$('pdfView'); if(!pv) return; pv.addEventListener('touchstart',readerTouchStart,{passive:true}); pv.addEventListener('touchmove',readerTouchMove,{passive:true}); pv.addEventListener('touchend',readerTouchEnd,{passive:true}); pv.addEventListener('touchcancel',readerTouchEnd,{passive:true}); })();
 function setPageBg(v){ let p=curPageObj(); if(!p) return; p.bgColor=v; bumpV(p); drawBackground(); renderPages(); }
 
 /* pointer drawing */
@@ -1177,7 +1177,7 @@ function shouldDraw(e){ return S.tool!=='hand'; }
    page jump; scrolling is done by hand here instead. ONE finger (or a
    stylus / mouse) draws with whatever tool is picked. A TWO-finger drag
    pans the page, and the zoomed canvas inside its scroller, even while
-   a drawing tool is active. The Hand tool pans with one finger. There is
+   a drawing tool is active. Spreading or pinching the two fingers zooms the page. The Hand tool pans with one finger. There is
    no Finger mode to set and nothing to confirm: a selected tool just
    works, and two fingers always move the page.
    When the second finger lands, any half-drawn stroke is thrown away
@@ -1186,7 +1186,7 @@ function shouldDraw(e){ return S.tool!=='hand'; }
    after the pan ends is ignored until it lifts, so lifting one finger
    never drops the other back into a stroke mid-page. A touch that lands
    while a stylus is down is treated as a palm, not a pan. */
-let inkPtrs=new Map(), panMid=null, handPan=null, panDead=new Set(), strokeUndoPushed=false;
+let inkPtrs=new Map(), panMid=null, handPan=null, panDead=new Set(), strokeUndoPushed=false, pinchZoom=null;
 function updateInkTouchAction(){ inkC.style.touchAction='none'; inkC.style.cursor= S.tool==='hand'? 'grab' : 'crosshair'; }
 function zoomScroller(){ return inkC.closest? inkC.closest('.zoomScroll') : null; }
 function panViewportBy(dx,dy){
@@ -1196,7 +1196,7 @@ function panViewportBy(dx,dy){
   if(sc){ let pl=sc.scrollLeft, pt=sc.scrollTop; sc.scrollLeft-=dx; sc.scrollTop-=dy; remX=dx-(pl-sc.scrollLeft); remY=dy-(pt-sc.scrollTop); }
   if(remX||remY) window.scrollBy(-remX,-remY);
 }
-function inkPtrMid(){ let ps=Array.from(inkPtrs.values()); return ps.length>=2? {x:(ps[0].x+ps[1].x)/2, y:(ps[0].y+ps[1].y)/2} : null; }
+function inkPtrMid(){ let ps=Array.from(inkPtrs.values()); return ps.length>=2? {x:(ps[0].x+ps[1].x)/2, y:(ps[0].y+ps[1].y)/2} : null; } function inkPtrDist(){ let ps=Array.from(inkPtrs.values()); return ps.length>=2?Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y):0; }
 function abortGestureForPan(){
   let wasMove=!!moveDrag;
   if(curStroke){ if(strokeUndoPushed && S.undoStack.length) S.undoStack.pop(); curStroke=null; }
@@ -1243,7 +1243,7 @@ inkC.addEventListener('pointerdown',e=>{
     e.preventDefault();
     try{ inkC.setPointerCapture(e.pointerId); }catch(err){}
     abortGestureForPan();
-    panMid=inkPtrMid();
+    panMid=inkPtrMid(); pinchZoom={d0:Math.max(20,inkPtrDist()),z0:editorZoom};
     inkPtrs.forEach((v,id)=>panDead.add(id));
     return;
   }
@@ -1307,7 +1307,7 @@ inkC.addEventListener('pointermove',e=>{
   if(panMid){
     let m=inkPtrMid(); if(!m) return;
     let dx=m.x-panMid.x, dy=m.y-panMid.y; panMid=m;
-    if(dx||dy){ e.preventDefault(); panViewportBy(dx,dy); }
+    if(dx||dy){ e.preventDefault(); panViewportBy(dx,dy); } if(pinchZoom){ let z=Math.max(0.5,Math.min(2.5,pinchZoom.z0*inkPtrDist()/Math.max(20,pinchZoom.d0))); if(Math.abs(z-editorZoom)>0.005) editorZoomBy(z/editorZoom); }
     return;
   }
   if(panDead.has(e.pointerId)) return;
@@ -1368,7 +1368,7 @@ function endStroke(){
 function inkPointerUp(e){
   let wasPan=!!panMid, wasHand=!!handPan;
   inkPtrs.delete(e.pointerId); panDead.delete(e.pointerId);
-  if(wasPan){ if(inkPtrs.size<2) panMid=null; return; }
+  if(wasPan){ if(inkPtrs.size<2){ panMid=null; pinchZoom=null; } return; }
   if(panDead.size) return; /* a finger left over from a pan never draws */
   if(wasHand){ handPan=null; return; }
   endStroke();
@@ -1711,7 +1711,7 @@ function loadPageIntoEditor(){
   if(!p.texts) p.texts=[]; if(!p.images) p.images=[]; if(!p.texs) p.texs=[]; if(!p.bgColor) p.bgColor='#fffdf6';
   let bgSel=$('pageBgSel'); if(bgSel) bgSel.value=p.bgColor;
   S.selection=[]; S.selRect=null; let sb=$('selBar'); if(sb) sb.classList.remove('open');
-  redrawAll(); renderStickies(); renderTable(); renderPages(); refreshLinks(); updateWordCount(); updateAudioUI(); renderCanvasTexts(); renderCanvasImages(); renderTexLayer();
+  redrawAll(); renderStickies(); renderTable(); renderPages(); refreshLinks(); updateWordCount(); updateAudioUI(); renderCanvasTexts(); renderCanvasImages(); renderTexLayer(); let btr=$('backToReadingBtn'); if(btr) btr.classList.toggle('hidden',!nb.pdfBookId);
   if(!$('floatingBoard').classList.contains('hidden')) loadBoard();
 }
 function switchPage(i){
@@ -2386,8 +2386,8 @@ function openBook(id){
   else { showEpubChrome(); renderEpubBook(); }
   showView('reader'); renderReaderSide();
 }
-function showEpubChrome(){ $('pdfView').classList.add('hidden'); $('readerArticle').classList.remove('hidden'); $('ttsBar').classList.add('hidden'); var f=$('annotateFab'); if(f) f.classList.add('hidden'); }
-function showPdfChrome(){ $('pdfView').classList.remove('hidden'); $('readerArticle').classList.add('hidden'); $('ttsBar').classList.add('hidden'); $('parallelBox').classList.add('hidden'); var f=$('annotateFab'); if(f) f.classList.remove('hidden'); }
+function showEpubChrome(){ $('pdfView').classList.add('hidden'); $('readerArticle').classList.remove('hidden'); $('ttsBar').classList.add('hidden'); var f=$('annotateFab'); if(f) f.classList.add('hidden'); var rz=$('readerZoomGroup'); if(rz) rz.classList.add('hidden'); }
+function showPdfChrome(){ $('pdfView').classList.remove('hidden'); $('readerArticle').classList.add('hidden'); $('ttsBar').classList.add('hidden'); $('parallelBox').classList.add('hidden'); var f=$('annotateFab'); if(f) f.classList.remove('hidden'); var rz=$('readerZoomGroup'); if(rz) rz.classList.remove('hidden'); }
 function closePdf(){ let b=curBook(); if(b) b.mode='scroll'; showView('library'); }
 function setReaderMode(m){
   prLeave();
@@ -2633,7 +2633,7 @@ async function renderPdfBook(){
   if(token!==pdfToken) return;
   b.page=Math.max(1,Math.min(b.numPages,b.page||1));
   let nums=[]; if(b.mode==='page') nums.push(b.page); else for(let n=1;n<=b.numPages;n++) nums.push(n);
-  let holders=pdfBuildPages(host,b,sizes,nums,'pdfPage');
+  let holders=pdfBuildPages(host,b,sizes,nums,'pdfPage'); readerZoom=b.readerZoom||1; host.style.width=(readerZoom*100)+'%'; var rzl=$('readerZoomLabel'); if(rzl) rzl.textContent=Math.round(readerZoom*100)+'%';
   st.classList.add('hidden'); st.textContent='';
   pdfLastW=window.innerWidth;
   pdfDrawIO=pdfWatch(holders,null,b,live);
@@ -2990,7 +2990,7 @@ async function annotatePdf(id){
   S.items.unshift(nb); openNotebook(nb.id);
   toast('Annotate freely. Ink stays in this notebook, and the PDF file is untouched.');
 }
-function annotateCurrentPdf(){ let b=curBook(); if(b) annotatePdf(b.id); }
+function annotateCurrentPdf(){ let b=curBook(); if(b) annotatePdf(b.id); } function backToReading(){ let nb=curNb(); if(!nb||!nb.pdfBookId) return; saveEditorToModel(); let b=S.items.find(i=>i.id===nb.pdfBookId); if(!b){ toast('The PDF for this notebook is no longer on the shelf'); return; } let p=nb.pages[nb.cur]; let pg=(p&&p.bgPdf&&p.bgPdf.page)||(nb.cur+1); if(b.kind==='pdf'&&b.numPages) b.page=Math.max(1,Math.min(b.numPages,pg)); openBook(nb.pdfBookId); }
 
 /* ============ focus timer ============ */
 let timerSec=25*60, timerInt=null;
