@@ -24,6 +24,7 @@
   --shadow-sheet:0 2px 0 rgba(24,32,43,.04),0 24px 48px -28px rgba(24,32,43,.45);
   --shadow-cover:0 12px 24px -16px rgba(24,32,43,.55);
   --shadow-modal:0 30px 80px -30px rgba(24,32,43,.65);
+  --shadow-nav:0 18px 40px -32px rgba(24,32,43,.65),0 1px 0 rgba(24,32,43,.03);
   --radius-xs:2px;
   --radius-sm:4px;
   --radius-md:6px;
@@ -52,6 +53,7 @@
     --shadow-sheet:0 2px 0 rgba(0,0,0,.3),0 24px 48px -24px rgba(0,0,0,.8);
     --shadow-cover:0 14px 28px -14px rgba(0,0,0,.8);
     --shadow-modal:0 30px 80px -30px rgba(0,0,0,.9);
+    --shadow-nav:0 18px 40px -28px rgba(0,0,0,.9),0 1px 0 rgba(255,255,255,.04);
     color-scheme:dark;
   }
 }
@@ -62,6 +64,7 @@
   --shadow-sheet:0 2px 0 rgba(24,32,43,.04),0 24px 48px -28px rgba(24,32,43,.45);
   --shadow-cover:0 12px 24px -16px rgba(24,32,43,.55);
   --shadow-modal:0 30px 80px -30px rgba(24,32,43,.65);
+  --shadow-nav:0 18px 40px -32px rgba(24,32,43,.65),0 1px 0 rgba(24,32,43,.03);
   color-scheme:light;
 }
 :root[data-theme="dark"]{
@@ -71,6 +74,7 @@
   --shadow-sheet:0 2px 0 rgba(0,0,0,.3),0 24px 48px -24px rgba(0,0,0,.8);
   --shadow-cover:0 14px 28px -14px rgba(0,0,0,.8);
   --shadow-modal:0 30px 80px -30px rgba(0,0,0,.9);
+  --shadow-nav:0 18px 40px -28px rgba(0,0,0,.9),0 1px 0 rgba(255,255,255,.04);
   color-scheme:dark;
 }
 
@@ -122,13 +126,17 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 /* ---------- library frame ---------- */
 .layout{max-width:var(--max);margin:0 auto;padding:28px 32px 124px}
 .layout.shelf{max-width:1180px}
-.masthead{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:4px 0 18px;border-bottom:1px solid var(--line-strong)}
-.wordmark{display:flex;align-items:baseline;gap:12px;color:var(--ink);text-decoration:none;min-width:0}
+.masthead{position:sticky;top:12px;z-index:50;display:grid;grid-template-columns:minmax(150px,1fr) minmax(280px,560px) minmax(150px,1fr);align-items:center;gap:16px;padding:10px 14px;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius-md);box-shadow:var(--shadow-nav)}
+.wordmark{display:flex;align-items:baseline;gap:12px;justify-self:start;color:var(--ink);text-decoration:none;min-width:0}
 .wordmarkName{font-family:var(--font-display);font-size:26px;font-weight:600;letter-spacing:-.03em;line-height:1}
 .wordmarkTag{font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
-.mastheadTools{display:flex;align-items:center;gap:8px;flex:0 0 auto}
-.saveFlag{font-size:11px;line-height:1.4;color:var(--muted);max-width:260px;text-align:right}
-.libraryHead{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,420px);align-items:end;gap:44px;padding:58px 0 34px}
+.mastheadTools{display:flex;align-items:center;justify-self:end;gap:8px;flex:0 0 auto}
+.saveFlag{font-size:11px;line-height:1.4;color:var(--muted);max-width:210px;text-align:right}
+.libraryHead{display:block;padding:52px 0 32px}
+.navSearch{width:100%;max-width:560px;justify-self:center}
+.navSearch .search{min-height:44px;background:var(--paper)}
+.navSearch .search input{height:42px}
+.navSearch .searchResults{top:calc(100% + 12px)}
 .libraryTitle h1{font-family:var(--font-display);font-size:clamp(3rem,5.4vw,4.6rem);font-weight:500;line-height:.92;letter-spacing:-.045em;margin:0 0 18px}
 .lede{font-family:var(--font-display);font-size:20px;line-height:1.45;color:var(--muted);max-width:34ch;margin:0}
 .searchWrap{position:relative;min-width:0}
@@ -487,7 +495,11 @@ mark{background:#F2D887;color:#1A1A1A;padding:0 2px;border-radius:2px}
 @media(min-width:1080px){
   .grid{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
+@media(max-width:1200px){
+  .saveFlag{display:none}
+}
 @media(max-width:1100px){
+  .masthead{grid-template-columns:auto minmax(220px,1fr) auto;gap:12px}
   .editorWrap{grid-template-columns:170px minmax(0,1fr) 230px;gap:18px}
 }
 @media(max-width:980px){
@@ -501,13 +513,15 @@ mark{background:#F2D887;color:#1A1A1A;padding:0 2px;border-radius:2px}
 }
 @media(max-width:860px){
   .layout{padding:16px 16px 108px}
-  .masthead{gap:12px;padding-bottom:14px}
-  .wordmark{flex-direction:column;gap:3px}
+  .masthead{grid-template-columns:1fr auto;gap:8px;padding:8px 10px;top:8px}
+  .wordmark{grid-column:1;grid-row:1;flex-direction:column;gap:3px}
   .wordmarkName{font-size:23px}
   .wordmarkTag{font-size:9px}
+  .mastheadTools{grid-column:2;grid-row:1}
+  .navSearch{grid-column:1/-1;grid-row:2;max-width:none;justify-self:stretch}
   .saveFlag{display:none}
   .iconBtn{width:44px;height:44px;min-width:44px;min-height:44px}
-  .libraryHead{grid-template-columns:1fr;gap:24px;padding:38px 0 26px}
+  .libraryHead{padding:32px 0 24px}
   .libraryTitle h1{font-size:clamp(2.8rem,12vw,4rem);margin-bottom:12px}
   .lede{font-size:18px;max-width:40ch}
   .search input{font-size:16px}

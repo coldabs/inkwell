@@ -36,7 +36,7 @@ Type scale: 11px labels, 13px controls, 15px body UI, 19px reading default, 28â€
 
 ## Composition
 
-- **Library:** a catalogue masthead, not a hero. Wordmark, shelf title, one line of description, then the search and filter line. The shelf is a grid of cloth-bound covers with real metadata.
+- **Library:** a floating navigation bar carries the wordmark, search and theme controls over the shelf. Below it, a catalogue masthead, not a hero: shelf title, one line of description, then the filter line. The shelf is a grid of cloth-bound covers with real metadata.
 - **Editor:** the page is the focal point. Side rails are flat, separated by hairlines. The toolbar is an instrument rail, not a floating card. The paper sheet has the only substantial shadow because it is the only physical object.
 - **Reader:** one narrow measure, generous leading, a running head, and a single drop cap at the start of a book. Sidebar material is reference apparatus, set smaller and quieter than the reading column.
 - **Modals:** rare, paper-white, one elevation, no glass.
@@ -46,7 +46,7 @@ Type scale: 11px labels, 13px controls, 15px body UI, 19px reading default, 28â€
 - Radius scale: 2px for inputs and small controls, 4px for buttons and paper edges, 6px for modals, 8px for covers. No pills.
 - Buttons are rectangular, with a 40px minimum height and a 44px touch target on mobile. Primary actions use ink; the single accent is reserved for "New notebook", the active filter rule, focus, and the bookmark state.
 - Icons are Tabler Icons outline, inline sprite, 1.7px stroke at 18px. Chosen by the owner. The set is consistent and relevant to the tools, not a decorative icon wall.
-- Shadows only on the paper sheet, the book covers, the reading sheet, the action dock, and the modal. The dock is elevated because it floats over the scrolling shelf and is the only persistent chrome that overlaps content. Toolbars, panels and sidebar rows sit flat.
+- Shadows only on the paper sheet, the book covers, the reading sheet, the floating navigation bar, the action dock, and the modal. The navigation bar and action dock are elevated because they float over the scrolling shelf and are the only persistent chrome that overlaps content. Toolbars, panels and sidebar rows sit flat.
 - Texture: none. The warmth of the paper and the hairline do the work.
 
 ## Motion

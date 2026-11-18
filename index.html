@@ -123,8 +123,16 @@
         <span class="wordmarkName">Inkwell</span>
         <span class="wordmarkTag">Notes &amp; reading</span>
       </a>
+      <div class="searchWrap navSearch" role="search" aria-label="Search the shelf">
+        <div class="search">
+          <svg class="ic searchIcon" aria-hidden="true"><use href="#ticon-search"></use></svg>
+          <input id="globalSearch" placeholder="Search notes, notebooks and books" aria-label="Search notebooks and notes" oninput="onSearchInput()" autocomplete="off"/>
+          <kbd class="searchKbd" title="Press / to search">/</kbd>
+        </div>
+        <div id="searchResults" class="searchResults hidden"></div>
+      </div>
       <div class="mastheadTools">
-        <span class="saveFlag" id="saveStatus" aria-live="polite">Saves automatically in this browser</span>
+        <span class="saveFlag" id="saveStatus" aria-live="polite">Saves in this browser</span>
         <button class="iconBtn" id="themeToggle" type="button" onclick="toggleTheme()" aria-label="Switch to dark theme" title="Switch theme">
           <svg class="ic" aria-hidden="true"><use href="#ticon-moon"></use></svg>
         </button>
@@ -139,14 +147,6 @@
         <p class="runningHead">Your library</p>
         <h1 id="shelfTitle">Your shelf</h1>
         <p class="lede">Handwritten notebooks and long-form reading, kept on this device.</p>
-      </div>
-      <div class="searchWrap searchMain">
-        <div class="search">
-          <svg class="ic searchIcon" aria-hidden="true"><use href="#ticon-search"></use></svg>
-          <input id="globalSearch" placeholder="Search notes, notebooks and books" aria-label="Search notebooks and notes" oninput="onSearchInput()" autocomplete="off"/>
-          <kbd class="searchKbd" title="Press / to search">/</kbd>
-        </div>
-        <div id="searchResults" class="searchResults hidden"></div>
       </div>
     </div>
 

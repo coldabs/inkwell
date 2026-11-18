@@ -111,7 +111,7 @@ function deletePdfFile(id){ idbDel('pdf:'+id); }
 function updateSaveStatus(failed){
   let el=$('saveStatus'); if(!el) return;
   if(failed){ el.textContent='Could not save in this browser. Use Backup to keep your notes safe.'; return; }
-  el.textContent= lastSaveAt? 'Saved in this browser · '+new Date(lastSaveAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}) : 'Saves automatically in this browser';
+  el.textContent= lastSaveAt? 'Saved locally · '+new Date(lastSaveAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}) : 'Saves in this browser';
 }
 function scheduleSave(){ if(!persistReady || inSave) return; persistDirty=true; clearTimeout(saveTimer); saveTimer=setTimeout(saveNow,700); }
 function bgPdfImgData(bg){
@@ -543,7 +543,7 @@ function onSearchInput(){
 }
 function runSearchResult(i){ let r=S.searchResults[i]; $('searchResults').classList.add('hidden'); $('libHint').style.visibility=''; setSearchChrome(false); if(r&&r.act) r.act(); }
 document.addEventListener('click',e=>{ if(!e.target.closest('.searchWrap')){ $('searchResults').classList.add('hidden'); let lh=$('libHint'); if(lh) lh.style.visibility=''; setSearchChrome(false); } });
-$('globalSearch').addEventListener('keydown',e=>{ if(e.key!=='Escape') return; $('searchResults').classList.add('hidden'); $('libHint').style.visibility=''; setSearchChrome(false); e.currentTarget.blur(); });
+$('globalSearch').addEventListener('keydown',e=>{ if(e.key!=='Escape') return; e.currentTarget.value=''; $('searchResults').classList.add('hidden'); $('libHint').style.visibility=''; setSearchChrome(false); renderLibrary(); e.currentTarget.blur(); });
 
 /* ============ notebooks: create / open ============ */
 function openNewNotebook(){$('newModal').classList.add('open'); setTimeout(()=>$('newTitle').focus(),50)}
