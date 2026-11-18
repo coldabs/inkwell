@@ -2868,17 +2868,20 @@ async function prBuildPane(side,book,tok){
     el.innerHTML=''; el.appendChild(wrap); prPadEnd(P);
     return P;
   }
-  /* PDF: one placeholder per page, sized to the page's shape, so the
-     layout (and therefore sync) is right before any page is drawn; pages
-     are drawn only as they come near the visible part of the pane. */
-  let v1;
-  try{ let first=await book.doc.getPage(1); v1=first.getViewport({scale:1}); }catch(e){ return null; }
+  /* PDF: one placeholder per page, each sized to ITS OWN page's shape
+     before anything is drawn, so the layout is final from the start —
+     a landscape or tall page never resizes later and shifts the pane
+     under the reader (which would throw the two panes out of step).
+     Pages are drawn only as they come near the visible part of the pane. */
+  let sizes;
+  try{ sizes=await prPdfPageSizes(book); }catch(e){ return null; }
   if(tok!==PR.token) return null;
   let wrap=document.createElement('div'); wrap.className='prPdf';
   for(let n=1;n<=book.numPages;n++){
     let pg=document.createElement('section'); pg.className='prPage'; pg.dataset.unit=n-1;
     let lab=document.createElement('div'); lab.className='pdfPageNum'; lab.textContent='Page '+n+' of '+book.numPages; pg.appendChild(lab);
-    let holder=document.createElement('div'); holder.className='prHolder'; holder.dataset.n=n; holder.style.aspectRatio=v1.width+' / '+v1.height; pg.appendChild(holder);
+    let sz=sizes[n-1]||sizes[0];
+    let holder=document.createElement('div'); holder.className='prHolder'; holder.dataset.n=n; holder.style.aspectRatio=sz[0]+' / '+sz[1]; pg.appendChild(holder);
     wrap.appendChild(pg);
   }
   el.innerHTML=''; el.appendChild(wrap); prPadEnd(P);
@@ -2886,6 +2889,20 @@ async function prBuildPane(side,book,tok){
   wrap.querySelectorAll('.prHolder').forEach(h=>io.observe(h));
   el._io=io;
   return P;
+}
+/* every page's size (rotation included), read once per opened file and
+   kept in memory only (never saved); fetched in small batches so a long
+   PDF does not flood pdf.js */
+async function prPdfPageSizes(book){
+  if(book._pageSizes && book._pageSizesDoc===book.doc && book._pageSizes.length===book.numPages) return book._pageSizes;
+  let sizes=[];
+  for(let start=1; start<=book.numPages; start+=16){
+    let batch=[]; for(let n=start; n<Math.min(book.numPages+1,start+16); n++) batch.push(n);
+    let got=await Promise.all(batch.map(n=>book.doc.getPage(n).then(p=>{ let v=p.getViewport({scale:1}); return [v.width,v.height]; })));
+    sizes=sizes.concat(got);
+  }
+  book._pageSizes=sizes; book._pageSizesDoc=book.doc;
+  return sizes;
 }
 async function prDrawPdfPage(book,n,holder,tok){
   try{
