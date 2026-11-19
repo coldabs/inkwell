@@ -163,6 +163,17 @@ async function saveNow(){
   if(persistSaveAgain){ persistSaveAgain=false; scheduleSave(); }
 }
 function dataUrlToCanvas(url){ return new Promise((res,rej)=>{ let img=new Image(); img.onload=()=>{ let c=document.createElement('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight; c.getContext('2d').drawImage(img,0,0); res(c); }; img.onerror=()=>rej(new Error('image failed')); img.src=url; }); }
+/* The size of a PDF page behind a notebook page, in PDF points: stored
+   w/h first, else the decoded background picture, else null (callers fall
+   back to the book's page sizes or Letter). This helper was called in
+   three places but never defined, so every save threw and the reading-mode
+   ink overlay could never draw. */
+function bgPdfSize(bg){
+  if(!bg) return null;
+  if(bg.w && bg.h) return [bg.w, bg.h];
+  if(bg.img && bg.img.width && bg.img.height) return [bg.img.width, bg.img.height];
+  return null;
+}
 /* A restored notebook page keeps its PDF background as a data URL and
    decodes it only when the page is actually viewed, decoding every
    page of every notebook during startup was a major cause of the slow
@@ -208,7 +219,7 @@ async function restoreLibrary(token){
         p.board=rp.board?{color:rp.board.color||0,strokes:rp.board.strokes||[],view:rp.board.view||{x:0,y:0,k:1},geom:rp.board.geom||null}:null;
         if(rp.audio && rp.audio.blob){ try{ p.audio={blob:rp.audio.blob,dur:rp.audio.dur||0,url:URL.createObjectURL(rp.audio.blob)}; }catch(e){} }
         if(rp.bgPdf){ /* keep the data URL and decode it lazily when the page is viewed, decoding every page here was a big part of the slow startup */
-          p.bgPdf={page:rp.bgPdf.page,bookTitle:rp.bgPdf.bookTitle,img:null,imgData:rp.bgPdf.imgData||null}; }
+          p.bgPdf={page:rp.bgPdf.page,bookTitle:rp.bgPdf.bookTitle,img:null,imgData:rp.bgPdf.imgData||null,w:rp.bgPdf.w||null,h:rp.bgPdf.h||null}; }
         nb.pages.push(p);
       }
       if(!nb.pages.length) nb.pages.push(blankPage());
@@ -594,6 +605,10 @@ function openNotebook(id){
   $('templateSel').value=nb.template;
   loadPageIntoEditor();
   showView('editor');
+  /* phone: always open at fit-to-width so the page uses the freed space —
+     a zoom left over from an earlier pinch (e.g. 70%) used to leave the
+     page small with empty margins around it */
+  if(window.matchMedia('(max-width:860px)').matches) editorZoomBy(0);
   requestAnimationFrame(()=>{ renderCanvasTexts(); });
   renderLibrary();
   /* warm this notebook's remaining page backgrounds in the background,
@@ -2269,7 +2284,7 @@ function handleImport(e){
   if(name.endsWith('.txt')){ let r=new FileReader(); r.onload=()=>{ let text=String(r.result);
     let book={id:uid(),kind:'epub',title:f.name.replace(/\.[^.]+$/,''),color:'#2e6f6a',updated:'Imported just now',ch:0,mode:'scroll',bookmarks:[],annotations:[],parallelNotes:{},
       chapters:[{title:f.name.replace(/\.[^.]+$/,''), html:text.split(/\n\s*\n/).map(p=>'<p>'+esc(p)+'</p>').join(''), text:text}]};
-    S.items.unshift(book); renderLibrary(); openBook(book.id); toast('Text file opened in the reader'); }; r.readAsText(f); return; }
+    S.items.unshift(book); renderLibrary(); afterImportOpen(book); toast('Text file opened in the reader'); }; r.readAsText(f); return; }
   toast('That file type is not supported. Use PDF, EPUB or TXT.');
 }
 async function importPdf(f){
@@ -2288,7 +2303,7 @@ async function importPdf(f){
        the next reload. */
     try{ await persistPdfFile(book); }
     catch(e){ toast('The PDF opened, but its file could not be saved in this browser, so it may not survive a reload. Storage may be full. Export a backup to keep it safe.',6000); }
-    openBook(book.id);
+    afterImportOpen(book);
   }catch(err){ toast('That PDF could not be opened'+(err&&err.message? ' ('+err.message+')':'')+'. Password-protected or damaged files will not open.'); }
 }
 
@@ -2352,7 +2367,7 @@ async function importEpub(f){
     }
     if(!chapters.length) throw new Error('no readable chapters found');
     let book={id:uid(),kind:'epub',title:bookTitle,color:'#2e6f6a',updated:'Imported just now',ch:0,mode:'scroll',bookmarks:[],annotations:[],chapters:chapters,parallelNotes:{}};
-    S.items.unshift(book); renderLibrary(); openBook(book.id);
+    S.items.unshift(book); renderLibrary(); afterImportOpen(book);
     toast('EPUB opened. '+chapters.length+' chapters, in reading mode');
   }catch(err){ toast('That EPUB could not be read ('+(err&&err.message?err.message:'unknown error')+')'); }
 }
@@ -2373,6 +2388,10 @@ function openBook(id){
     return; }
   closeParallelRead(true); /* a different book opens in the normal reader */
   S.curBookId=id;
+  /* phone: always open at fit-to-width so the page uses the freed space —
+     a zoom left over from an earlier pinch (e.g. 70%) used to leave the
+     page small with empty margins around it */
+  if(window.matchMedia('(max-width:860px)').matches && b.kind==='pdf') b.readerZoom=1;
   $('modeScrollBtn').classList.toggle('active',b.mode!=='page'); $('modePageBtn').classList.toggle('active',b.mode==='page');
   $('dictBox').classList.add('hidden'); $('ocrBox').classList.add('hidden'); $('parallelBox').classList.add('hidden');
   if(b.kind==='pdf'){ showPdfChrome(); renderPdfBook(); }
@@ -2449,14 +2468,20 @@ function wrapTextAcross(container,needle,kind){
     if(sn && e0>r.start && e0<=re){ en=r.node; eo=e0-r.start; break; }
   }
   if(!sn||!en) return false;
-  let range=document.createRange(); range.setStart(sn,so); range.setEnd(en,eo);
-  let wrapEl;
-  if(kind==='underline'){ wrapEl=document.createElement('span'); wrapEl.style.cssText='text-decoration:underline;text-decoration-color:#2456c8;text-decoration-thickness:2px'; }
-  else if(kind==='strike'){ wrapEl=document.createElement('span'); wrapEl.style.cssText='text-decoration:line-through;text-decoration-color:#b23a2e;text-decoration-thickness:2px'; }
-  else wrapEl=document.createElement('mark');
-  wrapEl.setAttribute('data-hl','1');
-  try{ range.surroundContents(wrapEl); return true; }
-  catch(e){ try{ let frag=range.extractContents(); wrapEl.appendChild(frag); range.insertNode(wrapEl); return true; }catch(e2){ return false; } }
+  /* wrap each touched node in its own mark (see wrapRangePerNode): one
+     range across the layer's spans would land a single malformed mark at
+     the layer origin and break mouse selection in the whole layer. */
+  let made=false;
+  for(let r of nodes){
+    let rs=r.start, re=r.start+r.text.length;
+    let s=Math.max(s0,rs), e=Math.min(e0,re);
+    if(e<=s) continue;
+    let el=wrapMarkEl(kind), rr=document.createRange();
+    rr.setStart(r.node,s-rs); rr.setEnd(r.node,e-rs);
+    try{ rr.surroundContents(el); }catch(e2){ let frag=rr.extractContents(); el.appendChild(frag); rr.insertNode(el); }
+    made=true;
+  }
+  return made;
 }
 function wrapTextOnce(container,needle,kind){
   if(!container||!needle) return false;
@@ -2555,6 +2580,7 @@ async function pdfDrawPage(book,n,holder,isLive,onJump){
     let cssVp=page.getViewport({scale:cssScale});
     renderPdfTextLayer(page,cssVp,holder,book,n);
     renderPdfLinks(page,cssVp,holder,book,onJump);
+    renderPdfInkOverlay(book,n,holder,vp); /* the linked notebook's ink, in reading mode too; no-op in Parallel Read panes (guarded inside) */
     if(holder._afterDraw) holder._afterDraw(); /* e.g. Parallel Read puts the page's handwriting over it */
   }catch(e){ /* a page that fails to draw keeps its blank placeholder; the rest still reads */ }
   finally{ if(holder._gen===gen){ holder._drawing=false; holder._task=null; } }
@@ -2799,15 +2825,50 @@ function changePage(d){
 
 /* --- highlights & annotations --- */
 /* wrap a selected range in a highlight / underline / strikethrough, shared by the reader and Parallel Read */
+/* One wrapper element for a mark of the given kind. */
+function wrapMarkEl(kind){
+  let el;
+  if(kind==='underline'){ el=document.createElement('span'); el.style.cssText='text-decoration:underline;text-decoration-color:#2456c8;text-decoration-thickness:2px'; }
+  else if(kind==='strike'){ el=document.createElement('span'); el.style.cssText='text-decoration:line-through;text-decoration-color:#b23a2e;text-decoration-thickness:2px'; }
+  else el=document.createElement('mark');
+  el.setAttribute('data-hl','1');
+  return el;
+}
+/* Wrap a range in marks, one per text node it touches. A range across
+   several absolutely-positioned PDF spans cannot be surroundContents'd as
+   one (it throws), and the extractContents fallback drops a single mark
+   at the layer origin, leaves empty spans behind, and that malformed mark
+   then breaks mouse selection in the whole layer: every mousedown puts
+   the caret at offset 0 of the first node and no drag ever extends it
+   (probe diag5b12 — removing the mark restores selection at once).
+   Wrapping each node's own portion keeps every span intact and each mark
+   sitting exactly over its own text. Returns the first mark made, or null. */
+function wrapRangePerNode(range,kind){
+  let sc=range.startContainer, so=range.startOffset, ec=range.endContainer, eo=range.endOffset;
+  if(sc===ec && sc.nodeType===3){
+    let el=wrapMarkEl(kind), r=document.createRange(); r.setStart(sc,so); r.setEnd(ec,eo);
+    try{ r.surroundContents(el); }catch(e){ let frag=r.extractContents(); el.appendChild(frag); r.insertNode(el); }
+    return el;
+  }
+  let root=range.commonAncestorContainer;
+  let walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:n=> range.intersectsNode(n)? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT});
+  let parts=[], nd;
+  while((nd=walker.nextNode())){
+    let s= nd===sc? so : 0, e= nd===ec? eo : nd.nodeValue.length;
+    if(e>s) parts.push({node:nd, s:s, e:e});
+  }
+  let first=null;
+  parts.forEach(p=>{
+    let el=wrapMarkEl(kind), r=document.createRange(); r.setStart(p.node,p.s); r.setEnd(p.node,p.e);
+    try{ r.surroundContents(el); }catch(e){ let frag=r.extractContents(); el.appendChild(frag); r.insertNode(el); }
+    if(!first) first=el;
+  });
+  return first;
+}
 function wrapRangeAsMark(range,kind){
-  let wrapEl;
-  if(kind==='underline'){ wrapEl=document.createElement('span'); wrapEl.style.cssText='text-decoration:underline;text-decoration-color:#2456c8;text-decoration-thickness:2px'; }
-  else if(kind==='strike'){ wrapEl=document.createElement('span'); wrapEl.style.cssText='text-decoration:line-through;text-decoration-color:#b23a2e;text-decoration-thickness:2px'; }
-  else wrapEl=document.createElement('mark');
-  wrapEl.setAttribute('data-hl','1');
-  try{ range.surroundContents(wrapEl); }
-  catch(e2){ let frag=range.extractContents(); wrapEl.appendChild(frag); range.insertNode(wrapEl); } /* a selection crossing element boundaries */
-  return wrapEl;
+  let el=wrapRangePerNode(range,kind);
+  if(!el) throw new Error('nothing to wrap');
+  return el;
 }
 /* A tap on a toolbar button collapses the live selection on a phone, so by
    the time Highlight / Dictionary / Listen runs there is nothing to act on.
@@ -2832,6 +2893,49 @@ function readerSelection(){
   }
   return sel;
 }
+/* The reader sheet is a modal <dialog>: while it is open the page behind it
+   is inert, and a range in an inert subtree cannot be selected — so a
+   Highlight / Dictionary / Listen tap inside the sheet finds no text, even
+   though the stored selection is intact (probe diag5b2). Close the sheet
+   first, then run the action on the next frame, when the page is readable
+   again and the stored selection restores. */
+function readerSheetAction(fn){
+  let d=$('readerSheet'); if(d && d.open) d.close();
+  readerHideSelBar();
+  requestAnimationFrame(()=>{ try{ fn(); }catch(e){} });
+}
+/* The floating text-tools bar over a selection in the normal reader — the
+   compact menu (Play Books / Kindle / MarginNote model): it is a plain
+   positioned div, not a modal dialog, so the page stays live and the
+   selection is still there when a tool is tapped. Its buttons preventDefault
+   on pointerdown so the tap itself does not collapse the selection, the
+   same trick the Parallel Read bar already uses. */
+function readerSelInfo(){
+  if(PR.on || S.view!=='reader') return null;
+  let sel=window.getSelection(); if(!sel.rangeCount || sel.isCollapsed || !sel.toString().trim()) return null;
+  let r=sel.getRangeAt(0), node=r.commonAncestorContainer, el=node.nodeType===1? node : node.parentElement;
+  if(!el||!el.closest||!el.closest('#readerBody, #pdfPages')) return null;
+  let rect=r.getBoundingClientRect(); if(!rect.width && !rect.height){ let rs=r.getClientRects(); if(!rs.length) return null; rect=rs[0]; }
+  return {rect:rect};
+}
+function readerShowSelBar(){
+  let bar=$('readerSelBar'); if(!bar) return;
+  let info=readerSelInfo(); if(!info){ readerHideSelBar(); return; }
+  bar.classList.remove('hidden');
+  let bw=bar.offsetWidth, bh=bar.offsetHeight, r=info.rect, coarse=window.matchMedia && matchMedia('(pointer:coarse)').matches;
+  let x=Math.max(8,Math.min(window.innerWidth-bw-8, r.left+r.width/2-bw/2));
+  /* above the selection with a mouse; below it on touch screens, clear of the phone's own copy / paste menu */
+  let y= coarse? r.bottom+10 : r.top-bh-8;
+  if(y<8) y=r.bottom+8;
+  if(y+bh>window.innerHeight-8) y=Math.max(8,r.top-bh-8);
+  bar.style.left=Math.round(x)+'px'; bar.style.top=Math.round(y)+'px';
+}
+function readerHideSelBar(){ let b=$('readerSelBar'); if(b) b.classList.add('hidden'); }
+let readerSelT=null;
+document.addEventListener('selectionchange',()=>{ if(PR.on || S.view!=='reader') return; clearTimeout(readerSelT); readerSelT=setTimeout(readerShowSelBar,120); });
+/* a scroll moves the passage away from the bar — hide it rather than leave it floating over the wrong text */
+['pdfView','readerBody'].forEach(id=>{ let el=$(id); if(el) el.addEventListener('scroll',()=>{ let b=$('readerSelBar'); if(b && !b.classList.contains('hidden')) readerHideSelBar(); },{passive:true}); });
+window.addEventListener('scroll',()=>{ let b=$('readerSelBar'); if(b && !b.classList.contains('hidden')) readerHideSelBar(); },{passive:true});
 function annotateSelection(kind){
   let b=curBook(); if(!b){ toast('Open a book first'); return; }
   if(PR.on){ prAnnotateSelection(kind); return; } /* Parallel Read: the mark goes to whichever book the text was selected in */
@@ -2845,20 +2949,8 @@ function annotateSelection(kind){
     let chEl=node.closest? node.closest('[data-ch]') : null;
     if(b.kind==='pdf') where='PDF page '+(holder? holder.dataset.page : b.page);
     else where='Chapter '+( (chEl? +chEl.dataset.ch : b.ch) +1)+' · '+b.chapters[chEl? +chEl.dataset.ch : b.ch].title;
-    let wrapEl;
-    if(kind==='underline'){ wrapEl=document.createElement('span'); wrapEl.style.cssText='text-decoration:underline;text-decoration-color:#2456c8;text-decoration-thickness:2px'; }
-    else if(kind==='strike'){ wrapEl=document.createElement('span'); wrapEl.style.cssText='text-decoration:line-through;text-decoration-color:#b23a2e;text-decoration-thickness:2px'; }
-    else wrapEl=document.createElement('mark');
-    try{ range.surroundContents(wrapEl); }
-    catch(e2){
-      /* P7: a selection crossing element boundaries makes
-         surroundContents() throw. Fall back to extracting the selected
-         contents into the wrapper and inserting that instead, so the
-         annotation is still made instead of silently dropped. */
-      let frag=range.extractContents();
-      wrapEl.appendChild(frag);
-      range.insertNode(wrapEl);
-    }
+    let wrapEl=wrapRangePerNode(range,kind);
+    if(!wrapEl) throw new Error('nothing to wrap');
   }catch(e){ toast('Select a clean stretch inside one paragraph'); return; }
   b.annotations.push({text:text, where:where, kind:kind});
   sel.removeAllRanges();
@@ -3079,7 +3171,7 @@ async function annotatePdf(id){
   S.items.unshift(nb); openNotebook(nb.id);
   toast('Annotate freely. Ink stays in this notebook, and the PDF file is untouched.');
 }
-function annotateCurrentPdf(){ let b=curBook(); if(b) annotatePdf(b.id); } function backToReading(){ let nb=curNb(); if(!nb||!nb.pdfBookId) return; saveEditorToModel(); let b=S.items.find(i=>i.id===nb.pdfBookId); if(!b){ toast('The PDF for this notebook is no longer on the shelf'); return; } let p=nb.pages[nb.cur]; let pg=(p&&p.bgPdf&&p.bgPdf.page)||(nb.cur+1); if(b.kind==='pdf'&&b.numPages) b.page=Math.max(1,Math.min(b.numPages,pg)); openBook(nb.pdfBookId); }
+function annotateCurrentPdf(){ let b=curBook(); if(b) annotatePdf(b.id); } function backToReading(){ let nb=curNb(); if(!nb||!nb.pdfBookId) return; saveEditorToModel(); saveNow(); /* flush the strokes now, not on the 700ms timer, so leaving annotation mode really saves them */ let b=S.items.find(i=>i.id===nb.pdfBookId); if(!b){ toast('The PDF for this notebook is no longer on the shelf'); return; } let p=nb.pages[nb.cur]; let pg=(p&&p.bgPdf&&p.bgPdf.page)||(nb.cur+1); if(b.kind==='pdf'&&b.numPages) b.page=Math.max(1,Math.min(b.numPages,pg)); openBook(nb.pdfBookId); }
 
 /* ============ focus timer ============ */
 let timerSec=25*60, timerInt=null;
@@ -3122,34 +3214,91 @@ let PR_RAIL_H=40;   /* sidebar row pitch (row height + gap), measured from the r
 const PR_ZOOM_MIN=0.6, PR_ZOOM_MAX=3;
 let prPinch=null;
 function prOtherBooks(leftId){ return S.items.filter(i=>(i.kind==='pdf'||i.kind==='epub') && i.id!==leftId); }
-function toggleParallelRead(){ if(PR.on) closeParallelRead(); else openParallelRead(); }
-/* the lookup / OCR cards can be parked inside a pane, move them home before a pane is emptied */
-function prRescueCards(){ ['dictBox','ocrBox'].forEach(id=>{ let x=$(id); if(x && x.closest('#parallelRead')){ x.classList.add('hidden'); $('readerArticle').appendChild(x); } }); }
-function prClampZoom(z){ z=+z; if(!isFinite(z)||z<=0) z=1; return Math.max(PR_ZOOM_MIN,Math.min(PR_ZOOM_MAX,Math.round(z*100)/100)); }
-async function openParallelRead(){
-  let L=curBook(); if(!L || S.view!=='reader'){ toast('Open a book first'); return; }
-  let others=prOtherBooks(L.id);
-  if(!others.length){ toast('Parallel Read needs a second book, import a PDF or EPUB first'); return; }
-  if(!others.some(o=>o.id===L.parallelWith)) L.parallelWith=others[0].id;
+/* Parallel Read is home-screen only: the only way in is the home-screen
+   button (pick two books first) or the picker inside Parallel Read itself
+   (change the second book). There is no in-reader entry. */
+let prPickStep=null, prPickFirst=null, prImportTarget=null;
+function prClosePicker(){ let d=$('prPickSheet'); if(d && d.open) d.close(); }
+/* Open both books side by side from their ids (home flow). Works whether
+   or not Parallel Read is already on; when it is on with the same first
+   book, just swap the second one instead of rebuilding everything. */
+function prUseAsSecond(firstId, secondId){
+  if(PR.on && curBook() && curBook().id===firstId){ prPickRight(secondId); return; }
+  openParallelReadPair(firstId, secondId);
+}
+async function openParallelReadPair(firstId, secondId){
+  let L=S.items.find(i=>i.id===firstId); if(!L) return;
+  let R=S.items.find(i=>i.id===secondId);
+  if(!R){ toast('Pick a second book'); return; }
+  L.parallelWith=secondId;
   if(['unit','percent','off'].indexOf(L.parallelSync)<0) L.parallelSync='unit';
   if(typeof L.parallelOffset!=='number' || !isFinite(L.parallelOffset)) L.parallelOffset=0;
+  S.curBookId=firstId;
+  showView('reader');
   PR.active='L';
   closeReaderCards(); $('parallelBox').classList.add('hidden');
   PR.on=true; PR.lastW=window.innerWidth; document.body.classList.add('prOn');
   $('readerGrid').classList.add('hidden'); $('annotateFab').classList.add('hidden');
   $('parallelRead').classList.remove('hidden');
-  let btn=$('parallelBtn'); btn.setAttribute('aria-pressed','true');
   $('prSync').value=L.parallelSync; $('prOffset').value=L.parallelOffset;
   $('prOffsetWrap').classList.toggle('hidden', L.parallelSync!=='unit');
-  prFillPicker(L);
+  prFillSecondBtn(L);
   window.scrollTo({top:0});
   await prRenderBoth();
   scheduleSave();
 }
-function prFillPicker(L){
-  let sel=$('prRight'); sel.innerHTML='';
-  prOtherBooks(L.id).forEach(b=>{ let o=document.createElement('option'); o.value=b.id; o.textContent=b.title+(b.kind==='pdf'?' (PDF)':' (EPUB)'); if(b.id===L.parallelWith) o.selected=true; sel.appendChild(o); });
+/* The picker popup: shelf books already on the device, plus Open from
+   files. Step 'first' picks the left book, step 'second' the right one. */
+function prOpenPicker(step){
+  let leftId=null;
+  if(step==='second') leftId = (PR.on && curBook()) ? curBook().id : prPickFirst;
+  if(step==='second' && !leftId){ toast('Pick the first book first'); step='first'; }
+  prPickStep=step;
+  let books=S.items.filter(i=>(i.kind==='pdf'||i.kind==='epub') && i.id!==leftId);
+  $('prPickTitle').textContent = step==='first' ? 'Parallel Read — pick the first book' : 'Pick the second book';
+  $('prPickEmpty').classList.toggle('hidden', books.length>0);
+  let list=$('prPickList'); list.innerHTML='';
+  books.forEach(b=>{
+    let row=document.createElement('button');
+    row.type='button'; row.className='pickRow'; row.onclick=()=>prPickBook(b.id);
+    let meta=b.kind==='pdf' ? ((b.numPages||'?')+' pages · PDF') : (((b.chapters||[]).length)+' chapters · EPUB');
+    row.innerHTML='<span class="pickDot" style="background:'+esc(b.color||'#4a5a74')+'"></span><span class="pickMain"><b>'+esc(b.title)+'</b><span class="kbd">'+esc(meta)+'</span></span><span class="pickGo" aria-hidden="true">›</span>';
+    list.appendChild(row);
+  });
+  let d=$('prPickSheet');
+  if(!d.open){ try{ d.showModal(); }catch(e){ d.show(); } }
 }
+function prPickBook(id){
+  if(prPickStep==='first'){ prPickFirst=id; prOpenPicker('second'); return; }
+  prClosePicker();
+  prUseAsSecond(prPickFirst, id);
+  prPickFirst=null; prPickStep=null;
+}
+/* Import from the picker: the file becomes the picked book instead of
+   opening on its own in the normal reader. */
+function prPickImport(e){
+  let step=prPickStep||'second';
+  let firstId = step==='second' ? ((PR.on && curBook()) ? curBook().id : prPickFirst) : null;
+  prImportTarget={step:step, firstId:firstId};
+  handleImport(e);
+}
+function afterImportOpen(book){
+  let t=prImportTarget; prImportTarget=null;
+  if(!t){ openBook(book.id); return; }
+  if(t.step==='first'){ prPickFirst=book.id; prOpenPicker('second'); return; }
+  prClosePicker();
+  prUseAsSecond(t.firstId, book.id);
+  prPickFirst=null; prPickStep=null;
+}
+/* The second-book control in the Parallel Read bar: a button showing the
+   book in use (tap it to pick another), not a dropdown. */
+function prFillSecondBtn(L){
+  let R=S.items.find(i=>i.id===L.parallelWith)||null;
+  let lab=$('prRightLabel'); if(lab) lab.textContent=R? R.title : 'Choose a book';
+}
+/* the lookup / OCR cards can be parked inside a pane, move them home before a pane is emptied */
+function prRescueCards(){ ['dictBox','ocrBox'].forEach(id=>{ let x=$(id); if(x && x.closest('#parallelRead')){ x.classList.add('hidden'); $('readerArticle').appendChild(x); } }); }
+function prClampZoom(z){ z=+z; if(!isFinite(z)||z<=0) z=1; return Math.max(PR_ZOOM_MIN,Math.min(PR_ZOOM_MAX,Math.round(z*100)/100)); }
 function prUnitIndex(b){ return b.kind==='pdf'? Math.max(0,(b.page||1)-1) : Math.max(0,b.ch||0); }
 function prClearPane(s){ let el=$('prPane'+s); if(el._io){ el._io.disconnect(); el._io=null; } el.querySelectorAll('.pdfHolder').forEach(pdfReleasePage); el.innerHTML=''; let r=$('prRail'+s); if(r) r.innerHTML=''; }
 async function prRenderBoth(){
@@ -3470,7 +3619,7 @@ function prUpdatePositions(){
   });
   updateResume(); /* the left book's resume label + a save */
 }
-function prPickRight(id){ let L=curBook(); if(!L) return; L.parallelWith=id; scheduleSave(); prRenderBoth(); }
+function prPickRight(id){ let L=curBook(); if(!L) return; L.parallelWith=id; prFillSecondBtn(L); scheduleSave(); prRenderBoth(); }
 function prSetSync(v){
   let L=curBook(); if(!L) return;
   L.parallelSync=(['unit','percent','off'].indexOf(v)>=0)? v : 'unit';
@@ -3496,12 +3645,24 @@ function closeParallelRead(silent){
   ['L','R'].forEach(s=>{ let el=$('prPane'+s); el.closest('.prCol').classList.remove('prActive'); prClearPane(s); });
   $('prRail').innerHTML=''; PR.railBook=null; PR.railExpect=null; PR.railActive=-1;
   $('parallelRead').classList.add('hidden'); $('readerGrid').classList.remove('hidden');
-  $('parallelBtn').setAttribute('aria-pressed','false'); document.body.classList.remove('prOn');
+  document.body.classList.remove('prOn');
   scheduleSave();
   if(silent) return;
   let b=curBook(); if(!b) return;
-  if(b.kind==='pdf'){ $('annotateFab').classList.remove('hidden'); jumpToPdfPage(b.page,true); }
-  else jumpToChapter(b.ch);
+  if(b.kind==='pdf'){
+    $('annotateFab').classList.remove('hidden');
+    /* Parallel Read can be entered from the home screen, where this book
+       was never opened in the normal reader — then the reader has no
+       pages at all and the jump below is a no-op, leaving an empty
+       reader. Build the pages first (renderPdfBook scrolls to the
+       current page itself once they exist). */
+    if(!document.querySelector('#pdfPages .pdfHolder')){ showPdfChrome(); renderPdfBook(); }
+    else jumpToPdfPage(b.page,true);
+  }
+  else {
+    if(!document.querySelector('#readerBody [data-ch]')){ showEpubChrome(); renderEpubBook(); }
+    jumpToChapter(b.ch);
+  }
 }
 /* reader tools that live in the normal reader view leave Parallel Read first */
 function prLeave(){ if(PR.on) closeParallelRead(); }
@@ -3665,8 +3826,12 @@ function prInkPage(book,n,create){
 /* where the PDF page sits inside the notebook page (the editor's own fit: centred, scaled to fit) */
 function prInkGeom(book,n,pg){
   let sz=(pg && bgPdfSize(pg.bgPdf)) || (book._pageSizes && book._pageSizes[n-1]) || [612,792];
-  let PH=Math.max(400,Math.min(2200,Math.round(CW*sz[1]/sz[0]))), s=Math.min(CW/sz[0],PH/sz[1]), dw=sz[0]*s, dh=sz[1]*s;
-  return {ox:(CW-dw)/2, oy:(PH-dh)/2, dw:dw, dh:dh};
+  /* the notebook page's own height for this PDF page (same clamp as pageH),
+     never the editor's current page height, so the overlay lands right
+     even when the reader opens without the editor having been there */
+  let PHp=Math.max(400,Math.min(2200,Math.round(CW*sz[1]/sz[0])));
+  let s=Math.min(CW/sz[0],PHp/sz[1]), dw=sz[0]*s, dh=sz[1]*s;
+  return {ox:(CW-dw)/2, oy:(PHp-dh)/2, dw:dw, dh:dh};
 }
 /* Annotate works on EVERY book in Parallel Read: PDF pages and EPUB chapters alike.
    A "surface" is one PDF page (.pdfHolder; ink kept in the PDF's annotation notebook, in the
