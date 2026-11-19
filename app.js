@@ -649,8 +649,10 @@ const bgX=bgC.getContext('2d'), hiX=hiC.getContext('2d'), inkX=inkC.getContext('
 /* P1: Dark Slate pages (#2b2f36) need light ruling and light ink. The
    mapping happens at render time only, stored stroke/text colours stay
    as picked, so switching the page back to a light colour restores the
-   original navy exactly. Same idea as boardInkColor() for the board. */
-function isDarkPage(p){ return !!(p && String(p.bgColor||'').toLowerCase()==='#2b2f36'); }
+   original navy exactly. Same idea as boardInkColor() for the board.
+   Step 1: #17171A (the dark-ink paper canvas token --paper-dark) is
+   also a dark page, so its ruling stays faint and light. */
+function isDarkPage(p){ let c=String(p && p.bgColor||'').toLowerCase(); return c==='#2b2f36' || c==='#17171a'; }
 function pageInkColor(c,p){ if(isDarkPage(p) && String(c||'').toLowerCase()==='#1b2a4a') return '#f8fafc'; return c; }
 function paintTemplate(x,tpl,p){
   let dark=isDarkPage(p);
