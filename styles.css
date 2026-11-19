@@ -1,21 +1,27 @@
-/* Inkwell design system: editorial ink
-   Direction and reasons live in DESIGN.md. */
+/* Inkwell design system: editorial ink, modernised 2026-11-19
+   (Dribbble refs: Notes App 25146907, Smart Note 27125335, Note App
+   24116561, Noto 27557898, Reading App 7032552, Reading Concept
+   27416781, All Doc's Reader 27865030).
+   Direction: warm off-white surfaces, colour carried by the book covers
+   and one terracotta-red accent — no paper texture, no heavy boxes.
+   Chrome is borderless with hairlines and soft shadow; bold sans for
+   headings, serif kept only for the reading body and the wordmark. */
 
 :root{
   --font-ui:"Instrument Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
   --font-display:"Newsreader",Georgia,"Times New Roman",serif;
   --font-reading:"Newsreader",Georgia,"Times New Roman",serif;
   --font-hand:"Newsreader",Georgia,serif;
-  --bg:#EDE7DA;
-  --bg-deep:#E4DCCB;
-  --surface:#FBF8F0;
-  --paper:#FFFDF7;
-  --paper2:#F5F0E4;
+  --bg:#F6F4EF;
+  --bg-deep:#EFEBE2;
+  --surface:#FFFFFF;
+  --paper:#FFFFFF;
+  --paper2:#F4F2EC;
   --ink:#18202B;
   --ink-soft:#36404C;
   --muted:#6B6558;
-  --line:#D5CCBA;
-  --line-strong:#BDB29D;
+  --line:#E8E4DA;
+  --line-strong:#D9D3C5;
   --accent:#B23A2A;
   --accent-ink:#FFFFFF;
   --accent-soft:#F2DED8;
@@ -25,10 +31,10 @@
   --shadow-cover:0 12px 24px -16px rgba(24,32,43,.55);
   --shadow-modal:0 30px 80px -30px rgba(24,32,43,.65);
   --shadow-nav:0 18px 40px -32px rgba(24,32,43,.65),0 1px 0 rgba(24,32,43,.03);
-  --radius-xs:2px;
-  --radius-sm:4px;
-  --radius-md:6px;
-  --radius-lg:8px;
+  --radius-xs:6px;
+  --radius-sm:10px;
+  --radius-md:12px;
+  --radius-lg:16px;
   --reader-fs:19px;
   --max:1240px;
   color-scheme:light;
@@ -58,8 +64,8 @@
   }
 }
 :root[data-theme="light"]{
-  --bg:#EDE7DA; --bg-deep:#E4DCCB; --surface:#FBF8F0; --paper:#FFFDF7; --paper2:#F5F0E4;
-  --ink:#18202B; --ink-soft:#36404C; --muted:#6B6558; --line:#D5CCBA; --line-strong:#BDB29D;
+  --bg:#F6F4EF; --bg-deep:#EFEBE2; --surface:#FFFFFF; --paper:#FFFFFF; --paper2:#F4F2EC;
+  --ink:#18202B; --ink-soft:#36404C; --muted:#6B6558; --line:#E8E4DA; --line-strong:#D9D3C5;
   --accent:#B23A2A; --accent-ink:#FFFFFF; --accent-soft:#F2DED8; --danger:#A02E24; --success:#3F5C46;
   --shadow-sheet:0 2px 0 rgba(24,32,43,.04),0 24px 48px -28px rgba(24,32,43,.45);
   --shadow-cover:0 12px 24px -16px rgba(24,32,43,.55);
@@ -102,7 +108,7 @@ svg{display:inline-block}
 .badge{font-size:10px;letter-spacing:.1em;text-transform:uppercase;background:transparent;border:1px solid var(--line);padding:4px 7px;border-radius:var(--radius-xs);display:inline-block;color:var(--muted)}
 
 /* ---------- controls ---------- */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 14px;border:1px solid var(--line-strong);border-radius:var(--radius-sm);background:var(--surface);color:var(--ink);font-family:var(--font-ui);font-size:13px;font-weight:600;line-height:1;text-decoration:none;transition:background .15s ease,border-color .15s ease,color .15s ease}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 14px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface);color:var(--ink);font-family:var(--font-ui);font-size:13px;font-weight:600;line-height:1;text-decoration:none;transition:background .15s ease,border-color .15s ease,color .15s ease}
 .btn:hover{border-color:var(--ink-soft)}
 .btn:active{background:var(--paper2)}
 .btn.primary{background:var(--ink);color:var(--surface);border-color:var(--ink)}
@@ -117,7 +123,7 @@ svg{display:inline-block}
 .iconBtn{width:40px;height:40px;min-width:40px;min-height:40px;padding:0;border:1px solid transparent;border-radius:var(--radius-sm);background:transparent;color:var(--ink);display:grid;place-items:center;transition:background .15s ease,border-color .15s ease}
 .iconBtn:hover{background:var(--paper2);border-color:var(--line)}
 .iconBtn:active{background:var(--line)}
-select{min-height:38px;border:1px solid var(--line-strong);border-radius:var(--radius-xs);background:var(--surface);color:var(--ink);padding:0 10px;font-size:13px;font-weight:500}
+select{min-height:38px;border:1px solid var(--line);border-radius:var(--radius-xs);background:var(--surface);color:var(--ink);padding:0 10px;font-size:13px;font-weight:500}
 select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 input[type=range]{accent-color:var(--accent);min-height:28px}
 input[type=checkbox],input[type=radio]{width:17px;height:17px;min-height:0;accent-color:var(--accent);flex:0 0 auto}
@@ -126,7 +132,9 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 /* ---------- library frame ---------- */
 .layout{max-width:var(--max);margin:0 auto;padding:28px 32px 124px}
 .layout.shelf{max-width:1180px}
-.masthead{position:sticky;top:12px;z-index:50;display:grid;grid-template-columns:minmax(150px,1fr) minmax(280px,560px) minmax(150px,1fr);align-items:center;gap:16px;padding:10px 14px;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius-md);box-shadow:var(--shadow-nav)}
+/* Sticky chrome is borderless: a translucent bar with a hairline under it,
+   not a boxed panel (the old bordered boxes read 90s). */
+.masthead{position:sticky;top:12px;z-index:50;display:grid;grid-template-columns:minmax(150px,1fr) minmax(280px,560px) minmax(150px,1fr);align-items:center;gap:16px;padding:10px 14px;background:var(--surface);background:color-mix(in srgb,var(--surface) 86%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none}
 .wordmark{display:flex;align-items:baseline;gap:12px;justify-self:start;color:var(--ink);text-decoration:none;min-width:0}
 .wordmarkName{font-family:var(--font-display);font-size:26px;font-weight:600;letter-spacing:-.03em;line-height:1}
 .wordmarkTag{font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
@@ -134,41 +142,41 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 .installBtn{min-height:34px;padding:0 10px;font-size:11px;border-color:var(--line-strong)}
 .installBtn .ic{width:14px;height:14px}
 .saveFlag{font-size:11px;line-height:1.4;color:var(--muted);max-width:210px;text-align:right;white-space:nowrap}
-.libraryHead{display:block;padding:52px 0 32px}
+.libraryHead{display:block;padding:40px 0 28px}
 .navSearch{width:100%;max-width:560px;justify-self:center}
 .navSearch .search{min-height:44px;background:var(--paper)}
 .navSearch .search input{height:42px}
 .navSearch .searchResults{top:calc(100% + 12px)}
-.libraryTitle h1{font-family:var(--font-display);font-size:clamp(3rem,5.4vw,4.6rem);font-weight:500;line-height:.92;letter-spacing:-.045em;margin:0 0 18px}
-.lede{font-family:var(--font-display);font-size:20px;line-height:1.45;color:var(--muted);max-width:34ch;margin:0}
+.libraryTitle h1{font-family:var(--font-ui);font-size:clamp(2.4rem,6vw,3.4rem);font-weight:700;line-height:1.02;letter-spacing:-.03em;margin:0 0 14px}
+.lede{font-family:var(--font-ui);font-size:16px;line-height:1.55;color:var(--muted);max-width:52ch;margin:0}
 .searchWrap{position:relative;min-width:0}
-.search{display:flex;align-items:center;gap:10px;min-height:50px;padding:0 12px;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius-sm);transition:border-color .15s ease,box-shadow .15s ease}
+.search{display:flex;align-items:center;gap:10px;min-height:50px;padding:0 12px;background:var(--surface);border:1px solid var(--line);border-radius:999px;transition:border-color .15s ease,box-shadow .15s ease}
 .search:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
 .searchIcon{color:var(--muted)}
 .search input{flex:1;min-width:0;height:48px;border:0;background:transparent;color:var(--ink);font-size:15px;outline:none}
 .search input:focus-visible{outline:none}
 .search input::placeholder{color:var(--muted)}
 .searchKbd{flex:0 0 auto;min-width:24px;min-height:24px;display:grid;place-items:center;border:1px solid var(--line);border-radius:var(--radius-xs);font-size:11px;line-height:1;color:var(--muted);padding:0 5px}
-.searchResults{position:absolute;top:calc(100% + 8px);left:0;right:0;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius-sm);box-shadow:var(--shadow-modal);max-height:56vh;overflow:auto;z-index:60}
+.searchResults{position:absolute;top:calc(100% + 8px);left:0;right:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--shadow-modal);max-height:56vh;overflow:auto;z-index:60}
 .srItem{padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer}
 .srItem:last-child{border-bottom:0}
 .srItem:hover{background:var(--paper2)}
 .srItem b{display:block;font-size:13px;font-weight:600;line-height:1.35}
 .srItem span{display:block;font-size:12px;line-height:1.5;color:var(--muted);margin-top:2px}
-.shelfBar{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;border-bottom:1px solid var(--line);margin-bottom:28px}
-.chipRow{display:flex;align-items:flex-end;gap:24px;flex-wrap:wrap}
-.chip{min-height:44px;padding:10px 0 12px;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;color:var(--muted);font-size:13px;font-weight:600;line-height:1}
-.chip:hover{color:var(--ink)}
-.chip.active{color:var(--ink);border-bottom-color:var(--accent)}
-.chip.dashed{border:1px solid var(--line);padding:8px 12px;color:var(--ink)}
+.shelfBar{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:28px}
+.chipRow{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap}
+.chip{min-height:44px;padding:8px 14px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--muted);font-size:13px;font-weight:600;line-height:1}
+.chip:hover{color:var(--ink);border-color:var(--line-strong)}
+.chip.active{color:var(--surface);background:var(--ink);border-color:var(--ink)}
+.chip.dashed{border:1px dashed var(--line-strong);padding:8px 12px;color:var(--ink)}
 .libHint{font-size:11px;line-height:1.5;color:var(--muted);text-align:right;padding-bottom:12px;margin:0}
 
 /* ---------- empty state ---------- */
 .empty{padding:64px 24px;text-align:center;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--surface);margin-bottom:28px}
 .emptyIcon{width:54px;height:54px;margin:0 auto 18px;border:1px solid var(--line);border-radius:50%;display:grid;place-items:center;color:var(--accent)}
 .emptyIcon .ic{width:24px;height:24px}
-.empty h3{font-family:var(--font-display);font-size:32px;font-weight:500;letter-spacing:-.02em;margin:0 0 8px}
-.empty p{font-family:var(--font-display);font-size:16px;line-height:1.6;color:var(--muted);max-width:38ch;margin:0 auto 20px}
+.empty h3{font-family:var(--font-ui);font-size:24px;font-weight:700;letter-spacing:-.02em;margin:0 0 8px}
+.empty p{font-family:var(--font-ui);font-size:15px;line-height:1.6;color:var(--muted);max-width:44ch;margin:0 auto 20px}
 .emptyActions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px}
 
 /* ---------- shelf ---------- */
@@ -180,14 +188,14 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 .bookSpine{width:11px;flex:0 0 auto;box-shadow:inset -1px 0 0 rgba(255,255,255,.18)}
 .bookFace{flex:1;min-width:0;display:flex;flex-direction:column;padding:18px 42px 16px 16px}
 .bookKind{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px}
-.bookTitle{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin:0;font-family:var(--font-display);font-size:26px;font-weight:500;line-height:1.08;letter-spacing:-.02em;overflow-wrap:anywhere}
+.bookTitle{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin:0;font-family:var(--font-ui);font-size:22px;font-weight:700;line-height:1.15;letter-spacing:-.02em;overflow-wrap:anywhere}
 .bookMeta{margin-top:auto;padding-top:18px;font-size:11px;line-height:1.55;letter-spacing:.01em}
 .bookMeta span{display:block}
 .bookMenu{position:absolute;top:10px;right:10px;width:30px;height:30px;min-height:30px;padding:0;border:1px solid rgba(255,255,255,.28);border-radius:var(--radius-xs);background:rgba(0,0,0,.14);color:inherit;display:grid;place-items:center;z-index:2}
 .bookMenu:hover{background:rgba(0,0,0,.3)}
 .bookMenu::after{content:"";position:absolute;inset:-7px}
 .bookMenu .ic{width:16px;height:16px}
-.bookActions{position:absolute;top:46px;right:8px;width:190px;z-index:25;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius-sm);box-shadow:var(--shadow-modal);padding:4px;display:none;flex-direction:column}
+.bookActions{position:absolute;top:46px;right:8px;width:190px;z-index:25;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--shadow-modal);padding:4px;display:none;flex-direction:column}
 .bookCard.menuOpen .bookActions{display:flex}
 .bookActions button{display:flex;align-items:center;gap:8px;width:100%;min-height:38px;padding:9px 10px;border:0;border-radius:var(--radius-xs);background:transparent;color:var(--ink);font-size:13px;font-weight:500;text-align:left}
 .bookActions button:hover{background:var(--paper2)}
@@ -201,8 +209,8 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 .utilsRow .btn{width:100%;justify-content:flex-start;border-color:transparent;background:transparent;padding:0 8px}
 .utilsRow .btn:hover{background:var(--paper2);border-color:var(--line)}
 .aboutPanel{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:32px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);padding:24px;margin:0 0 28px}
-.aboutIntro h4{font-family:var(--font-display);font-size:24px;font-weight:500;letter-spacing:-.02em;margin:0 0 10px}
-.aboutIntro p{font-family:var(--font-display);font-size:15px;line-height:1.65;color:var(--ink-soft);margin:0 0 10px}
+.aboutIntro h4{font-family:var(--font-ui);font-size:18px;font-weight:700;letter-spacing:-.01em;margin:0 0 10px}
+.aboutIntro p{font-family:var(--font-ui);font-size:14px;line-height:1.65;color:var(--ink-soft);margin:0 0 10px}
 .aboutIntro .aboutCounts{font-family:var(--font-ui);font-size:12px;line-height:1.6;color:var(--muted);margin:0}
 .aboutStats{min-width:0}
 .listRow{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
@@ -215,21 +223,25 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 
 /* ---------- bottom action rail ---------- */
 .bottomBar{position:fixed;left:0;right:0;bottom:0;z-index:45;background:transparent;pointer-events:none}
-.bottomBarInner{max-width:720px;margin:0 auto 20px;display:flex;gap:8px;padding:8px;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius-md);box-shadow:var(--shadow-modal);pointer-events:auto}
+/* Floating pill action rail (not a full-width bordered bar). */
+.bottomBarInner{max-width:720px;margin:0 auto 20px;display:flex;gap:8px;padding:8px;background:var(--surface);border:1px solid var(--line);border-radius:999px;box-shadow:var(--shadow-modal);pointer-events:auto}
 .bottomBar .btn{white-space:nowrap}
-.btn.newMain{flex:1;justify-content:center;background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-size:14px;min-height:46px}
+.btn.newMain{flex:1;justify-content:center;background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-size:14px;min-height:46px;border-radius:999px}
 .btn.newMain:hover{background:var(--ink);border-color:var(--ink);color:var(--surface)}
-.btn.outlineBlue{background:transparent;border-color:var(--line-strong);color:var(--ink);font-size:13px;min-height:46px}
+.btn.outlineBlue{background:transparent;border-color:var(--line);color:var(--ink);font-size:13px;min-height:46px;border-radius:999px}
 .btn.outlineBlue:hover{border-color:var(--ink)}
 
 /* ---------- editor frame ---------- */
-.editorTop{position:sticky;top:10px;z-index:30;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius-sm)}
+.editorTop{position:sticky;top:10px;z-index:30;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;background:var(--surface);background:color-mix(in srgb,var(--surface) 86%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:0;border-bottom:1px solid var(--line);border-radius:0}
 .titleField{flex:1;min-width:180px}
-#noteTitle{width:100%;padding:2px 4px;border:0;border-radius:var(--radius-xs);background:transparent;color:var(--ink);font-family:var(--font-display);font-size:26px;font-weight:600;line-height:1.2;letter-spacing:-.02em}
+#noteTitle{width:100%;padding:2px 4px;border:0;border-radius:var(--radius-xs);background:transparent;color:var(--ink);font-family:var(--font-ui);font-size:19px;font-weight:700;line-height:1.25;letter-spacing:-.01em}
+#backToReadingBtn .backShort{display:none}
 #noteTitle:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* ---------- writing rail ---------- */
-.toolbar{position:sticky;top:78px;z-index:25;display:flex;flex-direction:column;align-items:stretch;gap:0;margin-top:10px;padding:4px 6px 0;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius-sm)}
+/* Floating rounded toolbar (borderless, soft shadow) instead of a
+   full-width bordered strip — the Notes-App reference. */
+.toolbar{position:sticky;top:78px;z-index:25;display:flex;flex-direction:column;align-items:stretch;gap:0;margin-top:10px;padding:4px 6px 0;background:var(--surface);background:color-mix(in srgb,var(--surface) 92%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none}
 .tbRow{display:flex;align-items:center;gap:2px;width:100%;min-height:42px;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
 .tbRow::-webkit-scrollbar{display:none}
 .tbRowTools .tool{width:38px;height:38px;min-height:38px;padding:0;border:1px solid transparent;border-radius:var(--radius-xs);background:transparent;color:var(--ink);display:grid;place-items:center;flex:0 0 auto}
@@ -238,7 +250,8 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 .tool.active{background:var(--ink);border-color:var(--ink);color:var(--surface)}
 .tool.active:hover{background:var(--ink)}
 .tbDivider{width:1px;height:22px;background:var(--line);margin:0 5px;flex:0 0 auto}
-.tbBoardBtn{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;min-height:34px;padding:0 10px;border:1px solid var(--line-strong);border-radius:var(--radius-xs);background:transparent;color:var(--ink);font-size:12px;font-weight:600;white-space:nowrap}
+#editorMoreBtn .moreShort{display:none}
+.tbBoardBtn{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;min-height:34px;padding:0 10px;border:1px solid var(--line);border-radius:var(--radius-xs);background:transparent;color:var(--ink);font-size:12px;font-weight:600;white-space:nowrap}
 .tbBoardBtn:hover{background:var(--paper2)}
 .tbBoardBtn[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--surface)}
 .tbMenuBtn{display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;min-height:34px;padding:0 8px;border:1px solid transparent;border-radius:var(--radius-xs);background:transparent;color:var(--ink);font-size:12px;font-weight:600;white-space:nowrap}
@@ -253,14 +266,14 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 .swatch{position:relative;width:24px;height:24px;min-height:24px;padding:0;border:1px solid rgba(0,0,0,.18);border-radius:50%;flex:0 0 auto;box-shadow:0 0 0 1px transparent}
 .swatch::after{content:"";position:absolute;inset:-5px}
 .swatch.active{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--ink)}
-input[type=color].colorPick{width:28px;height:28px;min-height:28px;flex:0 0 auto;padding:2px;border:1px solid var(--line-strong);border-radius:50%;background:var(--surface);cursor:pointer}
+input[type=color].colorPick{width:28px;height:28px;min-height:28px;flex:0 0 auto;padding:2px;border:1px solid var(--line);border-radius:50%;background:var(--surface);cursor:pointer}
 .statusBar{display:flex;align-items:center;gap:14px;padding:5px 4px;border-top:1px solid var(--line);font-size:11px;line-height:1.3;color:var(--muted);white-space:nowrap;overflow-x:auto;scrollbar-width:none}
 .statusBar::-webkit-scrollbar{display:none}
 .statusBar b{color:var(--ink);font-weight:600}
 .statusSpacer{flex:1}
 
 /* ---------- tool popovers ---------- */
-.toolPop{position:absolute;left:6px;right:6px;top:calc(100% + 6px);z-index:70;max-height:46vh;overflow:auto;padding:14px 16px;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius-sm);box-shadow:var(--shadow-modal);display:none}
+.toolPop{position:absolute;left:6px;right:6px;top:calc(100% + 6px);z-index:70;max-height:46vh;overflow:auto;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--shadow-modal);display:none}
 @media(min-width:680px){.toolPop{left:auto;right:6px;width:380px}}
 .toolPop.open{display:block}
 .toolPop h5{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
@@ -276,7 +289,7 @@ input[type=color].colorPick{width:28px;height:28px;min-height:28px;flex:0 0 auto
 /* ---------- editor workspace ---------- */
 .editorWrap{display:grid;grid-template-columns:188px minmax(0,1fr) 252px;gap:24px;align-items:start;margin-top:18px}
 .editorWrap>*{min-width:0}
-.panel{background:transparent;border:0;border-top:1px solid var(--line-strong);border-radius:0;padding:12px 0 0}
+.panel{background:transparent;border:0;border-top:1px solid var(--line);border-radius:0;padding:12px 0 0}
 .panel h4{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
 .panel .panelSub{margin-top:20px}
 .panel .kbd{font-size:12px;line-height:1.6}
@@ -302,7 +315,7 @@ input[type=color].colorPick{width:28px;height:28px;min-height:28px;flex:0 0 auto
 .stageWrap{display:grid;gap:16px}
 .stageWrap.split{grid-template-columns:1fr 1fr}
 .zoomScroll{overflow:auto;border-radius:var(--radius-xs)}
-.canvasShell{position:relative;overflow:hidden;background:var(--paper);border:1px solid var(--line-strong);border-radius:var(--radius-sm);box-shadow:var(--shadow-sheet)}
+.canvasShell{position:relative;overflow:hidden;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--shadow-sheet)}
 .canvasStack{position:relative;width:100%}
 .canvasStack canvas{display:block;width:100%;height:auto}
 #bgCanvas{position:relative}
@@ -329,10 +342,10 @@ table.inkTable td:focus{outline:2px solid var(--accent);outline-offset:-2px}
 #tableHost .btn.small{margin-top:2px}
 
 /* ---------- reader ---------- */
-.readerTop{position:sticky;top:10px;z-index:30;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;margin-bottom:10px;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius-sm)}
+.readerTop{position:sticky;top:10px;z-index:30;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;margin-bottom:10px;background:var(--surface);background:color-mix(in srgb,var(--surface) 86%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:0;border-bottom:1px solid var(--line);border-radius:0}
 .readerResume{margin-left:auto;font-size:11px;line-height:1.5;color:var(--muted);text-align:right;max-width:390px}
-.seg{display:flex;padding:2px;background:var(--paper2);border:1px solid var(--line-strong);border-radius:var(--radius-xs)}
-.seg button{min-height:30px;padding:5px 12px;border:0;border-radius:1px;background:transparent;color:var(--ink);font-size:12px;font-weight:600}
+.seg{display:flex;padding:2px;background:var(--paper2);border:1px solid var(--line);border-radius:999px}
+.seg button{min-height:30px;padding:5px 12px;border:0;border-radius:999px;background:transparent;color:var(--ink);font-size:12px;font-weight:600}
 .seg button.active{background:var(--ink);color:var(--surface)}
 .moreRow{display:none;position:static;margin-top:0;margin-bottom:10px}
 .moreRow.open{display:flex}
@@ -368,7 +381,7 @@ mark{background:#F2D887;color:#1A1A1A;padding:0 2px;border-radius:2px}
 #pdfView{max-width:860px;overflow-x:auto;margin:0 auto;padding:18px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius-sm);box-shadow:var(--shadow-sheet)}
 .pdfHead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px}
 .pdfHead>div:first-child{display:flex;flex-direction:column;gap:3px;min-width:0}
-#pdfName{font-family:var(--font-display);font-size:22px;font-weight:600;letter-spacing:-.02em}
+#pdfName{font-family:var(--font-ui);font-size:18px;font-weight:700;letter-spacing:-.01em}
 .pdfHeadActions{display:flex;gap:6px;flex-wrap:wrap}
 #pdfPages{display:flex;flex-direction:column;gap:18px}
 .pdfPage{width:100%;overflow:hidden;background:#fff;border:1px solid var(--line);border-radius:var(--radius-xs)}
@@ -411,7 +424,7 @@ mark{background:#F2D887;color:#1A1A1A;padding:0 2px;border-radius:2px}
 .annotateFab.hidden{display:none!important}
 
 /* ---------- floating board, stickies, set square ---------- */
-.board{position:absolute;right:16px;top:16px;z-index:8;display:flex;flex-direction:column;width:min(380px,calc(100% - 32px));max-width:calc(100% - 32px);overflow:hidden;background:var(--paper);border:1px solid var(--line-strong);border-radius:var(--radius-sm);box-shadow:var(--shadow-modal);color:var(--ink)}
+.board{position:absolute;right:16px;top:16px;z-index:8;display:flex;flex-direction:column;width:min(380px,calc(100% - 32px));max-width:calc(100% - 32px);overflow:hidden;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--shadow-modal);color:var(--ink)}
 .boardHead{position:relative;z-index:12;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;background:var(--paper2);border-bottom:1px solid var(--line);font-size:11px;font-weight:600;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
 .boardHead>span{display:inline-flex;align-items:center;gap:6px}
 .boardHeadActions{display:inline-flex;gap:4px;flex-wrap:wrap}
@@ -473,11 +486,11 @@ mark{background:#F2D887;color:#1A1A1A;padding:0 2px;border-radius:2px}
 dialog.modal{border:0;padding:0;background:transparent;width:min(480px,calc(100vw - 24px));margin:auto}
 dialog.modal::backdrop{background:rgba(12,15,20,.62);overflow:hidden}
 dialog.modal:modal{overscroll-behavior:contain}
-.modalCard{width:100%;max-width:460px;max-height:88vh;overflow:auto;padding:26px;background:var(--paper);border:1px solid var(--line-strong);border-radius:var(--radius-md);box-shadow:var(--shadow-modal)}
-.modalCard h3{font-family:var(--font-display);font-size:27px;font-weight:500;letter-spacing:-.02em;margin:0 0 12px}
+.modalCard{width:100%;max-width:460px;max-height:88vh;overflow:auto;padding:26px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:var(--shadow-modal)}
+.modalCard h3{font-family:var(--font-ui);font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0 0 12px}
 .fieldLabel{display:block;margin:12px 0 6px;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.modalCard input,.modalCard select{width:100%;min-height:42px;margin:0 0 8px;padding:0 12px;background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);border-radius:var(--radius-xs);font-size:14px}
-.modalCard textarea{width:100%;padding:10px 12px;background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);border-radius:var(--radius-xs);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:1.5;resize:vertical}
+.modalCard input,.modalCard select{width:100%;min-height:42px;margin:0 0 8px;padding:0 12px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:var(--radius-sm);font-size:14px}
+.modalCard textarea{width:100%;padding:10px 12px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:var(--radius-sm);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:1.5;resize:vertical}
 .modalCard .kbd{font-size:12px;line-height:1.6;margin:0 0 6px}
 .modalActions{display:flex;gap:8px;margin-top:18px}
 .modalActions .btn{flex:1;justify-content:center}
@@ -485,7 +498,7 @@ dialog.modal:modal{overscroll-behavior:contain}
 #texPreview.texPreviewEmpty{background:var(--paper2);color:var(--muted);font-family:var(--font-ui);font-size:13px}
 .sizeRow{display:flex;align-items:center;gap:10px;margin-top:8px}
 .sizeRow input[type=range]{flex:1}
-.toast{position:fixed;left:50%;bottom:96px;z-index:90;display:none;max-width:92vw;padding:10px 16px;transform:translateX(-50%);background:var(--ink);color:var(--bg);border-radius:var(--radius-xs);font-size:12px;font-weight:600;text-align:center;box-shadow:var(--shadow-modal)}
+.toast{position:fixed;left:50%;bottom:96px;z-index:90;display:none;max-width:92vw;padding:10px 16px;transform:translateX(-50%);background:var(--ink);color:var(--bg);border-radius:var(--radius-xs);font-size:12px;font-weight:600;text-align:center;box-shadow:var(--shadow-modal);pointer-events:none}
 
 /* ---------- responsive ---------- */
 @media(min-width:700px){
@@ -523,7 +536,7 @@ dialog.modal:modal{overscroll-behavior:contain}
   .installBtn .installLabel{display:none}
   .iconBtn{width:44px;height:44px;min-width:44px;min-height:44px}
   .libraryHead{padding:32px 0 24px}
-  .libraryTitle h1{font-size:clamp(2.8rem,12vw,4rem);margin-bottom:12px}
+  .libraryTitle h1{font-size:clamp(2.2rem,11vw,3rem);margin-bottom:12px}
   .lede{font-size:18px;max-width:40ch}
   .search input{font-size:16px}
   .shelfBar{flex-direction:column;align-items:stretch;gap:0}
@@ -532,30 +545,47 @@ dialog.modal:modal{overscroll-behavior:contain}
   .libHint{text-align:left;padding:0 0 12px}
   .aboutPanel{grid-template-columns:1fr;gap:20px;padding:18px}
   .libraryFoot{padding-top:20px;margin-top:24px}
-  .bottomBarInner{max-width:none;margin:0;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:var(--surface);border:0;border-top:1px solid var(--line-strong);border-radius:0;box-shadow:none}
+  .bottomBarInner{max-width:none;margin:0 16px calc(16px + env(safe-area-inset-bottom));padding:8px;background:var(--surface);border:1px solid var(--line);border-radius:999px;box-shadow:var(--shadow-modal)}
   .btn.small{min-height:44px;padding:0 12px;font-size:13px}
   .editorTop{position:sticky;top:0;z-index:30;padding:6px 8px;gap:6px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
   .editorTop::-webkit-scrollbar{display:none}
   .editorTop .edFocus{display:none}
-  .titleField{flex:1 1 150px;min-width:120px}
-  #noteTitle{font-size:20px}
-  .toolbar{position:static;padding:6px;margin-top:8px}
-     #mainToolbar{position:relative}
-  .tbRowTools{flex-wrap:wrap;overflow:visible;gap:3px}
+  /* one back action only: while annotating a PDF the "Back to reading"
+     button is the way out, so the library back arrow hides (it was eating
+     the title's room and truncating it mid-word) */
+  .editorTop:has(#backToReadingBtn:not(.hidden))>button.iconBtn[aria-label="Back to library"]{display:none}
+  #backToReadingBtn{white-space:nowrap;flex:0 0 auto}
+  #backToReadingBtn .backShort{display:inline}
+  #backToReadingBtn .backLong{display:none}
+  .titleField{flex:1 1 120px;min-width:0}
+  #noteTitle{font-size:18px;text-overflow:ellipsis}
+  /* the dead 86px gap was #mainToolbar{position:relative} (left over from
+     the retired toolPop fix) inheriting the desktop top:78px: relative
+     positioning shifted the whole toolbar down. Static + top:auto kills it. */
+  .toolbar{position:static;top:auto;padding:4px 6px;margin-top:8px}
+  .tbRowTools{flex-wrap:nowrap;overflow-x:auto;gap:2px}
   .tbRowTools .tool{width:44px;height:44px;min-height:44px}
   .tbRowTools .iconBtn{width:44px;height:44px;min-width:44px;min-height:44px}
   .tbRowTools .tbMenuBtn,.tbRowTools .tbBoardBtn{min-height:44px}
+  .tbRowTools .tbDivider{display:none}
+  /* one slim tool row: the status line (Page / Layer / Zoom / Tool) moves
+     out of the always-visible chrome — Zoom already lives in the More tools
+     sheet, the rest is shown by the pressed tool and the pages panel */
+  .statusBar{display:none}
+  #editorMoreBtn .moreShort{display:inline}
+  #editorMoreBtn .moreLong{display:none}
   .tbRowOpts{flex-wrap:wrap;overflow:visible;gap:8px;padding:6px 0}
   .sizeGroup{flex:1 1 100%;justify-content:flex-start}
   .sizeGroup input[type=range]{flex:1;width:auto}
   .statusBar{gap:10px;font-size:10px}
-  #statusHint{display:none}
-  .toolPop{left:0;right:0;max-height:56vh}
+  #statusHint{display:none}  .toolPop{left:0;right:0;max-height:56vh}
   .canvasShell{border-radius:var(--radius-xs)}
   .textArea{font-size:16px;min-height:96px}
-  .readerTop{position:static;flex-wrap:wrap;padding:8px}
+  .readerTop{position:static;flex-wrap:nowrap;padding:6px 8px;gap:6px;overflow-x:auto;scrollbar-width:none}
+  .readerTop::-webkit-scrollbar{display:none}
   .readerTop .btn,.readerTop .seg{flex:0 0 auto}
-  .readerResume{width:100%;max-width:none;margin:0;text-align:left}
+  .readerResume{display:none}
+  .closePdfBtn{display:none}
   #readerGrid{grid-template-columns:1fr;gap:16px}
   #readerSide{display:none}
   #readerSide.open{display:block}
@@ -611,10 +641,21 @@ dialog.modal:modal{overscroll-behavior:contain}
 #parallelRead{display:flex;flex-direction:column;gap:10px}
 #parallelRead.hidden{display:none!important}
 body.prOn .layout{max-width:min(1800px,100%)}
-.prBar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 10px;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius-sm)}
-.prBarTitle{font-family:var(--font-display);font-size:18px;font-weight:600;letter-spacing:-.02em;margin:0}
+.prBar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 10px;background:var(--surface);border:0;border-bottom:1px solid var(--line);border-radius:0}
+.prBarTitle{font-family:var(--font-ui);font-size:16px;font-weight:700;letter-spacing:-.01em;margin:0}
 .prBarLabel{font-size:11px;line-height:1.4;color:var(--muted)}
 .prBar select,.prBar input{min-height:34px;max-width:100%;min-width:0;padding:0 10px;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:var(--radius-xs);font-size:12px;font-weight:600}
+#prRightBtn{max-width:240px}
+#prRightLabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+/* Parallel Read picker popup: one row per book — colour dot, title, meta. */
+.pickList{display:flex;flex-direction:column}
+.pickRow{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:10px 4px;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);text-align:left;cursor:pointer}
+.pickRow:last-child{border-bottom:0}
+.pickRow:hover{background:var(--paper2)}
+.pickDot{width:12px;height:12px;border-radius:4px;flex:0 0 auto}
+.pickMain{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pickMain b{font-size:14px;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pickGo{color:var(--muted);font-size:18px;line-height:1;flex:0 0 auto}
 .prBar input[type=number]{width:72px}
 .prSpacer{flex:1 1 0}
 .prOffsetWrap{display:inline-flex;align-items:center;gap:6px}
@@ -664,7 +705,7 @@ body.prOn .layout{max-width:min(1800px,100%)}
 .prHelp{margin:0;line-height:1.55}
 .prCount{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:var(--radius-xs);background:var(--paper2);color:var(--ink);font-size:10px;font-weight:600}
 .prCount:empty{display:none}
-.prInkBar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 10px;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius-sm)}
+.prInkBar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 10px;background:var(--surface);border:0;border-bottom:1px solid var(--line);border-radius:0}
 .prInkBar.hidden{display:none!important}
 .prInkWhoWrap{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:240px}
 .prInkWho{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600}
@@ -695,7 +736,7 @@ body.prOn .layout{max-width:min(1800px,100%)}
 .prMarkKind.underline{background:#2456C8}
 .prMarkKind.strike{background:var(--accent)}
 .prMarksFoot{padding-top:8px;margin-top:6px;border-top:1px solid var(--line)}
-.prSelBar{position:fixed;left:0;top:0;z-index:70;display:flex;gap:2px;padding:4px;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius-sm);box-shadow:var(--shadow-modal)}
+.prSelBar{position:fixed;left:0;top:0;z-index:70;display:flex;gap:2px;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--shadow-modal)}
 .prSelBar.hidden{display:none!important}
 .prSelBar button{min-height:34px;padding:0 10px;border:0;border-radius:var(--radius-xs);background:transparent;color:var(--ink);font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer}
 .prSelBar button:hover{background:var(--paper2)}
@@ -712,7 +753,7 @@ body.prOn #resumeLabel{display:none}
   body.prOn .layout{padding-bottom:16px}
   /* Phone: the book picker and Sync get labelled rows that wrap, so both are reachable without sideways scrolling; controls keep a 44px target. */.prBar{gap:6px;padding:8px;flex-wrap:wrap}
   .prBarTitle,.prMarksText{display:none}.prBarLabel{display:inline}
-  #prRight{flex:1 1 180px}
+  #prRightBtn{flex:1 1 180px;max-width:none}
   #prSync{flex:1 1 140px}
   .prBar select{min-width:0;min-height:44px}.prBar input{min-height:44px}.prBar .btn{min-height:44px}
   .prLong{display:none}
