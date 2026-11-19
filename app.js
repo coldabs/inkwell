@@ -5,18 +5,27 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;',
 let toastT=null;
 function toast(msg,ms){let t=$('toast');t.textContent=msg;t.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>t.style.display='none',ms||2600)}
 function download(name, blob){let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},400)}
-function closeModal(id){$(id).classList.remove('open')}
+function closeModal(id){ var d=$(id); if(d && d.open) d.close(); }
+/* Open a native <dialog> if it is not already open (showModal throws when the dialog is already open). */
+function openDialog(id){ var d=$(id); if(d && !d.open) d.showModal(); }
+/* Light dismiss for dialogs with closedby="any" where the browser does not support the closedby attribute yet (Safari). Esc and the back gesture already close modals everywhere; this only adds tap-outside-to-close. */
+if(typeof HTMLDialogElement!=='undefined' && !('closedBy' in HTMLDialogElement.prototype)){
+  const outside=(e,d)=>{ const r=d.getBoundingClientRect(); return e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom; };
+  for(const d of document.querySelectorAll('dialog[closedby="any"]')){
+    let pressedOutside=false;
+    d.addEventListener('pointerdown',e=>{ pressedOutside=outside(e,d); });
+    d.addEventListener('pointerup',e=>{ if(pressedOutside && outside(e,d)) d.close(); });
+  }
+}
 let pendingConfirm=null;
-function askConfirm(title,text,fn){$('confirmTitle').textContent=title;$('confirmText').textContent=text;pendingConfirm=fn;$('confirmModal').classList.add('open')}
+function askConfirm(title,text,fn){$('confirmTitle').textContent=title;$('confirmText').textContent=text;pendingConfirm=fn;openDialog('confirmModal')}
 function doConfirm(){closeModal('confirmModal');if(pendingConfirm){let f=pendingConfirm;pendingConfirm=null;f()}}
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape') return;
-  document.querySelectorAll('.modal.open').forEach(m=>m.classList.remove('open'));
   closeAllPopovers();
   let sr=$('searchResults'); if(sr) sr.classList.add('hidden');
   let lh=$('libHint'); if(lh) lh.style.visibility='';
 });
-document.querySelectorAll('.modal').forEach(m=>m.addEventListener('pointerdown',e=>{ if(e.target===m) m.classList.remove('open'); }));
 function icon(name,cls){ return '<svg class="ic '+(cls||'')+'" aria-hidden="true"><use href="#ticon-'+name+'"></use></svg>'; }
 function setBtnContent(id,iconName,label){ let b=$(id); if(b) b.innerHTML=icon(iconName,'ic-sm')+' '+label; }
 
@@ -427,8 +436,6 @@ function showView(v){
   window.scrollTo({top:0});
 }
 function filterLib(f,btn){ S.filter=f; document.querySelectorAll('.chip[data-filter]').forEach(c=>c.classList.toggle('active',c.getAttribute('data-filter')===f)); renderLibrary(); }
-function toggleAbout(){ $('aboutPanel').classList.toggle('hidden'); }
-function toggleLibUtils(btn){ let el=$('libUtils'); if(!el) return; el.classList.toggle('hidden'); if(btn) btn.setAttribute('aria-expanded',String(!el.classList.contains('hidden'))); }
 function toggleTtsBar(){ let b=$('ttsBar'); b.classList.toggle('hidden'); if(!b.classList.contains('hidden')) b.scrollIntoView({block:'nearest'}); }
 
 /* ============ library ============ */
@@ -568,7 +575,7 @@ document.addEventListener('click',e=>{ if(!e.target.closest('.searchWrap')){ $('
 $('globalSearch').addEventListener('keydown',e=>{ if(e.key!=='Escape') return; e.currentTarget.value=''; $('searchResults').classList.add('hidden'); $('libHint').style.visibility=''; setSearchChrome(false); renderLibrary(); e.currentTarget.blur(); });
 
 /* ============ notebooks: create / open ============ */
-function openNewNotebook(){$('newModal').classList.add('open'); setTimeout(()=>$('newTitle').focus(),50)}
+function openNewNotebook(){openDialog('newModal'); setTimeout(()=>$('newTitle').focus(),50)}
 function createNotebook(){
   let title=$('newTitle').value.trim()||'Untitled notebook';
   createNotebookSilent(title,$('newColor').value,$('newTemplate').value);
@@ -1158,7 +1165,7 @@ function insertPageImage(e){
   r.readAsDataURL(f);
 }
 let editorZoom=1; let readerZoom=1; let readerZoomT=null;
-function editorZoomBy(f){ editorZoom= f===0? 1 : Math.max(0.5, Math.min(2.5, editorZoom*f)); S.zoom=editorZoom; $('canvasShell').style.width=(editorZoom*100)+'%'; var zl=$('zoomLabel'); if(zl) zl.textContent=Math.round(editorZoom*100)+'%'; var zs=$('zoomSlider'); if(zs) zs.value=Math.round(editorZoom*100); updateStatusBar(); } function editorZoomSlider(el){ editorZoom=Math.max(0.5,Math.min(2.5,(parseInt(el.value,10)||100)/100)); S.zoom=editorZoom; $('canvasShell').style.width=(editorZoom*100)+'%'; var zl2=$('zoomLabel'); if(zl2) zl2.textContent=Math.round(editorZoom*100)+'%'; var zs2=$('zoomSlider'); if(zs2) zs2.value=Math.round(editorZoom*100); updateStatusBar(); } function readerZoomBy(f){ readerZoom=prClampZoom(f===0?1:readerZoom*f); let b=curBook(); if(b) b.readerZoom=readerZoom; let host=$('pdfPages'); if(host) host.style.width=(readerZoom*100)+'%'; let zl3=$('readerZoomLabel'); if(zl3) zl3.textContent=Math.round(readerZoom*100)+'%'; clearTimeout(readerZoomT); readerZoomT=setTimeout(()=>{ if(host) pdfRefresh(host,pdfDrawIO); },120); } let readerPinch=null; function readerTouchStart(e){ if(!e.touches||e.touches.length!==2) return; let b=curBook(); if(!b||b.kind!=='pdf') return; let host=$('pdfPages'); if(!host) return; let a=e.touches[0],c=e.touches[1],r=host.getBoundingClientRect(); readerPinch={host:host,d0:Math.max(20,Math.hypot(a.clientX-c.clientX,a.clientY-c.clientY)),z0:readerZoom,s:1}; e.preventDefault(); host.style.transformOrigin=((a.clientX+c.clientX)/2-r.left)+'px '+((a.clientY+c.clientY)/2-r.top)+'px'; } function readerTouchMove(e){ if(!readerPinch||!e.touches||e.touches.length!==2) return; e.preventDefault(); let a=e.touches[0],c=e.touches[1]; let z=prClampZoom(readerPinch.z0*Math.hypot(a.clientX-c.clientX,a.clientY-c.clientY)/readerPinch.d0); readerPinch.s=z/readerPinch.z0; readerPinch.host.style.transform='scale('+readerPinch.s+')'; } function readerTouchEnd(e){ if(!readerPinch||(e.touches&&e.touches.length>=2)) return; let p=readerPinch; readerPinch=null; p.host.style.transform=''; p.host.style.transformOrigin=''; if(Math.abs(p.s-1)>0.02) readerZoomBy(p.s); } (function(){ let pv=$('pdfView'); if(!pv) return; pv.style.touchAction='pan-x pan-y'; pv.addEventListener('touchstart',readerTouchStart,{passive:false}); pv.addEventListener('touchmove',readerTouchMove,{passive:false}); pv.addEventListener('touchend',readerTouchEnd,{passive:false}); pv.addEventListener('touchcancel',readerTouchEnd,{passive:false}); })();
+function editorZoomBy(f){ editorZoom= f===0? 1 : Math.max(0.5, Math.min(2.5, editorZoom*f)); S.zoom=editorZoom; $('canvasShell').style.width=(editorZoom*100)+'%'; var zl=$('zoomLabel'); if(zl) zl.textContent=Math.round(editorZoom*100)+'%'; var zs=$('zoomSlider'); if(zs) zs.value=Math.round(editorZoom*100); updateStatusBar(); } function readerZoomBy(f){ readerZoom=prClampZoom(f===0?1:readerZoom*f); let b=curBook(); if(b) b.readerZoom=readerZoom; let host=$('pdfPages'); if(host) host.style.width=(readerZoom*100)+'%'; let zl3=$('readerZoomLabel'); if(zl3) zl3.textContent=Math.round(readerZoom*100)+'%'; clearTimeout(readerZoomT); readerZoomT=setTimeout(()=>{ if(host) pdfRefresh(host,pdfDrawIO); },120); } let readerPinch=null; function readerTouchStart(e){ if(!e.touches||e.touches.length!==2) return; let b=curBook(); if(!b||b.kind!=='pdf') return; let host=$('pdfPages'); if(!host) return; let a=e.touches[0],c=e.touches[1],r=host.getBoundingClientRect(); readerPinch={host:host,d0:Math.max(20,Math.hypot(a.clientX-c.clientX,a.clientY-c.clientY)),z0:readerZoom,s:1}; e.preventDefault(); host.style.transformOrigin=((a.clientX+c.clientX)/2-r.left)+'px '+((a.clientY+c.clientY)/2-r.top)+'px'; } function readerTouchMove(e){ if(!readerPinch||!e.touches||e.touches.length!==2) return; e.preventDefault(); let a=e.touches[0],c=e.touches[1]; let z=prClampZoom(readerPinch.z0*Math.hypot(a.clientX-c.clientX,a.clientY-c.clientY)/readerPinch.d0); readerPinch.s=z/readerPinch.z0; readerPinch.host.style.transform='scale('+readerPinch.s+')'; } function readerTouchEnd(e){ if(!readerPinch||(e.touches&&e.touches.length>=2)) return; let p=readerPinch; readerPinch=null; p.host.style.transform=''; p.host.style.transformOrigin=''; if(Math.abs(p.s-1)>0.02) readerZoomBy(p.s); } (function(){ let pv=$('pdfView'); if(!pv) return; pv.style.touchAction='pan-x pan-y'; pv.addEventListener('touchstart',readerTouchStart,{passive:false}); pv.addEventListener('touchmove',readerTouchMove,{passive:false}); pv.addEventListener('touchend',readerTouchEnd,{passive:false}); pv.addEventListener('touchcancel',readerTouchEnd,{passive:false}); })();
 function setPageBg(v){ let p=curPageObj(); if(!p) return; p.bgColor=v; bumpV(p); drawBackground(); renderPages(); }
 
 /* pointer drawing */
@@ -1685,14 +1692,8 @@ function setTool(t,el){
   /* Gap 2: tapping the already-selected tool must NOT turn it off or
      switch to Hand, it stays selected until a different tool is picked. */
   S.tool=t; document.querySelectorAll('#mainToolbar .tool').forEach(b=>{ let on=b.dataset.tool===t; b.classList.toggle('active',on); b.setAttribute('aria-pressed',String(on)); });
-  updateInkTouchAction(); updateSizeUI(); updateToolOptsUI(); updateStatusBar(); updateOptsRow();
+  updateInkTouchAction(); updateSizeUI(); updateToolOptsUI(); updateStatusBar();
 }
-/* The Size + colours row is only up while a tool that draws (or sizes
-   what it touches) is active, Hand / Select / Lasso / Vertical space
-   collapse it so the page gets the room back. The tool menus live in
-   the tools row now, so nothing becomes unreachable. */
-const OPTS_ROW_TOOLS=['pen','calligraphy','highlighter','eraser','text','line','rect','ellipse','arrow','spline','compass'];
-function updateOptsRow(){ var row=$('tbOptsRow'); if(!row) return; row.classList.toggle('hidden', OPTS_ROW_TOOLS.indexOf(S.tool)<0); }
 function setColor(c,el){ S.color=c; document.querySelectorAll('#swatchBox .swatch').forEach(s=>s.classList.remove('active')); if(el) el.classList.add('active'); let cp=$('customColor'); if(cp && /^#[0-9a-f]{6}$/i.test(c)) cp.value=c; updateSizeUI(); }
 function toggleLayer(which,on){ (which==='ink'?inkC:hiC).style.display= on? 'block':'none'; updateStatusBar(); }
 document.addEventListener('keydown',e=>{
@@ -2045,7 +2046,7 @@ function renderTexLayer(){
 function openTexModal(){
   if(!curNb()){ toast('Open a notebook first'); return; }
   if(S.view!=='editor'){ openNotebook(curNb().id); }
-  $('texModal').classList.add('open'); updateTexPreview();
+  openDialog('texModal'); updateTexPreview();
   setTimeout(()=>$('texInput').focus(),50);
 }
 function applyTexTemplate(k){ if(k && TEX_TEMPLATES[k]){ $('texInput').value=TEX_TEMPLATES[k]; updateTexPreview(); } }
@@ -2082,21 +2083,14 @@ function importGpl(e){
   r.readAsText(f);
 }
 function setToolbarLayout(v){ let tb=$('mainToolbar'); tb.classList.remove('compact','minimal'); if(v) tb.classList.add(v); }
-function toggleMoreTools(btn){ togglePageMenu(btn); }
-function closeAllToolPops(){ document.querySelectorAll('.toolPop.open').forEach(el=>el.classList.remove('open')); ['toolOptsBtn','insertBtn','pageOptsBtn'].forEach(id=>{ var b=$(id); if(b) b.setAttribute('aria-expanded','false'); }); }
-/* One dismissal entry point for every popover in the editor (P4/P12
-   hygiene): tool-options popovers plus the Export menu. */
+/* Dismissal for the editor sheets (native <dialog> bottom sheets). The old
+   popover names are kept because the sheet buttons and setTool() call them. */
+function closeAllToolPops(){ ['editorSheet','exportSheet','prMarksSheet'].forEach(id=>{ var d=$(id); if(d && d.open) d.close(); }); document.querySelectorAll('.toolPop.open').forEach(el=>el.classList.remove('open')); }
 function closeAllPopovers(){ closeAllToolPops(); closeExportPop(); }
-function toggleOnePop(id,btn){ var el=$(id); var willOpen=el && !el.classList.contains('open'); closeAllToolPops(); if(el && willOpen){ el.classList.add('open'); if(btn) btn.setAttribute('aria-expanded','true'); } return willOpen; }
-function toggleToolOpts(btn){ if(toggleOnePop('toolOptsPop',btn)) updateToolOptsUI(); }
-function toggleInsertMenu(btn){ toggleOnePop('insertPop',btn); }
-function togglePageMenu(btn){ toggleOnePop('pagePop',btn); } /* Editor toolbar on a phone: one slim row of core tools (pen, highlighter, eraser, hand, undo, redo, More), the rest behind a More popover, and size + colour inside the Pen options popover instead of their own rows. On a wider screen the full toolbar is unchanged. The slim-row rules live here, next to the behaviour that places the controls. */ (function placeEditorToolbar(){ let mq=window.matchMedia?window.matchMedia('(max-width: 860px)'):null; if(!mq) return; let tb=$('mainToolbar'); if(!tb) return; let row=tb.querySelector('.tbRowTools'); let opts=$('tbOptsRow'); let pops=$('toolOptsPop'); if(!row||!opts||!pops) return; if(!document.getElementById('editorSlimStyle')){ let st=document.createElement('style'); st.id='editorSlimStyle'; st.textContent='@media(max-width:860px){#mainToolbar .tbRowTools{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}#mainToolbar .tbRowTools::-webkit-scrollbar{display:none}#mainToolbar .tbRowTools>.tbDivider{display:none}#mainToolbar .tbRowTools .tool{width:44px;height:44px;min-height:44px}#mainToolbar .tbRowTools .iconBtn{width:44px;height:44px;min-width:44px;min-height:44px}#mainToolbar .tbRowTools .tbMenuBtn,#mainToolbar .tbRowTools .tbBoardBtn{min-height:44px}#tbOptsRow{display:none}#moreToolsPop.open{display:flex;flex-wrap:wrap;gap:6px;align-items:center}#moreToolsPop .tbMenuBtn{min-height:44px}#toolOptsPop .sizeColourWrap{display:flex;flex-wrap:wrap;gap:8px;align-items:center}#editorStatus{flex-wrap:wrap;overflow-x:visible;white-space:normal;row-gap:2px}#editorStatus .statusSpacer{display:none}}'; document.head.appendChild(st); } let moreBtn=$('moreToolsBtn'); if(!moreBtn){ moreBtn=document.createElement('button'); moreBtn.type='button'; moreBtn.className='tbMenuBtn'; moreBtn.id='moreToolsBtn'; moreBtn.setAttribute('aria-expanded','false'); moreBtn.setAttribute('aria-haspopup','true'); moreBtn.setAttribute('aria-label','More tools'); moreBtn.innerHTML='More '+icon('chevron-down','ic-sm'); moreBtn.addEventListener('click',function(){ toggleOnePop('moreToolsPop',moreBtn); }); row.appendChild(moreBtn); } let morePop=$('moreToolsPop'); if(!morePop){ morePop=document.createElement('div'); morePop.className='toolPop'; morePop.id='moreToolsPop'; morePop.setAttribute('role','menu'); morePop.setAttribute('aria-label','More tools'); tb.appendChild(morePop); } let scSec=$('sizeColourSec'); if(!scSec){ scSec=document.createElement('div'); scSec.className='toolOptSection'; scSec.id='sizeColourSec'; scSec.setAttribute('data-tools','pen calligraphy highlighter eraser text line rect ellipse arrow spline compass'); let wrap=document.createElement('div'); wrap.className='sizeColourWrap'; scSec.appendChild(wrap); } let wrap=scSec.querySelector('.sizeColourWrap'); let sizeGroup=$('brushSizeGroup'); let swatches=$('swatchBox'); let custom=$('customColor'); let toolB=$('statusTool'); let toolSpan=toolB?toolB.parentElement:null; let divs=row.querySelectorAll('.tbDivider'); let d1=divs[0], d2=divs[1], d3=divs[2]; function anywhere(t){ return row.querySelector('[data-tool="'+t+'"]')||morePop.querySelector('[data-tool="'+t+'"]'); } function place(){ if(mq.matches){ ['calligraphy','select','text','line','rect','ellipse','arrow','spline','compass','lasso','vspace'].forEach(function(t){ let b=anywhere(t); if(b) morePop.appendChild(b); }); let board=$('boardBtn'); if(board) morePop.appendChild(board); ['toolOptsBtn','insertBtn','pageOptsBtn'].forEach(function(id){ let b=$(id); if(b) morePop.appendChild(b); }); let title=$('toolOptsTitle'); if(title&&title.nextSibling) pops.insertBefore(scSec,title.nextSibling); else pops.appendChild(scSec); if(sizeGroup) wrap.appendChild(sizeGroup); if(swatches) wrap.appendChild(swatches); if(custom) wrap.appendChild(custom); moreBtn.style.display=''; if(toolSpan) toolSpan.style.display='none'; } else { let hi=row.querySelector('[data-tool="highlighter"]'); let cb=anywhere('calligraphy'); if(cb) row.insertBefore(cb,hi||d1); ['select','text'].forEach(function(t){ let b=anywhere(t); if(b) row.insertBefore(b,d1); }); ['line','rect','ellipse','arrow','spline','compass','lasso','vspace'].forEach(function(t){ let b=anywhere(t); if(b) row.insertBefore(b,d2); }); let board=$('boardBtn'); if(board) row.insertBefore(board,d3); ['toolOptsBtn','insertBtn','pageOptsBtn'].forEach(function(id){ let b=$(id); if(b) row.appendChild(b); }); if(sizeGroup) opts.appendChild(sizeGroup); if(swatches) opts.appendChild(swatches); if(custom) opts.appendChild(custom); if(scSec.parentElement) scSec.parentElement.removeChild(scSec); morePop.classList.remove('open'); moreBtn.style.display='none'; if(toolSpan) toolSpan.style.display=''; } scSec.classList.toggle('show',OPTS_ROW_TOOLS.indexOf(S.tool)>=0); } place(); if(mq.addEventListener) mq.addEventListener('change',place); else if(mq.addListener) mq.addListener(place); })();
 const TOOL_LABELS={pen:'Pen',calligraphy:'Calligraphy',highlighter:'Highlighter',eraser:'Eraser',hand:'Hand',select:'Select',text:'Text',line:'Line',rect:'Rectangle',ellipse:'Ellipse',arrow:'Arrow',spline:'Spline',compass:'Compass',lasso:'Lasso',vspace:'Vertical space'};
 function updateToolOptsUI(){ var label=TOOL_LABELS[S.tool]||'Tool'; var btn=$('toolOptsBtn'); if(btn) btn.innerHTML=label+' options '+icon('chevron-down','ic-sm'); var title=$('toolOptsTitle'); if(title) title.textContent=label+' options'; document.querySelectorAll('.toolOptSection').forEach(sec=>{ var tools=(sec.getAttribute('data-tools')||'').split(/\s+/); sec.classList.toggle('show', tools.indexOf(S.tool)>=0); }); }
 function updateStatusBar(){ var nb=curNb(); var sp=$('statusPage'); if(sp && nb) sp.textContent=(nb.cur+1)+' / '+nb.pages.length; var sl=$('statusLayer'); if(sl){ var inkOn=!$('layerInkTgl')||$('layerInkTgl').checked; var hiOn=!$('layerHiTgl')||$('layerHiTgl').checked; sl.textContent= S.tool==='highlighter'?'Highlight': (inkOn&&hiOn?'Ink + Highlight': inkOn?'Ink': hiOn?'Highlight':'None'); } var sz=$('statusZoom'); if(sz) sz.textContent=Math.round((typeof editorZoom!=='undefined'?editorZoom:1)*100)+'%'; var st=$('statusTool'); if(st) st.textContent=TOOL_LABELS[S.tool]||S.tool; }
-document.addEventListener('click',e=>{ if(!e.target.closest('#mainToolbar')) closeAllToolPops(); });
-function toggleExportMenu(btn){ let p=$('exportPop'); let open=p.classList.toggle('open'); if(btn) btn.setAttribute('aria-expanded',open); }
-function closeExportPop(){ let p=$('exportPop'); if(p) p.classList.remove('open'); let b=$('exportBtn'); if(b) b.setAttribute('aria-expanded','false'); }
+function closeExportPop(){ var d=$('exportSheet'); if(d && d.open) d.close(); var b=$('exportBtn'); if(b) b.setAttribute('aria-expanded','false'); }
 function selectLayerStrokes(which){ let p=curPageObj(); if(!p) return; S.selection=(which==='ink'? p.ink : p.hi).slice(); drawSelectionOverlay(); toast(S.selection.length? S.selection.length+' stroke(s) selected on the '+(which==='ink'?'ink':'highlight')+' layer' : 'That layer is empty on this page'); }
 
 /* ============ exports ============ */
@@ -3607,17 +3601,18 @@ document.addEventListener('selectionchange',()=>{ if(!PR.on) return; clearTimeou
 ['L','R'].forEach(s=>$('prPane'+s).addEventListener('scroll',()=>{ let b=$('prSelBar'); if(b && !b.classList.contains('hidden')) prShowSelBar(); },{passive:true}));
 /* "Marks": the marks of the book in use */
 function prToggleMarks(btn){
-  let pop=$('prMarksPop'), willOpen=pop.classList.contains('hidden');
-  pop.classList.toggle('hidden',!willOpen); if(btn) btn.setAttribute('aria-expanded',willOpen?'true':'false');
-  if(willOpen) prRenderMarks();
+  let d=$('prMarksSheet'); if(!d) return;
+  if(d.open){ d.close(); if(btn) btn.setAttribute('aria-expanded','false'); }
+  else { prRenderMarks(); d.showModal(); if(btn) btn.setAttribute('aria-expanded','true'); }
 }
-function prCloseMarks(){ let pop=$('prMarksPop'); if(pop) pop.classList.add('hidden'); let b=$('prMarksBtn'); if(b) b.setAttribute('aria-expanded','false'); }
+function prCloseMarks(){ let d=$('prMarksSheet'); if(d && d.open) d.close(); let b=$('prMarksBtn'); if(b) b.setAttribute('aria-expanded','false'); }
 function prRenderMarks(){
-  let pop=$('prMarksPop'), P=PR.panes[PR.active]; if(!pop) return;
-  if(!P){ pop.innerHTML=''; return; }
+  let body=$('prMarksBody'), P=PR.panes[PR.active]; if(!body) return;
+  let t=$('prMarksTitle');
+  if(!P){ if(t) t.textContent='Marks'; body.innerHTML=''; return; }
   let b=P.book, list=b.annotations||[];
-  pop.innerHTML='<div class="prMarksHead"><b>Marks in “'+esc(b.title)+'”</b><span class="kbd">'+list.length+'</span></div>'
-    +(list.length
+  if(t) t.textContent='Marks in “'+b.title+'”'+(list.length?' ('+list.length+')':'');
+  body.innerHTML=(list.length
       ? '<div class="prMarksList">'+list.map((a,i)=>'<button type="button" class="prMarkRow" data-i="'+i+'"><span class="prMarkKind '+esc(a.kind||'highlight')+'" aria-hidden="true"></span><span class="prMarkText">“'+esc(String(a.text).slice(0,100))+'”</span><span class="kbd">'+esc(a.where||'')+(a.kind&&a.kind!=='highlight'?' · '+esc(a.kind):'')+'</span></button>').join('')+'</div>'
         +'<div class="prMarksFoot"><button class="btn small" type="button" onclick="exportAnnotationsFor(PR.panes[PR.active]&&PR.panes[PR.active].book)">Export marks</button></div>'
       : '<p class="kbd" style="margin:10px 4px 2px;line-height:1.5">No marks yet, select text in this book, then Highlight, Underline or Strikethrough.</p>');
@@ -3625,16 +3620,15 @@ function prRenderMarks(){
 function prUpdateMarksBtn(){
   let P=PR.panes[PR.active], n=P? (P.book.annotations||[]).length : 0, c=$('prMarksCount');
   if(c) c.textContent= n? String(n) : '';
-  let pop=$('prMarksPop'); if(pop && !pop.classList.contains('hidden')) prRenderMarks();
+  let d=$('prMarksSheet'); if(d && d.open) prRenderMarks();
 }
-$('prMarksPop').addEventListener('click',e=>{
+$('prMarksBody').addEventListener('click',e=>{
   let r=e.target.closest('.prMarkRow'); if(!r) return;
   let P=PR.panes[PR.active]; if(!P) return;
   let a=(P.book.annotations||[])[+r.dataset.i]; if(!a) return;
   let m=/(?:PDF page|Chapter)\s+(\d+)/.exec(a.where||''); if(m) prJump(PR.active,+m[1]-1);
   prCloseMarks();
 });
-document.addEventListener('click',e=>{ if(!e.target.closest('#prMarksPop,#prMarksBtn')) prCloseMarks(); });
 
 /* ---------- handwriting on both books ("Annotate", right in Parallel Read) ----------
    The same drawing tools as the editor, on the page itself: pen, calligraphy
@@ -3983,7 +3977,6 @@ syncThemeToggle();
 updateInkTouchAction();
 updateSizeUI();
 updateToolOptsUI();
-updateOptsRow();
 initApp();
 async function initApp(){
   /* First paint must not wait for storage. Paint the starter shelf,
