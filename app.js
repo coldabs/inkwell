@@ -79,8 +79,11 @@ function smoothOrInstant(){ return prefersReducedMotion()? 'auto' : 'smooth'; }
    store, modules and tests are all intentionally left undone. */
 
 /* ============ state ============ */
-const CW=1200, CH=800;
-let PH=CH; /* live height of the page being edited, portrait PDF pages grow it so the page fills the width instead of shrinking into the middle of a landscape sheet */
+const CW=1200, CH=1697; /* A4 portrait (1200 x 1697): blank pages are portrait
+  like real notebook paper, so the page fills the phone screen instead of
+  sitting as a short landscape strip with empty space around it. */
+let PH=CH; /* live height of the page being edited; PDF-backed pages set it
+  from the PDF page ratio instead */
 function pageH(p){ if(p&&p.bgPdf&&p.bgPdf.img&&p.bgPdf.img.width&&p.bgPdf.img.height){ return Math.max(400,Math.min(2200,Math.round(CW*p.bgPdf.img.height/p.bgPdf.img.width))); } return CH; }
 function syncPageHeight(){ let h=pageH(curPageObj()); if(h!==PH||bgC.height!==h){ PH=h; [bgC,hiC,inkC].forEach(c=>{c.height=h}); [bgX,hiX,inkX].forEach(c=>{c.lineCap='round';c.lineJoin='round'}); } }
 const SAMPLE_ID='sample-book';
@@ -361,7 +364,7 @@ function buildSamplePdfBytes(){
       ['h',11.5,17,'sheet, Night for reading in the dark. The text size steps up and'],
       ['h',11.5,17,'down from the same bar, and Listen reads the page aloud.'],
       ['h',11.5,20,''],
-      ['h',11.5,17,'Select any word to look it up in the dictionary or on Wikipedia,'],
+      ['h',11.5,17,'Select any word to highlight it, underline it or mark it in colour,'],
       ['h',11.5,17,'or run OCR over a scanned page to pull its print into text you'],
       ['h',11.5,17,'can copy straight into a notebook.'] ],
     [ ['b',22,32,'Marking up a PDF'],
@@ -822,6 +825,7 @@ function openNotebook(id){
   $('templateSel').value=nb.template;
   loadPageIntoEditor();
   showView('editor');
+  layoutEditorSheet();
   /* phone: always open at fit-to-width so the page uses the freed space —
      a zoom left over from an earlier pinch (e.g. 70%) used to leave the
      page small with empty margins around it */
@@ -1925,16 +1929,103 @@ function setTool(t,el){
   if(S.tool!==t) closeAllPopovers();
   /* Gap 2: tapping the already-selected tool must NOT turn it off or
      switch to Hand, it stays selected until a different tool is picked. */
-  S.tool=t; document.querySelectorAll('#mainToolbar .tool').forEach(b=>{ let on=b.dataset.tool===t; b.classList.toggle('active',on); b.setAttribute('aria-pressed',String(on)); });
+  S.tool=t; document.querySelectorAll('#mainToolbar .tool, #editorSheet .tool').forEach(b=>{ let on=b.dataset.tool===t; b.classList.toggle('active',on); b.setAttribute('aria-pressed',String(on)); });
+  /* P2: the Shapes disclosure shows active while any shape tool is picked. */
+  var sh=$('shapesBtn'); if(sh){ var isShape=['line','rect','ellipse','arrow','spline','compass'].indexOf(t)>=0; sh.classList.toggle('active',isShape); sh.setAttribute('aria-pressed',String(isShape)); }
   updateInkTouchAction(); updateSizeUI(); updateToolOptsUI(); updateStatusBar();
 }
 function setColor(c,el){ S.color=c; document.querySelectorAll('#swatchBox .swatch').forEach(s=>s.classList.remove('active')); if(el) el.classList.add('active'); let cp=$('customColor'); if(cp && /^#[0-9a-f]{6}$/i.test(c)) cp.value=c; updateSizeUI(); }
+/* P2: left rail tabs (Pages | Layers). */
+function switchRailTab(tab){
+  var pages=tab==='pages';
+  var tp=$('railTabPages'), tl=$('railTabLayers'), rp=$('railPages'), rl=$('railLayers');
+  if(tp) tp.setAttribute('aria-selected',String(pages));
+  if(tl) tl.setAttribute('aria-selected',String(!pages));
+  if(rp) rp.hidden=!pages;
+  if(rl) rl.hidden=pages;
+}
 function toggleLayer(which,on){ (which==='ink'?inkC:hiC).style.display= on? 'block':'none'; updateStatusBar(); }
 document.addEventListener('keydown',e=>{
   if(S.view!=='editor') return;
   if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z' && !e.shiftKey){ e.preventDefault(); undoStroke(); }
   if((e.ctrlKey||e.metaKey) && (e.key.toLowerCase()==='y' || (e.key.toLowerCase()==='z'&&e.shiftKey))){ e.preventDefault(); redoStroke(); }
 });
+
+
+/* P2: on phones the Draw/Insert/Page/Notes&Audio controls live in the
+   inspector's bottom-sheet tabs; on wider screens they live in the
+   rails and under the canvas. The nodes themselves move -- same ids,
+   same handlers -- so nothing is duplicated or re-bound. */
+let edSheetMode=null;
+function layoutEditorSheet(){
+  var mobile=window.matchMedia('(max-width:768px)').matches;
+  if(mobile===edSheetMode) return; edSheetMode=mobile;
+  /* Guarded: a layout slip here must never abort the rest of app.js
+     (a throw during load used to leave PR uninitialised and break
+     every showView call on desktop widths). */
+  try{
+  var pp=$('pagesPanel'), rp=$('railPages'), rl=$('railLayers'),
+      nb=document.querySelector('.noteBlock'), sr=document.querySelector('.studioRow'),
+      tabPage=$('sheetTabPage'), tabDraw=$('sheetTabDraw'), tabNotes=$('sheetTabNotes'),
+      stage=$('stageWrap'), th=$('tableHost');
+  if(!pp||!rp||!rl||!nb||!sr||!tabPage||!tabDraw||!tabNotes||!stage||!th) return;
+  if(mobile){
+    tabPage.appendChild(rp);
+    tabDraw.appendChild(rl);
+    tabNotes.appendChild(nb);
+    tabNotes.appendChild(sr);
+    /* Each panel lives alone in its own sheet tab now, so both must be
+       shown: the rail tab buttons that used to toggle them are inside
+       #pagesPanel, which hides on mobile. */
+    rp.hidden=false; rl.hidden=false;
+    pp.classList.add('mobileMoved');
+  }else{
+    var d=$('editorSheet'); if(d) d.style.height='';
+    var help=pp.querySelector('.helpBox');
+    pp.appendChild(rp); pp.appendChild(rl); if(help) pp.appendChild(help);
+    /* Restore the rail-tab state the buttons show (Pages by default). */
+    switchRailTab(($('railTabLayers') && $('railTabLayers').getAttribute('aria-selected')==='true') ? 'layers' : 'pages');
+    /* #editorStatus is inside #stageWrap but NOT a direct child (it sits
+       in a wrapper div), so insert before it via its own parent. */
+    var anchor=$('editorStatus')||th;
+    var parent=anchor.parentNode;
+    parent.insertBefore(nb, anchor); parent.insertBefore(sr, anchor);
+    pp.classList.remove('mobileMoved');
+  }
+  }catch(err){ try{ console.warn('layoutEditorSheet', err); }catch(e){} }
+}
+/* P2: drag the inspector's grip to resize the bottom sheet (phones). */
+(function(){
+  var grip=$('editorSheetGrip'), d=$('editorSheet'); if(!grip||!d) return;
+  var startY=0, startH=0, dragging=false;
+  grip.addEventListener('pointerdown',e=>{
+    if(!window.matchMedia('(max-width:768px)').matches || !d.open) return;
+    dragging=true; startY=e.clientY; startH=d.getBoundingClientRect().height;
+    try{ grip.setPointerCapture(e.pointerId); }catch(err){}
+    e.preventDefault();
+  });
+  grip.addEventListener('pointermove',e=>{
+    if(!dragging) return;
+    var h=startH+(startY-e.clientY);
+    var min=Math.round(innerHeight*0.45), max=Math.round(innerHeight*0.92);
+    d.style.height=Math.max(min,Math.min(max,h))+'px';
+  });
+  function endDrag(){
+    if(!dragging) return; dragging=false;
+    var h=d.getBoundingClientRect().height;
+    d.style.height=(h<innerHeight*0.7 ? Math.round(innerHeight*0.55) : Math.round(innerHeight*0.92))+'px';
+  }
+  grip.addEventListener('pointerup',endDrag);
+  grip.addEventListener('pointercancel',()=>{ dragging=false; });
+  grip.addEventListener('dblclick',()=>{
+    if(!window.matchMedia('(max-width:768px)').matches || !d.open) return;
+    var h=d.getBoundingClientRect().height;
+    d.style.height=(h>innerHeight*0.7 ? Math.round(innerHeight*0.55) : Math.round(innerHeight*0.92))+'px';
+  });
+  d.addEventListener('close',()=>{ d.style.height=''; });
+})();
+window.addEventListener('resize',()=>{ clearTimeout(window.__edSheetT); window.__edSheetT=setTimeout(layoutEditorSheet,150); });
+layoutEditorSheet();
 
 /* ============ editor: pages ============ */
 function loadPageIntoEditor(){
@@ -1944,7 +2035,7 @@ function loadPageIntoEditor(){
   $('templateSel').value=nb.template;
   $('noteText').value=p.text||'';
   if(!p.texts) p.texts=[]; if(!p.images) p.images=[]; if(!p.texs) p.texs=[]; if(!p.bgColor) p.bgColor='#fffdf6';
-  let bgSel=$('pageBgSel'); if(bgSel) bgSel.value=p.bgColor;
+  let bgSel=$('pageBgSel'); if(bgSel) bgSel.value=p.bgColor; syncPageBgSwatches(p.bgColor);
   S.selection=[]; S.selRect=null; let sb=$('selBar'); if(sb) sb.classList.remove('open');
   redrawAll(); renderStickies(); renderTable(); renderPages(); refreshLinks(); updateWordCount(); updateAudioUI(); renderCanvasTexts(); renderCanvasImages(); renderTexLayer(); let btr=$('backToReadingBtn'); if(btr) btr.classList.toggle('hidden',!nb.pdfBookId);
   if(!$('floatingBoard').classList.contains('hidden')) loadBoard();
@@ -2235,6 +2326,7 @@ function updateWordCount(){ let v=$('noteText').value; $('wordCount').textConten
 $('noteText').addEventListener('input',()=>{ saveEditorToModel(); updateWordCount(); });
 function toggleSplit(){
   S.split=!S.split;
+  var stb=$('splitTopBtn'); if(stb) stb.setAttribute('aria-pressed', S.split?'true':'false');
   $('stageWrap').classList.toggle('split',S.split);
   let pane=$('splitPane'); pane.classList.toggle('hidden',!S.split);
   /* P3: Split View halves the page shell, re-clamp the floating
@@ -2319,7 +2411,70 @@ function importGpl(e){
 function setToolbarLayout(v){ let tb=$('mainToolbar'); tb.classList.remove('compact','minimal'); if(v) tb.classList.add(v); }
 /* Dismissal for the editor sheets (native <dialog> bottom sheets). The old
    popover names are kept because the sheet buttons and setTool() call them. */
-function closeAllToolPops(){ ['editorSheet','exportSheet','prMarksSheet'].forEach(id=>{ var d=$(id); if(d && d.open) d.close(); }); document.querySelectorAll('.toolPop.open').forEach(el=>el.classList.remove('open')); }
+function closeAllToolPops(){ ['editorSheet','exportSheet','prMarksSheet'].forEach(id=>{ var d=$(id); if(d && d.open) d.close(); }); document.querySelectorAll('.toolPop.open, .shapePop.open').forEach(el=>el.classList.remove('open')); var sb=$('shapesBtn'); if(sb) sb.setAttribute('aria-expanded','false'); }
+/* P2: Shapes popover on the floating pill toolbar. */
+function toggleShapePop(){
+  var pop=$('shapePop'), btn=$('shapesBtn'); if(!pop||!btn) return;
+  var open=!pop.classList.contains('open');
+  pop.classList.toggle('open',open); btn.setAttribute('aria-expanded',String(open));
+}
+function closeShapePop(){ var pop=$('shapePop'), btn=$('shapesBtn'); if(pop) pop.classList.remove('open'); if(btn) btn.setAttribute('aria-expanded','false'); }
+document.addEventListener('pointerdown',e=>{
+  var pop=$('shapePop'); if(!pop||!pop.classList.contains('open')) return;
+  var btn=$('shapesBtn');
+  if(!pop.contains(e.target) && !(btn && (e.target===btn || btn.contains(e.target)))) closeShapePop();
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){ var pop=$('shapePop'); if(pop&&pop.classList.contains('open')) closeShapePop(); }
+});
+/* P2: inspector sheet tabs (Draw | Insert | Page | Notes & Audio). */
+function switchSheetTab(tab){
+  ['draw','insert','page','notes'].forEach(t=>{
+    var cap=t[0].toUpperCase()+t.slice(1);
+    var b=$('sheetTabBtn'+cap), p=$('sheetTab'+cap);
+    if(b) b.setAttribute('aria-selected',String(t===tab));
+    if(p) p.hidden=(t!==tab);
+  });
+}
+/* P2: page-colour swatches (the select stays as the state mirror). */
+function hexToRgb(h){ h=String(h||'').replace('#',''); return 'rgb('+parseInt(h.substr(0,2),16)+', '+parseInt(h.substr(2,2),16)+', '+parseInt(h.substr(4,2),16)+')'; }
+function syncPageBgSwatches(v){
+  var box=$('pageSwatches'); if(!box||!v) return;
+  var want=hexToRgb(v);
+  box.querySelectorAll('.pageSwatch').forEach(b=>{
+    var cur=''; try{ cur=getComputedStyle(b).backgroundColor; }catch(e){}
+    b.classList.toggle('active', cur===want);
+  });
+}
+function pickPageBg(v){
+  var sel=$('pageBgSel'); if(sel) sel.value=v;
+  setPageBg(v); syncPageBgSwatches(v);
+}
+/* P2: open the Tools & Insert inspector (side drawer on desktop,
+   4-tab bottom sheet on mobile). */
+function openInspector(section){
+  var d=$('editorSheet'); if(!d) return;
+  if(!d.open) d.showModal();
+  var b=$('pillInsertBtn'); if(b) b.setAttribute('aria-expanded','true');
+  if(section && typeof switchSheetTab==='function') switchSheetTab(section);
+}
+/* Toolbar guide: focusgroup gives the roving tab stop natively; where
+   it is unsupported, a small roving-tabindex fallback does the same. */
+(function(){
+  var d=$('editorSheet'); if(d) d.addEventListener('close',()=>{ var b=$('pillInsertBtn'); if(b) b.setAttribute('aria-expanded','false'); });
+  if('focusGroup' in HTMLElement.prototype) return;
+  var bar=$('mainToolbar'); if(!bar) return;
+  function items(){ return Array.from(bar.querySelectorAll('button:not([disabled])')).filter(b=>b.offsetParent!==null); }
+  bar.addEventListener('focusin',e=>{ if(items().includes(e.target)) items().forEach(b=>{ b.tabIndex=(b===e.target?0:-1); }); });
+  bar.addEventListener('keydown',e=>{
+    var list=items(); var i=list.indexOf(document.activeElement); if(i<0) return;
+    var rtl=getComputedStyle(bar).direction==='rtl';
+    var step={ArrowRight:rtl?-1:1,ArrowLeft:rtl?1:-1,Home:'home',End:'end'}[e.key];
+    if(step===undefined) return; e.preventDefault();
+    var n= step==='home'?0 : step==='end'?list.length-1 : (i+step+list.length)%list.length;
+    list[n].focus();
+  });
+})();
 function closeAllPopovers(){ closeAllToolPops(); closeExportPop(); }
 const TOOL_LABELS={pen:'Pen',calligraphy:'Calligraphy',highlighter:'Highlighter',eraser:'Eraser',hand:'Hand',select:'Select',text:'Text',line:'Line',rect:'Rectangle',ellipse:'Ellipse',arrow:'Arrow',spline:'Spline',compass:'Compass',lasso:'Lasso',vspace:'Vertical space'};
 function updateToolOptsUI(){ var label=TOOL_LABELS[S.tool]||'Tool'; var btn=$('toolOptsBtn'); if(btn) btn.innerHTML=label+' options '+icon('chevron-down','ic-sm'); var title=$('toolOptsTitle'); if(title) title.textContent=label+' options'; document.querySelectorAll('.toolOptSection').forEach(sec=>{ var tools=(sec.getAttribute('data-tools')||'').split(/\s+/); sec.classList.toggle('show', tools.indexOf(S.tool)>=0); }); }
@@ -2613,7 +2768,7 @@ function openBook(id){
      page small with empty margins around it */
   if(window.matchMedia('(max-width:860px)').matches && b.kind==='pdf') b.readerZoom=1;
   $('modeScrollBtn').classList.toggle('active',b.mode!=='page'); $('modePageBtn').classList.toggle('active',b.mode==='page');
-  $('dictBox').classList.add('hidden'); $('ocrBox').classList.add('hidden'); $('parallelBox').classList.add('hidden');
+  $('ocrBox').classList.add('hidden'); $('parallelBox').classList.add('hidden');
   if(b.kind==='pdf'){ showPdfChrome(); renderPdfBook(); }
   else { showEpubChrome(); renderEpubBook(); }
   showView('reader'); renderReaderSide();
@@ -2642,9 +2797,9 @@ function updateResume(){ updateReadProgress();
 /* --- EPUB rendering --- */
 function renderEpubBook(){
   let b=curBook(); if(!b||b.kind!=='epub') return;
-  /* the lookup card may have been parked inside the body next to a
-     selection, rescue it (and the OCR panel) before innerHTML is rebuilt */
-  ['dictBox','ocrBox'].forEach(id=>{ let el=$(id); if(el && el.closest('#readerBody')) $('readerArticle').appendChild(el); });
+  /* the OCR panel may have been parked inside the body, rescue it
+     before innerHTML is rebuilt */
+  ['ocrBox'].forEach(id=>{ let el=$(id); if(el && el.closest('#readerBody')) $('readerArticle').appendChild(el); });
   $('readerBadge').textContent=(b.sample?'Sample book':'EPUB')+' • '+b.chapters.length+' chapters';
   $('readerTitle').textContent=b.title;
   let body=$('readerBody');
@@ -2724,8 +2879,8 @@ function reapplyAnnotations(){
     if(container) (wrapTextAcross(container,a.text,a.kind||'highlight',a.color,a.opacity)||wrapTextOnce(container,a.text,a.kind||'highlight',a.color,a.opacity));
   });
 }
-/* P3: lookup / OCR cards, closable, and never left behind on a new page */
-function closeReaderCards(){ let d=$('dictBox'); if(d) d.classList.add('hidden'); let o=$('ocrBox'); if(o) o.classList.add('hidden'); }
+/* P3: OCR card, closable, and never left behind on a new page */
+function closeReaderCards(){ let o=$('ocrBox'); if(o) o.classList.add('hidden'); }
 function jumpToChapter(i){ let b=curBook(); if(!b||b.kind!=='epub') return; closeReaderCards(); b.ch=Math.max(0,Math.min(b.chapters.length-1,i));
   if(b.mode==='page') renderEpubBook(); else { let el=document.querySelector('[data-ch="'+b.ch+'"]'); if(el) el.scrollIntoView({behavior:smoothOrInstant()}); updateResume(); }
   renderReaderSide(); }
@@ -3087,7 +3242,7 @@ function wrapRangeAsMark(range,kind,color,opacity){
   return el;
 }
 /* A tap on a toolbar button collapses the live selection on a phone, so by
-   the time Highlight / Dictionary / Listen runs there is nothing to act on.
+   the time Highlight / Listen runs there is nothing to act on.
    Keep the last real selection made inside the reader (or a Parallel Read
    pane) and hand it back when the live one is gone. */
 let lastReaderSel=null;
@@ -3111,7 +3266,7 @@ function readerSelection(){
 }
 /* The reader sheet is a modal <dialog>: while it is open the page behind it
    is inert, and a range in an inert subtree cannot be selected — so a
-   Highlight / Dictionary / Listen tap inside the sheet finds no text, even
+   Highlight / Listen tap inside the sheet finds no text, even
    though the stored selection is intact (probe diag5b2). Close the sheet
    first, then run the action on the next frame, when the page is readable
    again and the stored selection restores. */
@@ -3151,7 +3306,7 @@ function readerHideSelBar(){ let b=$('readerSelBar'); if(b) b.classList.add('hid
    pointerdown so the tap does not collapse the selection — but on a phone
    that tap may never produce a click (the compatibility click is
    suppressed, or the tap is consumed dismissing the touch selection), so
-   Dictionary did nothing at all there while the same tap worked with a
+   a tap there did nothing at all while the same tap worked with a
    mouse. Fire touch/pen taps on pointerup and mouse/keyboard taps on
    click; the 250ms same-action guard stops a double fire if a browser
    ever delivers both for one tap. barTapOk ignores a pointerup after the
@@ -3166,7 +3321,6 @@ function barAct(ev, act, bar){
   if(act==='highlight') annotateSelection('highlight');
   else if(act==='underline') annotateSelection('underline');
   else if(act==='strike') annotateSelection('strike');
-  else if(act==='dictionary'){ lookupSelection(); if(bar==='pr') prHideSelBar(); else readerHideSelBar(); }
   else if(act==='color') toggleSelColorPop(bar);
 }
 /* Mark colour + intensity (Item B). A mark stores the colour and opacity
@@ -3229,6 +3383,16 @@ function selDotAct(ev, color){
 document.addEventListener('click',e=>{ let pop=$('selColorPop'); if(pop&&!pop.classList.contains('hidden')&&e.target&&!e.target.closest('#selColorPop')&&!e.target.closest('.selColorBtn')) hideSelColorPop(); });
 document.addEventListener('input',e=>{ if(e.target&&e.target.classList&&e.target.classList.contains('selSlider')){ let host=e.target.closest('[data-selcolor-for]'); if(host&&host.dataset.selcolorFor==='sheet') _selColorFrom='reader'; selColorSetOpacity(e.target.value); } });
 let readerSelT=null;
+/* Long-press fix: Android Chrome fires contextmenu on a touch long-press,
+   popping the native copy/paste menu over our own selection bar. Suppress
+   it on reader prose (touch only, so desktop right-click keeps its menu);
+   inputs keep their menu so paste still works. */
+document.addEventListener('contextmenu',e=>{
+  if(!window.matchMedia('(pointer:coarse)').matches) return;
+  if(!e.target.closest || !e.target.closest('#readerArticle, #pdfView, #parallelRead')) return;
+  if(e.target.closest('input,textarea,select,[contenteditable="true"]')) return;
+  e.preventDefault();
+});
 document.addEventListener('selectionchange',()=>{ if(PR.on || S.view!=='reader') return; clearTimeout(readerSelT); readerSelT=setTimeout(readerShowSelBar,120); });
 /* a scroll moves the passage away from the bar — hide it rather than leave it floating over the wrong text */
 ['pdfView','readerBody'].forEach(id=>{ let el=$(id); if(el) el.addEventListener('scroll',()=>{ let b=$('readerSelBar'); if(b && !b.classList.contains('hidden')) readerHideSelBar(); },{passive:true}); });
@@ -3263,50 +3427,6 @@ function exportAnnotations(){
   let b=curBook(); if(!b||!b.annotations.length){ toast('No annotations to export'); return; }
   let txt=b.title+' annotations\n\n'+b.annotations.map(a=>'• '+a.text+'\n  ('+a.where+')').join('\n\n');
   download('annotations-'+b.title.replace(/[^\w\- ]+/g,'')+'.txt', new Blob([txt],{type:'text/plain'}));
-}
-
-/* --- dictionary / Wikipedia: live lookup --- */
-/* P9: normalise a messy selection to the word the reader means.
-   Take the LAST word of the selection, then strip punctuation from its
-   two ends only, inner characters (the apostrophe in "don't", the
-   hyphen in "well-known") are part of the word and stay. A token that
-   is pure punctuation (an em dash, a quote mark) is skipped for the
-   word before it. Written from that rule, not from the audit's regex:
-   its trailing alternative stripped word characters, not punctuation. */
-function normalizeLookupWord(raw){
-  let tokens=String(raw||'').trim().split(/\s+/).filter(Boolean);
-  for(let i=tokens.length-1;i>=0;i--){
-    let w=tokens[i].replace(/^[^\p{L}\p{N}]+/u,'').replace(/[^\p{L}\p{N}]+$/u,'');
-    if(w) return w;
-  }
-  return '';
-}
-async function lookupSelection(){
-  let w=normalizeLookupWord(readerSelection().toString());
-  let box=$('dictBox');
-  if(!w){ toast('Select a word in the text first'); return; }
-  /* P3: park the card right after the paragraph the word sits in, so it
-     lands on-screen next to the selection instead of at the end of the
-     whole book (where it sat in Scroll mode), and give it a close button.
-     Read the selection through readerSelection(), so a tap that collapsed
-     the live selection still parks it next to the word the user picked. */
-  try{ let sel=readerSelection(); if(sel.rangeCount){ let node=sel.getRangeAt(0).commonAncestorContainer; let el=node.nodeType===1? node : node.parentElement; let block=el && el.closest? (el.closest('p,li,div')||el) : null; if(block && block.parentNode) block.parentNode.insertBefore(box, block.nextSibling); } }catch(e){}
-  let closeBtn='<div class="cardHead"><span></span><button class="btn small cardClose" type="button" onclick="closeReaderCards()" aria-label="Close lookup">✕ Close</button></div>';
-  box.classList.remove('hidden'); box.innerHTML=closeBtn+'<b>'+esc(w)+'</b><p class="kbd">Looking it up…</p>'; box.scrollIntoView({behavior:smoothOrInstant(),block:'nearest'});
-  let html=closeBtn+'<b style="font-size:18px">'+esc(w)+'</b>';
-  try{
-    let r=await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(w.toLowerCase()));
-    if(r.ok){ let data=await r.json(); let e0=data[0];
-      if(e0.phonetic) html+=' <span class="kbd">'+esc(e0.phonetic)+'</span>';
-      e0.meanings.slice(0,2).forEach(m=>{ html+='<p style="line-height:1.6;font-family:Newsreader,serif"><i>'+esc(m.partOfSpeech)+'</i>: '+esc(m.definitions[0].definition)+'</p>'; });
-    } else html+='<p class="kbd">No dictionary entry for this word.</p>';
-  }catch(e){ html+='<p class="kbd">Dictionary needs a connection. Try again.</p>'; }
-  try{
-    let r2=await fetch('https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(w));
-    if(r2.ok){ let s=await r2.json(); if(s.extract) html+='<p style="line-height:1.6;font-family:Newsreader,serif"><b>Wikipedia:</b> '+esc(s.extract.slice(0,420))+'…</p>'; }
-  }catch(e){}
-  html+='<p><a href=https://en.wiktionary.org/wiki/'+encodeURIComponent(w.toLowerCase())+' target=_blank rel=noopener>Wiktionary</a> · <a href=https://en.wikipedia.org/wiki/'+encodeURIComponent(w)+' target=_blank rel=noopener>Wikipedia</a></p>';
-  box.innerHTML=html;
 }
 
 /* --- OCR: Tesseract.js on-device --- */
@@ -3365,7 +3485,7 @@ async function handwritingToText(){
   let p=curPageObj(); if(!p){ toast('Open a notebook first'); return; }
   if(!p.ink.length){ toast('Write something on the page first'); return; }
   if(!window.Tesseract){ toast('Recognition engine could not load. Check the connection.'); return; }
-  let btn=$('hwBtn'); btn.disabled=true; btn.textContent='Recognising…';
+  let btn=$('hwBtn'); btn.disabled=true; let hwLab=btn?btn.querySelector('span'):null; if(hwLab) hwLab.textContent='Recognising…'; else if(btn) btn.textContent='Recognising…';
   try{
     let comp=composePage(p,'blank');
     let res=await Tesseract.recognize(comp,'eng');
@@ -3373,7 +3493,7 @@ async function handwritingToText(){
     if(text){ $('noteText').value=($('noteText').value? $('noteText').value+'\n':'')+text; saveEditorToModel(); updateWordCount(); toast('Handwriting recognised and added below'); }
     else toast('No text recognised. Try larger, clearer letters.');
   }catch(e){ toast('Recognition failed. Check the connection and retry.'); }
-  btn.disabled=false; btn.textContent='Handwriting → Text';
+  btn.disabled=false; if(hwLab) hwLab.textContent='Handwriting → Text'; else btn.textContent='Handwriting → Text';
 }
 
 /* --- TTS --- */
@@ -3604,8 +3724,8 @@ function prFillSecondBtn(L){
   let R=S.items.find(i=>i.id===L.parallelWith)||null;
   let lab=$('prRightLabel'); if(lab) lab.textContent=R? R.title : 'Choose a book';
 }
-/* the lookup / OCR cards can be parked inside a pane, move them home before a pane is emptied */
-function prRescueCards(){ ['dictBox','ocrBox'].forEach(id=>{ let x=$(id); if(x && x.closest('#parallelRead')){ x.classList.add('hidden'); $('readerArticle').appendChild(x); } }); }
+/* the OCR card can be parked inside a pane, move it home before a pane is emptied */
+function prRescueCards(){ ['ocrBox'].forEach(id=>{ let x=$(id); if(x && x.closest('#parallelRead')){ x.classList.add('hidden'); $('readerArticle').appendChild(x); } }); }
 function prClampZoom(z){ z=+z; if(!isFinite(z)||z<=0) z=1; return Math.max(PR_ZOOM_MIN,Math.min(PR_ZOOM_MAX,Math.round(z*100)/100)); }
 function prUnitIndex(b){ return b.kind==='pdf'? Math.max(0,(b.page||1)-1) : Math.max(0,b.ch||0); }
 function prClearPane(s){ let el=$('prPane'+s); if(el._io){ el._io.disconnect(); el._io=null; } el.querySelectorAll('.pdfHolder').forEach(pdfReleasePage); el.innerHTML=''; let r=$('prRail'+s); if(r) r.innerHTML=''; }
