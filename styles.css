@@ -1050,6 +1050,20 @@ dialog.sheet.drawerRight{
 .shapePop .tool .ic{width:19px;height:19px}
 .shapePop .tool:hover{background:var(--paper2)}
 .shapePop .tool[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:var(--surface)}
+/* Colour-picker fix: the ink-colour dot on the pill. The button is only
+   24px wide in the row (the pill cannot spare a full 44px slot at 390px),
+   but the ::after extends its tap area to 44px, the same trick the sheet
+   swatches use (.swatch::after). The dot itself shows the current ink
+   colour, like the selection bar's .selColorDot. */
+.tbRowTools .tool.pillColorBtn{position:relative;width:24px;min-width:24px;height:44px;min-height:44px;padding:0}
+.pillColorBtn::after{content:"";position:absolute;inset:-10px}
+.pillColorDot{display:block;width:20px;height:20px;border-radius:50%;background:#18202B;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--border)}
+/* Scoped under #mainToolbar on purpose: the generic
+   `.toolbar [role="group"]{display:flex}` rule would otherwise beat the
+   plain `.colorPop{display:none}` and the palette would never hide. */
+#mainToolbar .colorPop{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);display:none;flex-wrap:wrap;gap:8px;max-width:calc(100vw - 24px);padding:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-modal);z-index:70}
+#mainToolbar .colorPop.open{display:flex}
+#mainToolbar .colorPop .swatch{width:24px;height:24px;min-height:24px}
 .toolbar.compact{padding:2px 4px}
 .toolbar.minimal .tbDivider{display:none}
 .toolbar.minimal .pillInsert .tbLabel{display:none}
@@ -1057,7 +1071,7 @@ dialog.sheet.drawerRight{
   .shapePop .tool{width:44px;height:44px;min-height:44px}
 }
 @media (max-width:1024px){
-  .toolbar{top:8px;max-width:calc(100% - 12px)}
+  .toolbar{top:8px;max-width:calc(100% - 4px)}
   .toolbar .tbDivider{display:none}
   .pillInsert .tbLabel{display:none}
   .pillInsert{min-width:44px;padding:0 12px;justify-content:center}
