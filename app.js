@@ -1937,7 +1937,14 @@ function setTool(t,el){
   var sh=$('shapesBtn'); if(sh){ var isShape=['line','rect','ellipse','arrow','spline','compass'].indexOf(t)>=0; sh.classList.toggle('active',isShape); sh.setAttribute('aria-pressed',String(isShape)); }
   updateInkTouchAction(); updateSizeUI(); updateToolOptsUI(); updateStatusBar();
 }
-function setColor(c,el){ S.color=c; document.querySelectorAll('#swatchBox .swatch').forEach(s=>s.classList.remove('active')); if(el) el.classList.add('active'); let cp=$('customColor'); if(cp && /^#[0-9a-f]{6}$/i.test(c)) cp.value=c; updateSizeUI(); }
+function setColor(c,el){ S.color=c;
+  /* Colour-picker fix: the sheet swatches and the pill popover swatches
+     stay in sync whichever place the colour was picked from. */
+  document.querySelectorAll('#swatchBox .swatch, #colorPop .swatch').forEach(s=>s.classList.toggle('active', (s.getAttribute('data-c')||'').toLowerCase()===String(c).toLowerCase()));
+  let cp=$('customColor'); if(cp && /^#[0-9a-f]{6}$/i.test(c)) cp.value=c;
+  var dot=$('pillColorDot'); if(dot) dot.style.background=c;
+  var pc=$('pillCustomColor'); if(pc && /^#[0-9a-f]{6}$/i.test(c)) pc.value=c;
+  updateSizeUI(); }
 /* P2: left rail tabs (Pages | Layers). */
 function switchRailTab(tab){
   var pages=tab==='pages';
@@ -2474,21 +2481,37 @@ function importGpl(e){
 function setToolbarLayout(v){ let tb=$('mainToolbar'); tb.classList.remove('compact','minimal'); if(v) tb.classList.add(v); }
 /* Dismissal for the editor sheets (native <dialog> bottom sheets). The old
    popover names are kept because the sheet buttons and setTool() call them. */
-function closeAllToolPops(){ ['editorSheet','exportSheet','prMarksSheet'].forEach(id=>{ var d=$(id); if(d && d.open) d.close(); }); document.querySelectorAll('.toolPop.open, .shapePop.open').forEach(el=>el.classList.remove('open')); var sb=$('shapesBtn'); if(sb) sb.setAttribute('aria-expanded','false'); }
+function closeAllToolPops(){ ['editorSheet','exportSheet','prMarksSheet'].forEach(id=>{ var d=$(id); if(d && d.open) d.close(); }); document.querySelectorAll('.toolPop.open, .shapePop.open, .colorPop.open').forEach(el=>el.classList.remove('open')); var sb=$('shapesBtn'); if(sb) sb.setAttribute('aria-expanded','false'); var cb=$('pillColorBtn'); if(cb) cb.setAttribute('aria-expanded','false'); }
 /* P2: Shapes popover on the floating pill toolbar. */
 function toggleShapePop(){
   var pop=$('shapePop'), btn=$('shapesBtn'); if(!pop||!btn) return;
   var open=!pop.classList.contains('open');
+  if(open) closeColorPop();
   pop.classList.toggle('open',open); btn.setAttribute('aria-expanded',String(open));
 }
 function closeShapePop(){ var pop=$('shapePop'), btn=$('shapesBtn'); if(pop) pop.classList.remove('open'); if(btn) btn.setAttribute('aria-expanded','false'); }
+/* Colour-picker fix: ink-colour popover on the floating pill toolbar,
+   same pattern as the shapes popover. Only one pill popover is open at
+   a time, and a tap anywhere else (or Escape) closes it. */
+function toggleColorPop(){
+  var pop=$('colorPop'), btn=$('pillColorBtn'); if(!pop||!btn) return;
+  var open=!pop.classList.contains('open');
+  if(open) closeShapePop();
+  pop.classList.toggle('open',open); btn.setAttribute('aria-expanded',String(open));
+}
+function closeColorPop(){ var pop=$('colorPop'), btn=$('pillColorBtn'); if(pop) pop.classList.remove('open'); if(btn) btn.setAttribute('aria-expanded','false'); }
 document.addEventListener('pointerdown',e=>{
-  var pop=$('shapePop'); if(!pop||!pop.classList.contains('open')) return;
-  var btn=$('shapesBtn');
-  if(!pop.contains(e.target) && !(btn && (e.target===btn || btn.contains(e.target)))) closeShapePop();
+  var pop=$('shapePop'); if(pop&&pop.classList.contains('open')){
+    var btn=$('shapesBtn');
+    if(!pop.contains(e.target) && !(btn && (e.target===btn || btn.contains(e.target)))) closeShapePop();
+  }
+  var cp=$('colorPop'); if(cp&&cp.classList.contains('open')){
+    var cb=$('pillColorBtn');
+    if(!cp.contains(e.target) && !(cb && (e.target===cb || cb.contains(e.target)))) closeColorPop();
+  }
 });
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){ var pop=$('shapePop'); if(pop&&pop.classList.contains('open')) closeShapePop(); }
+  if(e.key==='Escape'){ var pop=$('shapePop'); if(pop&&pop.classList.contains('open')) closeShapePop(); var cp=$('colorPop'); if(cp&&cp.classList.contains('open')) closeColorPop(); }
 });
 /* P2: inspector sheet tabs (Draw | Insert | Page | Notes & Audio). */
 function switchSheetTab(tab){
