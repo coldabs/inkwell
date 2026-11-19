@@ -85,7 +85,19 @@ const CW=1200, CH=1697; /* A4 portrait (1200 x 1697): blank pages are portrait
 let PH=CH; /* live height of the page being edited; PDF-backed pages set it
   from the PDF page ratio instead */
 function pageH(p){ if(p&&p.bgPdf&&p.bgPdf.img&&p.bgPdf.img.width&&p.bgPdf.img.height){ return Math.max(400,Math.min(2200,Math.round(CW*p.bgPdf.img.height/p.bgPdf.img.width))); } return CH; }
-function syncPageHeight(){ let h=pageH(curPageObj()); if(h!==PH||bgC.height!==h){ PH=h; [bgC,hiC,inkC].forEach(c=>{c.height=h}); [bgX,hiX,inkX].forEach(c=>{c.lineCap='round';c.lineJoin='round'}); } }
+/* Zoom sharpness: the editor canvases used to keep a fixed 1200px backing
+   store while zoom widened the shell in CSS, so at 150-250% the browser
+   upscaled the bitmap and ink went soft (at 200% on a DPR-2 phone the
+   1200px store is shown at ~1460 device px). The backing store now tracks
+   the displayed size (x devicePixelRatio, capped), and strokes - stored as
+   vectors - are redrawn at that resolution when the zoom settles, so
+   writing stays crisp at any zoom. canvasScale = backing px per canvas unit
+   (1 = the old 1200px store, never worse). */
+let canvasScale=1, zoomRescaleT=null;
+function canvasScaleTarget(){ let shell=$('canvasShell'); if(!shell||!curPageObj()) return 1; let w=shell.getBoundingClientRect().width; if(!w) return 1; let dpr=Math.min(window.devicePixelRatio||1,2); let k=(w*dpr)/CW; k=Math.min(k,2200/CW,Math.sqrt(8e6/(CW*PH))); return Math.max(1,k); }
+function applyCanvasTransform(){ [bgX,hiX,inkX].forEach(c=>{ c.setTransform(canvasScale,0,0,canvasScale,0,0); }); }
+function rescaleCanvases(){ if(!curPageObj()||S.view!=='editor') return; let k=canvasScaleTarget(); if(Math.abs(k-canvasScale)<0.02) return; canvasScale=k; redrawAll(); }
+function syncPageHeight(){ let h=pageH(curPageObj()); let W=Math.round(CW*canvasScale), H=Math.round(h*canvasScale); if(h!==PH||bgC.width!==W||bgC.height!==H){ PH=h; [bgC,hiC,inkC].forEach(c=>{c.width=W;c.height=H;}); [bgX,hiX,inkX].forEach(c=>{c.lineCap='round';c.lineJoin='round'}); } applyCanvasTransform(); }
 const SAMPLE_ID='sample-book';
 function blankPage(){return {ink:[],hi:[],text:'',stickies:[],table:null,board:null,audio:null,bgPdf:null,texts:[],images:[],texs:[],bgColor:'#fffdf6'}}
 function blankBoard(){return {color:0,strokes:[],view:{x:0,y:0,k:1},geom:null}}
@@ -994,6 +1006,12 @@ function copySelection(){ if(!S.selection.length){ toast('Select some strokes fi
 function pasteSelection(){ let p=curPageObj(); if(!p){ toast('Open a notebook page first'); return; } if(!S.clipboard.length){ toast('Nothing copied yet. Select strokes and tap Copy.'); return; } snapshotUndo(); let copies=JSON.parse(JSON.stringify(S.clipboard)); copies.forEach(c=>{ c.points=c.points.map(pt=>({x:Math.min(CW-4,(pt.x||0)+36), y:Math.min(PH-4,(pt.y||0)+36), p:pt.p})); delete c._layer; p.ink.push(c); }); S.selection=copies; bumpV(p); drawSelectionOverlay(); renderPages(); toast('Pasted '+copies.length+' stroke(s)'); }
 function snapVal(v){ return S.snapGrid? Math.round(v/24)*24 : v; }
 function finishSelection(){ let p=curPageObj(); if(!p||!S.selRect) return; let r={x1:Math.min(S.selRect.x1,S.selRect.x2),y1:Math.min(S.selRect.y1,S.selRect.y2),x2:Math.max(S.selRect.x1,S.selRect.x2),y2:Math.max(S.selRect.y1,S.selRect.y2)}; S.selRect=null;
+  /* Deselect fix: a tap is a box with no area — it only deselects.
+     It must not re-select a stroke whose (much larger) bounding box the
+     tap point happens to fall inside, and it must not nag with
+     "Nothing in that box": a tap is not a failed drag. Only a real
+     dragged box reports what it found. */
+  if(Math.abs(r.x2-r.x1)<8 && Math.abs(r.y2-r.y1)<8){ S.selection=[]; drawSelectionOverlay(); return; }
   let all=p.ink.concat(p.hi); S.selection=all.filter(st=>{ let b=strokeBBox(st); return b.x2>=r.x1 && b.x1<=r.x2 && b.y2>=r.y1 && b.y1<=r.y2; });
   drawSelectionOverlay(); if(S.selection.length) toast(S.selection.length+' stroke(s) selected. Drag inside the box to move.'); else toast('Nothing in that box. Drag around some ink.');
 }
@@ -1383,14 +1401,14 @@ function renderCanvasImages(){
     wrap.addEventListener('pointerdown',e=>{
       if(e.target===grip||e.target===del) return; e.stopPropagation(); wrap.setPointerCapture(e.pointerId);
       let shell=inkC.getBoundingClientRect(); let sx=e.clientX, sy=e.clientY, ox=im.x, oy=im.y;
-      function mv(ev){ im.x=ox+(ev.clientX-sx)*(CW/shell.width); im.y=oy+(ev.clientY-sy)*((inkC.height||CH)/shell.height); wrap.style.left=(im.x/CW*100)+'%'; wrap.style.top=(im.y/PH*100)+'%'; }
+      function mv(ev){ im.x=ox+(ev.clientX-sx)*(CW/shell.width); im.y=oy+(ev.clientY-sy)*(PH/shell.height); wrap.style.left=(im.x/CW*100)+'%'; wrap.style.top=(im.y/PH*100)+'%'; }
       function up(){ wrap.removeEventListener('pointermove',mv); wrap.removeEventListener('pointerup',up); bumpV(p); renderPages(); }
       wrap.addEventListener('pointermove',mv); wrap.addEventListener('pointerup',up);
     });
     grip.addEventListener('pointerdown',e=>{
       e.stopPropagation(); grip.setPointerCapture(e.pointerId);
       let shell=inkC.getBoundingClientRect(); let sx=e.clientX, sy=e.clientY, ow=im.w, oh=im.h;
-      function mv(ev){ im.w=Math.max(40, ow+(ev.clientX-sx)*(CW/shell.width)); im.h=Math.max(30, oh+(ev.clientY-sy)*((inkC.height||CH)/shell.height)); wrap.style.width=(im.w/CW*100)+'%'; wrap.style.height=(im.h/PH*100)+'%'; }
+      function mv(ev){ im.w=Math.max(40, ow+(ev.clientX-sx)*(CW/shell.width)); im.h=Math.max(30, oh+(ev.clientY-sy)*(PH/shell.height)); wrap.style.width=(im.w/CW*100)+'%'; wrap.style.height=(im.h/PH*100)+'%'; }
       function up(){ grip.removeEventListener('pointermove',mv); grip.removeEventListener('pointerup',up); bumpV(p); renderPages(); }
       grip.addEventListener('pointermove',mv); grip.addEventListener('pointerup',up);
     });
@@ -1406,12 +1424,12 @@ function insertPageImage(e){
   r.readAsDataURL(f);
 }
 let editorZoom=1; let readerZoom=1; let readerZoomT=null;
-function editorZoomBy(f){ editorZoom= f===0? 1 : Math.max(0.5, Math.min(2.5, editorZoom*f)); S.zoom=editorZoom; $('canvasShell').style.width=(editorZoom*100)+'%'; var zl=$('zoomLabel'); if(zl) zl.textContent=Math.round(editorZoom*100)+'%'; var zs=$('zoomSlider'); if(zs) zs.value=Math.round(editorZoom*100); updateStatusBar(); } function readerZoomBy(f){ readerZoom=prClampZoom(f===0?1:readerZoom*f); let b=curBook(); if(b) b.readerZoom=readerZoom; let host=$('pdfPages'); if(host) host.style.width=(readerZoom*100)+'%'; let zl3=$('readerZoomLabel'); if(zl3) zl3.textContent=Math.round(readerZoom*100)+'%'; clearTimeout(readerZoomT); readerZoomT=setTimeout(()=>{ if(host) pdfRefresh(host,pdfDrawIO); },120); } let readerPinch=null; function readerTouchStart(e){ if(!e.touches||e.touches.length!==2) return; let b=curBook(); if(!b||b.kind!=='pdf') return; let host=$('pdfPages'); if(!host) return; let a=e.touches[0],c=e.touches[1],r=host.getBoundingClientRect(); readerPinch={host:host,d0:Math.max(20,Math.hypot(a.clientX-c.clientX,a.clientY-c.clientY)),z0:readerZoom,s:1}; e.preventDefault(); host.style.transformOrigin=((a.clientX+c.clientX)/2-r.left)+'px '+((a.clientY+c.clientY)/2-r.top)+'px'; } function readerTouchMove(e){ if(!readerPinch||!e.touches||e.touches.length!==2) return; e.preventDefault(); let a=e.touches[0],c=e.touches[1]; let z=prClampZoom(readerPinch.z0*Math.hypot(a.clientX-c.clientX,a.clientY-c.clientY)/readerPinch.d0); readerPinch.s=z/readerPinch.z0; readerPinch.host.style.transform='scale('+readerPinch.s+')'; } function readerTouchEnd(e){ if(!readerPinch||(e.touches&&e.touches.length>=2)) return; let p=readerPinch; readerPinch=null; p.host.style.transform=''; p.host.style.transformOrigin=''; if(Math.abs(p.s-1)>0.02) readerZoomBy(p.s); } (function(){ let pv=$('pdfView'); if(!pv) return; pv.style.touchAction='pan-x pan-y'; pv.addEventListener('touchstart',readerTouchStart,{passive:false}); pv.addEventListener('touchmove',readerTouchMove,{passive:false}); pv.addEventListener('touchend',readerTouchEnd,{passive:false}); pv.addEventListener('touchcancel',readerTouchEnd,{passive:false}); })();
+function editorZoomBy(f){ editorZoom= f===0? 1 : Math.max(0.5, Math.min(2.5, editorZoom*f)); S.zoom=editorZoom; $('canvasShell').style.width=(editorZoom*100)+'%'; var zl=$('zoomLabel'); if(zl) zl.textContent=Math.round(editorZoom*100)+'%'; var zs=$('zoomSlider'); if(zs) zs.value=Math.round(editorZoom*100); var zp=$('zoomFabPct'); if(zp) zp.textContent=Math.round(editorZoom*100)+'%'; updateStatusBar(); clearTimeout(zoomRescaleT); zoomRescaleT=setTimeout(rescaleCanvases,140); } function readerZoomBy(f){ readerZoom=prClampZoom(f===0?1:readerZoom*f); let b=curBook(); if(b) b.readerZoom=readerZoom; let host=$('pdfPages'); if(host) host.style.width=(readerZoom*100)+'%'; let zl3=$('readerZoomLabel'); if(zl3) zl3.textContent=Math.round(readerZoom*100)+'%'; clearTimeout(readerZoomT); readerZoomT=setTimeout(()=>{ if(host) pdfRefresh(host,pdfDrawIO); },120); } let readerPinch=null; function readerTouchStart(e){ if(!e.touches||e.touches.length!==2) return; let b=curBook(); if(!b||b.kind!=='pdf') return; let host=$('pdfPages'); if(!host) return; let a=e.touches[0],c=e.touches[1],r=host.getBoundingClientRect(); readerPinch={host:host,d0:Math.max(20,Math.hypot(a.clientX-c.clientX,a.clientY-c.clientY)),z0:readerZoom,s:1}; e.preventDefault(); host.style.transformOrigin=((a.clientX+c.clientX)/2-r.left)+'px '+((a.clientY+c.clientY)/2-r.top)+'px'; } function readerTouchMove(e){ if(!readerPinch||!e.touches||e.touches.length!==2) return; e.preventDefault(); let a=e.touches[0],c=e.touches[1]; let z=prClampZoom(readerPinch.z0*Math.hypot(a.clientX-c.clientX,a.clientY-c.clientY)/readerPinch.d0); readerPinch.s=z/readerPinch.z0; readerPinch.host.style.transform='scale('+readerPinch.s+')'; } function readerTouchEnd(e){ if(!readerPinch||(e.touches&&e.touches.length>=2)) return; let p=readerPinch; readerPinch=null; p.host.style.transform=''; p.host.style.transformOrigin=''; if(Math.abs(p.s-1)>0.02) readerZoomBy(p.s); } (function(){ let pv=$('pdfView'); if(!pv) return; pv.style.touchAction='pan-x pan-y'; pv.addEventListener('touchstart',readerTouchStart,{passive:false}); pv.addEventListener('touchmove',readerTouchMove,{passive:false}); pv.addEventListener('touchend',readerTouchEnd,{passive:false}); pv.addEventListener('touchcancel',readerTouchEnd,{passive:false}); })();
 function setPageBg(v){ let p=curPageObj(); if(!p) return; p.bgColor=v; bumpV(p); drawBackground(); renderPages(); }
 
 /* pointer drawing */
 let drawing=false, curStroke=null, lastPt=null, lastT=0, eraseChanged=false;
-function canvasPos(e){ let r=inkC.getBoundingClientRect(); return { x:(e.clientX-r.left)*(CW/r.width), y:(e.clientY-r.top)*((inkC.height||CH)/r.height) }; }
+function canvasPos(e){ let r=inkC.getBoundingClientRect(); return { x:(e.clientX-r.left)*(CW/r.width), y:(e.clientY-r.top)*(PH/r.height) }; }
 function pointerPressure(e,pt){
   if(e.pointerType==='pen' && e.pressure && e.pressure>0) return e.pressure;
   if(lastPt){ let d=Math.hypot(pt.x-lastPt.x,pt.y-lastPt.y); return Math.max(0.2,Math.min(1, 1.05 - d/46)); }
@@ -1442,7 +1460,13 @@ function panViewportBy(dx,dy){
      The zoom scroller consumes what it can; the rest pans the window. */
   let remX=dx, remY=dy, sc=zoomScroller();
   if(sc){ let pl=sc.scrollLeft, pt=sc.scrollTop; sc.scrollLeft-=dx; sc.scrollTop-=dy; remX=dx-(pl-sc.scrollLeft); remY=dy-(pt-sc.scrollTop); }
-  if(remX||remY) window.scrollBy(-remX,-remY);
+  /* Hand fix: the window fallback must be instant. html{scroll-behavior:
+     smooth} makes a plain scrollBy lag far behind the finger during a
+     drag — a 150px two-finger drag moved the page only ~15px, and a
+     quick drag could read as no movement at all — while horizontal
+     panning inside .zoomScroll was always instant. That gap is why the
+     grab tool felt dead on the vertical axis. */
+  if(remX||remY) window.scrollBy({left:-remX, top:-remY, behavior:'instant'});
 }
 function inkPtrMid(){ let ps=Array.from(inkPtrs.values()); return ps.length>=2? {x:(ps[0].x+ps[1].x)/2, y:(ps[0].y+ps[1].y)/2} : null; } function inkPtrDist(){ let ps=Array.from(inkPtrs.values()); return ps.length>=2?Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y):0; }
 function abortGestureForPan(){
@@ -1929,7 +1953,11 @@ function setTool(t,el){
   /* P4: switching to a different tool dismisses any open tool-options
      popover, it used to stay open and silently re-label itself for the
      new tool, so settings for one tool looked like another's. */
-  if(S.tool!==t) closeAllPopovers();
+  /* Deselect fix: switching tools also drops the selection. A selection
+     left over from the Select tool had no obvious way out, so the dashed
+     box just stayed until the user tapped empty canvas. Tapping the
+     already-active tool keeps the selection, like it keeps the tool. */
+  if(S.tool!==t){ closeAllPopovers(); clearSelection(); }
   /* Gap 2: tapping the already-selected tool must NOT turn it off or
      switch to Hand, it stays selected until a different tool is picked. */
   S.tool=t; document.querySelectorAll('#mainToolbar .tool, #editorSheet .tool').forEach(b=>{ let on=b.dataset.tool===t; b.classList.toggle('active',on); b.setAttribute('aria-pressed',String(on)); });
@@ -2034,7 +2062,7 @@ function layoutEditorSheet(){
   });
   d.addEventListener('close',()=>{ d.style.height=''; });
 })();
-window.addEventListener('resize',()=>{ clearTimeout(window.__edSheetT); window.__edSheetT=setTimeout(layoutEditorSheet,150); });
+window.addEventListener('resize',()=>{ clearTimeout(window.__edSheetT); window.__edSheetT=setTimeout(layoutEditorSheet,150); clearTimeout(zoomRescaleT); zoomRescaleT=setTimeout(rescaleCanvases,200); });
 layoutEditorSheet();
 
 /* ============ editor: pages ============ */
@@ -2047,7 +2075,7 @@ function loadPageIntoEditor(){
   if(!p.texts) p.texts=[]; if(!p.images) p.images=[]; if(!p.texs) p.texs=[]; if(!p.bgColor) p.bgColor='#fffdf6';
   let bgSel=$('pageBgSel'); if(bgSel) bgSel.value=p.bgColor; syncPageBgSwatches(p.bgColor);
   S.selection=[]; S.selRect=null; let sb=$('selBar'); if(sb) sb.classList.remove('open');
-  redrawAll(); renderStickies(); renderTable(); renderPages(); refreshLinks(); updateWordCount(); updateAudioUI(); renderCanvasTexts(); renderCanvasImages(); renderTexLayer(); let btr=$('backToReadingBtn'); if(btr) btr.classList.toggle('hidden',!nb.pdfBookId);
+  redrawAll(); rescaleCanvases(); renderStickies(); renderTable(); renderPages(); refreshLinks(); updateWordCount(); updateAudioUI(); renderCanvasTexts(); renderCanvasImages(); renderTexLayer(); let btr=$('backToReadingBtn'); if(btr) btr.classList.toggle('hidden',!nb.pdfBookId);
   if(!$('floatingBoard').classList.contains('hidden')) loadBoard();
   /* Split View follows the notebook: refresh the pane only when the
      book it should show has changed, so page switches never reset
@@ -2432,7 +2460,7 @@ function renderTexLayer(){
     d.addEventListener('pointerdown',e=>{
       if(e.target===del) return; e.stopPropagation(); d.setPointerCapture(e.pointerId);
       let shell=inkC.getBoundingClientRect(); let sx=e.clientX, sy=e.clientY, ox=t.x, oy=t.y;
-      function mv(ev){ t.x=ox+(ev.clientX-sx)*(CW/shell.width); t.y=oy+(ev.clientY-sy)*((inkC.height||CH)/shell.height); d.style.left=(t.x/CW*100)+'%'; d.style.top=(t.y/PH*100)+'%'; }
+      function mv(ev){ t.x=ox+(ev.clientX-sx)*(CW/shell.width); t.y=oy+(ev.clientY-sy)*(PH/shell.height); d.style.left=(t.x/CW*100)+'%'; d.style.top=(t.y/PH*100)+'%'; }
       function up(){ d.removeEventListener('pointermove',mv); d.removeEventListener('pointerup',up); bumpV(p); renderPages(); }
       d.addEventListener('pointermove',mv); d.addEventListener('pointerup',up);
     });
@@ -2511,7 +2539,7 @@ document.addEventListener('pointerdown',e=>{
   }
 });
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){ var pop=$('shapePop'); if(pop&&pop.classList.contains('open')) closeShapePop(); var cp=$('colorPop'); if(cp&&cp.classList.contains('open')) closeColorPop(); }
+  if(e.key==='Escape'){ var pop=$('shapePop'); if(pop&&pop.classList.contains('open')) closeShapePop(); var cp=$('colorPop'); if(cp&&cp.classList.contains('open')) closeColorPop(); if(S.view==='editor' && S.selection.length) clearSelection(); }
 });
 /* P2: inspector sheet tabs (Draw | Insert | Page | Notes & Audio). */
 function switchSheetTab(tab){
