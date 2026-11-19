@@ -2097,7 +2097,6 @@ function updateStatusBar(){ var nb=curNb(); var sp=$('statusPage'); if(sp && nb)
 document.addEventListener('click',e=>{ if(!e.target.closest('#mainToolbar')) closeAllToolPops(); });
 function toggleExportMenu(btn){ let p=$('exportPop'); let open=p.classList.toggle('open'); if(btn) btn.setAttribute('aria-expanded',open); }
 function closeExportPop(){ let p=$('exportPop'); if(p) p.classList.remove('open'); let b=$('exportBtn'); if(b) b.setAttribute('aria-expanded','false'); }
-function toggleReaderMore(btn){ let p=$('readerMore'); let open=p.classList.toggle('open'); if(btn){ let label=$('readerMoreLabel'); if(label) label.textContent= open? 'Fewer':'More'; btn.setAttribute('aria-expanded',open); } } /* Reader toolbar on a phone: keep the first row slim (back, page, zoom, Contents, More) and put the mode switch, Bookmark and Parallel Read in the More panel, one tap away. On a wider screen they stay in the first row. The slim-row rules live here, next to the behaviour that places the controls. */ (function placeReaderControls(){ let mq=window.matchMedia?window.matchMedia('(max-width: 860px)'):null; if(!mq) return; if(!document.getElementById('readerSlimStyle')){ let st=document.createElement('style'); st.id='readerSlimStyle'; st.textContent='@media(max-width:860px){#view-reader .readerTop{padding:6px 8px;gap:6px}#view-reader .readerTop .btn{min-height:44px}#readerZoomGroup .btn{min-height:44px;min-width:40px;padding:0 8px}#view-reader .readerResume{flex:1 1 auto;width:auto;min-width:120px;max-width:390px;margin:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#sideToggle .btnLabel{display:none}.pdfHead{flex-wrap:nowrap;align-items:center}.pdfHead>div:first-child{min-width:0;overflow:hidden}#pdfName{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#pdfMeta{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}'; document.head.appendChild(st); } let side=$('sideToggle'); if(side&&!side.querySelector('.btnLabel')){ Array.prototype.slice.call(side.childNodes).forEach(function(n){ if(n.nodeType===3&&n.textContent.trim()){ let s=document.createElement('span'); s.className='btnLabel'; s.textContent=n.textContent.trim(); side.replaceChild(s,n); } }); } function place(){ let more=$('readerMore'); let top=document.querySelector('#view-reader .readerTop'); if(!more||!top) return; let seg=document.querySelector('#view-reader .seg'); let bm=$('bookmarkBtn'); let pr=$('parallelBtn'); let zg=$('readerZoomGroup'); let mb=$('readerMoreBtn'); if(mq.matches){ let nodes=[seg,bm,pr].filter(function(n){ return !!n; }); if(nodes.length) more.prepend.apply(more,nodes); } else { if(seg&&zg) top.insertBefore(seg,zg); if(bm&&mb) top.insertBefore(bm,mb); if(pr&&mb) top.insertBefore(pr,mb); } } place(); if(mq.addEventListener) mq.addEventListener('change',place); else if(mq.addListener) mq.addListener(place); })();
 function selectLayerStrokes(which){ let p=curPageObj(); if(!p) return; S.selection=(which==='ink'? p.ink : p.hi).slice(); drawSelectionOverlay(); toast(S.selection.length? S.selection.length+' stroke(s) selected on the '+(which==='ink'?'ink':'highlight')+' layer' : 'That layer is empty on this page'); }
 
 /* ============ exports ============ */
@@ -2399,7 +2398,7 @@ function setReaderMode(m){
 function setReaderTheme(v){ $('readerArticle').className='reader '+v; $('parallelRead').dataset.theme=v; let pv=$('pdfView'); pv.style.filter= v==='dark'? 'invert(0.92) hue-rotate(180deg)':''; }
 function readerFont(d){ let cur=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--reader-fs'))||19; let next=Math.max(15,Math.min(26,cur+d*1.5)); document.documentElement.style.setProperty('--reader-fs',next+'px'); }
 function toggleReaderSide(){ prLeave(); $('readerSide').classList.toggle('open'); }
-function updateResume(){
+function updateResume(){ updateReadProgress();
   let b=curBook(); if(!b) return;
   scheduleSave();
   if(b.kind==='pdf'){ $('pageLabel').textContent='Page '+b.page+' / '+b.numPages; $('resumeLabel').textContent='Reading · '+b.title+' · Page '+b.page+' of '+b.numPages+' · '+Math.round(b.page/b.numPages*100)+'%. Resumes here.'; S.stats.pagesRead['pdf:'+b.id+':'+b.page]=1; }
@@ -2744,7 +2743,7 @@ window.addEventListener('resize',()=>{
   }catch(e){}
 })();
 /* --- reader sidebar: TOC, bookmarks, annotations, thumbnails --- */
-async function renderReaderSide(){
+/* Reading progress: the native <progress> under the reader top bar. EPUB counts chapters, PDF counts pages. */ function updateReadProgress(){ let el=$('readProgress'); if(!el) return; let b=curBook(); if(!b){ el.value=0; return; } if(b.kind==='pdf'){ el.value= b.numPages? Math.round((b.page||1)/b.numPages*100):0; } else if(b.kind==='epub'){ let n=(b.chapters||[]).length; el.value= n? Math.round(((b.ch||0)+1)/n*100):0; } else el.value=0; } async function renderReaderSide(){ updateReadProgress();
   scheduleSave();
   let b=curBook(); let toc=$('tocList'), bm=$('bookmarkList'), an=$('annoList'), th=$('thumbList');
   if(!b){ toc.innerHTML='<p class="kbd">Open a book to see its contents.</p>'; return; }
