@@ -29,7 +29,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="styles.css?v=2026-11-19-r6">
+<link rel="stylesheet" href="styles.css?v=2026-11-19-r7">
 </head>
 <body>
 <!-- Icons: Tabler Icons 3.52.0, MIT, https://tabler.io/icons -->
@@ -128,12 +128,11 @@
         <span class="wordmarkTag">Notes &amp; reading</span>
       </a>
       <div class="searchWrap navSearch" role="search" aria-label="Search the shelf">
-        <div class="search">
+        <button type="button" class="search searchTrigger" id="paletteTrigger" onclick="openPalette()" aria-label="Search the shelf">
           <svg class="ic searchIcon" aria-hidden="true"><use href="#ticon-search"></use></svg>
-          <input id="globalSearch" placeholder="Search notes, notebooks and books" aria-label="Search notebooks and notes" oninput="onSearchInput()" autocomplete="off"/>
+          <span class="searchTriggerText">Search shelf…</span>
           <kbd class="searchKbd" title="Press / to search">/</kbd>
-        </div>
-        <div id="searchResults" class="searchResults hidden"></div>
+        </button>
       </div>
       <div class="mastheadTools">
         <span class="saveFlag" id="saveStatus" aria-live="polite">Saved</span>
@@ -141,7 +140,7 @@
         <button class="iconBtn" id="themeToggle" type="button" onclick="toggleTheme()" aria-label="Switch to dark theme" title="Switch theme">
           <svg class="ic" aria-hidden="true"><use href="#ticon-moon"></use></svg>
         </button>
-        <button class="iconBtn" type="button" commandfor="librarySheet" command="show-modal" aria-label="Shelf options" title="Shelf options">
+        <button class="iconBtn" type="button" onclick="openShelfOptions()" aria-label="Shelf options" title="Shelf options">
           <svg class="ic" aria-hidden="true"><use href="#ticon-adjustments"></use></svg>
         </button>
       </div>
@@ -162,7 +161,26 @@
         <button class="chip" data-filter="pdf" onclick="filterLib('pdf',this)">PDFs</button>
         <button class="chip" data-filter="epub" onclick="filterLib('epub',this)">EPUBs</button>
       </div>
+      <div class="newWrap">
+        <button type="button" class="btn primary newBtn" id="newMenuTrigger" aria-haspopup="menu" aria-expanded="false" commandfor="newMenu" command="toggle-popover">
+          <svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-plus"></use></svg> New <svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg>
+        </button>
+      </div>
+      <input id="pdfImport" type="file" accept=".pdf" class="hidden" onchange="handleImport(event)"/>
+      <input id="epubImport" type="file" accept=".epub,.txt" class="hidden" onchange="handleImport(event)"/>
       <p class="kbd libHint" id="libHint"></p>
+    </div>
+    <!-- The + New menu lives OUTSIDE .newWrap on purpose: .newWrap is
+         display:none on phones (the FAB opens the menu there), and a
+         popover inside a display:none ancestor never renders — it
+         opens but measures 0x0 and its buttons are not clickable. -->
+    <div id="newMenu" popover="auto" class="menuPop">
+      <div focusgroup="menu nomemory" aria-labelledby="newMenuTrigger">
+        <button type="button" onclick="newMenuAct('notebook')"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-notebook"></use></svg> New notebook</button>
+        <button type="button" onclick="newMenuAct('pdf')"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-file-type-pdf"></use></svg> Import a PDF</button>
+        <button type="button" onclick="newMenuAct('epub')"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-book"></use></svg> Import an EPUB</button>
+        <button type="button" onclick="newMenuAct('parallel')"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-columns"></use></svg> Parallel Read</button>
+      </div>
     </div>
 
     <h2 class="srOnly">On your shelf</h2>
@@ -181,9 +199,20 @@
 
     <div id="libraryGrid" class="grid"></div>
 
-    <dialog class="sheet" id="librarySheet" closedby="any">
+    <dialog class="sheet drawerRight" id="librarySheet" closedby="any">
       <div class="sheetHead"><h2>Shelf options</h2><form method="dialog"><button class="btn" type="submit">Close</button></form></div>
       <div class="sheetBody">
+      <section class="sheetSection">
+        <h3>This shelf</h3>
+        <div class="statGrid">
+          <div class="statCard"><b id="statNotebooks">0</b><span id="statNotebooksLabel">notebooks</span></div>
+          <div class="statCard"><b id="statBooks">0</b><span id="statBooksLabel">books</span></div>
+          <div class="statCard"><b id="statPages">0</b><span id="statPagesLabel">pages</span></div>
+          <div class="statCard"><b id="statAnnos">0</b><span id="statAnnosLabel">annotations</span></div>
+        </div>
+        <div class="storageBar" role="img" aria-label="Storage used"><span class="storageFill" id="storageFill" style="width:0%"></span></div>
+        <p class="sheetNote" id="storageText">Checking storage use…</p>
+      </section>
       <section class="sheetSection">
         <h3>Library</h3>
         <div class="utilsRow">
@@ -191,26 +220,26 @@
           <label class="btn" for="backupImport"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-upload"></use></svg> Restore backup</label>
           <input id="backupImport" type="file" accept=".json" class="hidden" onchange="importBackup(event)"/>
         </div>
-      </section>>
+      </section>
       <section class="sheetSection">
         <h3>Samples</h3>
         <div class="utilsRow">
           <button class="btn" onclick="openBook(SAMPLE_ID)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-book-2"></use></svg> Open sample book</button>
           <button class="btn" onclick="openBook(SAMPLE_PDF_ID)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-file-type-pdf"></use></svg> Open demo PDF</button>
         </div>
-      </section>>
+      </section>
       <section class="sheetSection">
         <h3>Workspace</h3>
         <div class="utilsRow">
           <button class="btn" onclick="openTimer()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-clock"></use></svg> <span id="timerLabel">Focus 25:00</span></button>
+          <button class="btn" id="drawerInstallBtn" onclick="$('installBtn').click()" style="display:none"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-download"></use></svg> Install Inkwell</button>
         </div>
-      </section>>
+      </section>
 
     <div class="sheetSection" id="aboutPanel">
       <div class="aboutIntro">
-        <h3>This shelf</h3>
+        <h3>About this shelf</h3>
         <p>Inkwell keeps handwriting, PDFs and EPUBs in one library. Everything is stored in this browser on this device, so it is here when you close the tab. Backup gives you a copy for another device.</p>
-        <p class="aboutCounts">On this shelf: <b id="statNotebooks">0</b> notebooks · <b id="statBooks">0</b> books · <b id="statPages">0</b> pages · <b id="statAnnos">0</b> annotations.</p>
       </div>
       <div class="aboutStats">
         <div class="listRow"><span>Time writing</span><b id="statWrite">0m</b></div>
@@ -224,21 +253,19 @@
 
         </div>
     </dialog>
+
   <footer class="libraryFoot">
       <p>Inkwell. Local-first notes and reading.</p>
       <p><a href="https://github.com/coldabs/inkwell" target="_blank" rel="noopener">Source on GitHub</a> <span aria-hidden="true">·</span> Icons by <a href="https://tabler.io/icons" target="_blank" rel="noopener">Tabler</a></p>
     </footer>
 
-    <div class="bottomBar" id="libraryBar">
-      <div class="bottomBarInner">
-        <button class="btn newMain" onclick="openNewNotebook()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-plus"></use></svg> <span class="prLong">New notebook</span><span class="prShort">New</span></button>
-        <label class="btn outlineBlue" for="pdfImport" aria-label="Import a PDF"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-file-type-pdf"></use></svg> PDF</label>
-        <input id="pdfImport" type="file" accept=".pdf" class="hidden" onchange="handleImport(event)"/>
-        <label class="btn outlineBlue" for="epubImport" aria-label="Import an EPUB"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-book"></use></svg> EPUB</label>
-        <input id="epubImport" type="file" accept=".epub,.txt" class="hidden" onchange="handleImport(event)"/>
-        <button class="btn outlineBlue" type="button" onclick="prOpenPicker('first')" aria-label="Parallel Read"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-columns"></use></svg> <span class="prLong">Parallel Read</span><span class="prShort">Parallel</span></button>
-      </div>
-    </div>
+    <nav class="tabBar" id="libraryBar" aria-label="Library">
+      <button type="button" class="tabBtn active" id="tabShelf" onclick="setLibTab('shelf')" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#ticon-layout-grid"></use></svg><span>Shelf</span></button>
+      <button type="button" class="tabBtn" id="tabRecent" onclick="setLibTab('recent')"><svg class="ic" aria-hidden="true"><use href="#ticon-rotate-clockwise"></use></svg><span>Recent</span></button>
+      <button type="button" class="tabBtn" id="tabFocus" onclick="setLibTab('focus')"><svg class="ic" aria-hidden="true"><use href="#ticon-clock"></use></svg><span>Focus</span></button>
+      <button type="button" class="tabBtn" id="tabOptions" onclick="setLibTab('options')"><svg class="ic" aria-hidden="true"><use href="#ticon-adjustments"></use></svg><span>Options</span></button>
+    </nav>
+    <button type="button" class="libFab" id="libFab" aria-label="New" aria-haspopup="menu" aria-expanded="false" commandfor="newMenu" command="toggle-popover"><svg class="ic" aria-hidden="true"><use href="#ticon-plus"></use></svg></button>
   </section>
 
   <!-- Editor -->
@@ -538,6 +565,16 @@
       <button type="button" class="selColorBtn" onpointerdown="event.preventDefault()" onpointerup="barAct(event,'color','pr')" onclick="barAct(event,'color','pr')" aria-label="Mark colour"><span class="selColorDot" aria-hidden="true"></span></button>
     </div>
   </section>
+    <dialog class="palette" id="paletteDialog" closedby="any" aria-labelledby="paletteTitle">
+      <h2 id="paletteTitle" class="srOnly">Search the shelf</h2>
+      <div class="paletteSearch">
+        <svg class="ic searchIcon" aria-hidden="true"><use href="#ticon-search"></use></svg>
+        <input id="globalSearch" placeholder="Search notes, notebooks and books" aria-label="Search notebooks and notes" oninput="onSearchInput()" autocomplete="off"/>
+        <kbd class="searchKbd" title="Press Esc to close">esc</kbd>
+      </div>
+      <div id="paletteResults" class="paletteResults" role="listbox" aria-label="Search results"></div>
+      <p class="paletteHint"><kbd class="searchKbd">/</kbd> or <kbd class="searchKbd">⌘K</kbd> to search · <kbd class="searchKbd">↑</kbd><kbd class="searchKbd">↓</kbd> to move · <kbd class="searchKbd">↵</kbd> to open · <kbd class="searchKbd">esc</kbd> to close</p>
+    </dialog>
 </main>
 
 <dialog id="newModal" class="modal" closedby="any" aria-labelledby="newModalTitle">
@@ -589,7 +626,7 @@
   </div>
 </dialog>
 
-<script src="app.js?v=2026-11-19-r6"></script>
+<script src="app.js?v=2026-11-19-r7"></script>
 <script>
 /* PWA: install prompt and offline app shell. */
 (function(){
