@@ -23,7 +23,6 @@ function doConfirm(){closeModal('confirmModal');if(pendingConfirm){let f=pending
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape') return;
   closeAllPopovers();
-  let sr=$('searchResults'); if(sr) sr.classList.add('hidden');
   let lh=$('libHint'); if(lh) lh.style.visibility='';
 });
 function icon(name,cls){ return '<svg class="ic '+(cls||'')+'" aria-hidden="true"><use href="#ticon-'+name+'"></use></svg>'; }
@@ -49,10 +48,15 @@ if(window.matchMedia){
   else if(mq.addListener) mq.addListener(onSystemTheme);
 }
 document.addEventListener('keydown',e=>{
-  if(e.defaultPrevented || S.view!=='library') return;
+  if(e.defaultPrevented) return;
   let el=document.activeElement, tag=el?el.tagName:'';
-  if(e.key==='/' && !/^(INPUT|TEXTAREA|SELECT)$/.test(tag) && !(el&&el.isContentEditable)){
-    let s=$('globalSearch'); if(s){ e.preventDefault(); s.focus(); s.select(); }
+  let typing=/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (el&&el.isContentEditable);
+  if((e.key==='/' && !typing) || ((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='k')){
+    /* The palette IS the search now: / and Cmd/Ctrl+K open it from
+       anywhere (library, reader, editor) — except while typing, where
+       / and Ctrl+K must type. The dialog lives outside the views so
+       it renders from any of them. */
+    e.preventDefault(); openPalette();
   }
 });
 
@@ -84,14 +88,14 @@ function blankPage(){return {ink:[],hi:[],text:'',stickies:[],table:null,board:n
 function blankBoard(){return {color:0,strokes:[],view:{x:0,y:0,k:1},geom:null}}
 const BOARD_COLORS=['#fffdf6','#f6e8c8','#d9e9f7','#dcf0dd','#f8e0e0','#e6def6','#39404e'];
 let S={
-  items:[], filter:'all',
+  items:[], filter:'all', recent:false,
   curNbId:null, curBookId:null,
   tool:'pen', color:'#18202B',
   undoStack:[], redoStack:[],
   view:'library',
   stats:{writeSec:0, readSec:0, strokes:0, pagesRead:{}, focusDone:0},
   split:false, recording:false, recStart:0,
-  searchResults:[], zoom:1, selection:[], selRect:null,
+  searchResults:[], zoom:1, selection:[], selRect:null, paletteItems:[], paletteSel:-1,
   strokeStyle:'solid', eraserMode:'stroke', stabilize:28, snapGrid:false, clipboard:[]
 };
 function curNb(){return S.items.find(i=>i.id===S.curNbId)||null}
@@ -140,14 +144,14 @@ function bgPdfImgData(bg){
 function serializeLibrary(){
   return { v:1, savedAt:Date.now(), stats:S.stats,
     items:S.items.map(it=>{
-      if(it.kind==='notebook') return {id:it.id,kind:'notebook',title:it.title,color:it.color,template:it.template,cur:it.cur,updated:it.updated,annotations:it.annotations||[],pdfBookId:it.pdfBookId||null,
+      if(it.kind==='notebook') return {id:it.id,kind:'notebook',title:it.title,color:it.color,template:it.template,cur:it.cur,updated:it.updated,openedAt:it.openedAt||0,annotations:it.annotations||[],pdfBookId:it.pdfBookId||null,
         pages:(it.pages||[]).map(p=>({ink:p.ink||[],hi:p.hi||[],text:p.text||'',stickies:p.stickies||[],table:p.table||null,texts:p.texts||[],texs:p.texs||[],bgColor:p.bgColor||'#fffdf6',
           images:(p.images||[]).map(im=>({id:im.id,x:im.x,y:im.y,w:im.w,h:im.h,src:im.src})),
           board:p.board?{color:p.board.color,strokes:p.board.strokes,view:p.board.view,geom:p.board.geom||null}:null,
           audio:(p.audio&&p.audio.blob)?{blob:p.audio.blob,dur:p.audio.dur}:null,
           bgPdf:p.bgPdf?{page:p.bgPdf.page,bookTitle:p.bgPdf.bookTitle,imgData:bgPdfImgData(p.bgPdf),w:(bgPdfSize(p.bgPdf)||[])[0]||null,h:(bgPdfSize(p.bgPdf)||[])[1]||null}:null }))};
-      if(it.kind==='pdf') return {id:it.id,kind:'pdf',title:it.title,color:it.color,updated:it.updated,sample:!!it.sample,fileName:it.fileName,numPages:it.numPages,page:it.page,mode:it.mode,bookmarks:it.bookmarks||[],annotations:it.annotations||[],textCache:it.textCache||{},parallelNotes:it.parallelNotes||{},parallelWith:it.parallelWith||null,parallelSync:it.parallelSync||'unit',parallelOffset:it.parallelOffset||0,parallelZoom:it.parallelZoom||1,ocrPages:it.ocrPages||{},markColor:it.markColor||null,markOpacity:(typeof it.markOpacity==='number'? it.markOpacity : 1)};
-      return {id:it.id,kind:'epub',title:it.title,color:it.color,updated:it.updated,sample:!!it.sample,ch:it.ch||0,mode:it.mode||'scroll',bookmarks:it.bookmarks||[],annotations:it.annotations||[],parallelNotes:it.parallelNotes||{},parallelWith:it.parallelWith||null,parallelSync:it.parallelSync||'unit',parallelOffset:it.parallelOffset||0,parallelZoom:it.parallelZoom||1,parallelInk:it.parallelInk||{},chapters:it.chapters||[],markColor:it.markColor||null,markOpacity:(typeof it.markOpacity==='number'? it.markOpacity : 1)};
+      if(it.kind==='pdf') return {id:it.id,kind:'pdf',title:it.title,color:it.color,updated:it.updated,openedAt:it.openedAt||0,sample:!!it.sample,fileName:it.fileName,numPages:it.numPages,page:it.page,mode:it.mode,bookmarks:it.bookmarks||[],annotations:it.annotations||[],textCache:it.textCache||{},parallelNotes:it.parallelNotes||{},parallelWith:it.parallelWith||null,parallelSync:it.parallelSync||'unit',parallelOffset:it.parallelOffset||0,parallelZoom:it.parallelZoom||1,ocrPages:it.ocrPages||{},markColor:it.markColor||null,markOpacity:(typeof it.markOpacity==='number'? it.markOpacity : 1)};
+      return {id:it.id,kind:'epub',title:it.title,color:it.color,updated:it.updated,openedAt:it.openedAt||0,sample:!!it.sample,ch:it.ch||0,mode:it.mode||'scroll',bookmarks:it.bookmarks||[],annotations:it.annotations||[],parallelNotes:it.parallelNotes||{},parallelWith:it.parallelWith||null,parallelSync:it.parallelSync||'unit',parallelOffset:it.parallelOffset||0,parallelZoom:it.parallelZoom||1,parallelInk:it.parallelInk||{},chapters:it.chapters||[],markColor:it.markColor||null,markOpacity:(typeof it.markOpacity==='number'? it.markOpacity : 1)};
     })};
 }
 async function saveNow(){
@@ -210,7 +214,7 @@ async function restoreLibrary(token){
   for(let raw of data.items){
    try{
     if(raw.kind==='notebook'){
-      let nb={id:raw.id,kind:'notebook',title:raw.title||'Untitled notebook',color:raw.color||'#b4552d',template:raw.template||'lined',cur:raw.cur||0,updated:raw.updated||'',annotations:raw.annotations||[],pdfBookId:raw.pdfBookId||null,pages:[]};
+      let nb={id:raw.id,kind:'notebook',title:raw.title||'Untitled notebook',color:raw.color||'#b4552d',template:raw.template||'lined',cur:raw.cur||0,updated:raw.updated||'',openedAt:raw.openedAt||0,annotations:raw.annotations||[],pdfBookId:raw.pdfBookId||null,pages:[]};
       for(let rp of (raw.pages||[])){
         let p=blankPage();
         p.ink=rp.ink||[]; p.hi=rp.hi||[]; p.text=rp.text||''; p.stickies=rp.stickies||[]; p.table=rp.table||null;
@@ -226,7 +230,7 @@ async function restoreLibrary(token){
       if(nb.cur>=nb.pages.length) nb.cur=nb.pages.length-1; if(nb.cur<0) nb.cur=0;
       items.push(nb);
     } else if(raw.kind==='pdf'){
-      let b={id:raw.id,kind:'pdf',title:raw.title||'PDF',color:raw.color||'#4a5a74',updated:raw.updated||'',sample:!!raw.sample,fileName:raw.fileName||raw.title,numPages:raw.numPages||0,page:raw.page||1,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],textCache:raw.textCache||{},parallelNotes:raw.parallelNotes||{},parallelWith:raw.parallelWith||null,parallelSync:raw.parallelSync||'unit',parallelOffset:+raw.parallelOffset||0,parallelZoom:+raw.parallelZoom||1,ocrPages:raw.ocrPages||{},markColor:raw.markColor||null,markOpacity:(typeof raw.markOpacity==='number'? raw.markOpacity : 1),doc:null,fileData:null};
+      let b={id:raw.id,kind:'pdf',title:raw.title||'PDF',color:raw.color||'#4a5a74',updated:raw.updated||'',openedAt:raw.openedAt||0,sample:!!raw.sample,fileName:raw.fileName||raw.title,numPages:raw.numPages||0,page:raw.page||1,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],textCache:raw.textCache||{},parallelNotes:raw.parallelNotes||{},parallelWith:raw.parallelWith||null,parallelSync:raw.parallelSync||'unit',parallelOffset:+raw.parallelOffset||0,parallelZoom:+raw.parallelZoom||1,ocrPages:raw.ocrPages||{},markColor:raw.markColor||null,markOpacity:(typeof raw.markOpacity==='number'? raw.markOpacity : 1),doc:null,fileData:null};
       try{
         let fd=await idbGet('pdf:'+raw.id);
         if(fd) b.fileData=fd;
@@ -239,7 +243,7 @@ async function restoreLibrary(token){
       }catch(e){}
       items.push(b);
     } else if(raw.kind==='epub'){
-      items.push({id:raw.id,kind:'epub',title:raw.title||'Book',color:raw.color||'#2e6f6a',updated:raw.updated||'',sample:!!raw.sample,ch:raw.ch||0,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],parallelNotes:raw.parallelNotes||{},parallelWith:raw.parallelWith||null,parallelSync:raw.parallelSync||'unit',parallelOffset:+raw.parallelOffset||0,parallelZoom:+raw.parallelZoom||1,parallelInk:(raw.parallelInk&&typeof raw.parallelInk==='object')? raw.parallelInk : {},chapters:raw.chapters||[],markColor:raw.markColor||null,markOpacity:(typeof raw.markOpacity==='number'? raw.markOpacity : 1)});
+      items.push({id:raw.id,kind:'epub',title:raw.title||'Book',color:raw.color||'#2e6f6a',updated:raw.updated||'',openedAt:raw.openedAt||0,sample:!!raw.sample,ch:raw.ch||0,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],parallelNotes:raw.parallelNotes||{},parallelWith:raw.parallelWith||null,parallelSync:raw.parallelSync||'unit',parallelOffset:+raw.parallelOffset||0,parallelZoom:+raw.parallelZoom||1,parallelInk:(raw.parallelInk&&typeof raw.parallelInk==='object')? raw.parallelInk : {},chapters:raw.chapters||[],markColor:raw.markColor||null,markOpacity:(typeof raw.markOpacity==='number'? raw.markOpacity : 1)});
     }
    }catch(e){ /* one damaged item must not cost the whole shelf */ }
   }
@@ -436,7 +440,6 @@ function showView(v){
   $('mainLayout').classList.toggle('shelf',v==='library');
   document.body.classList.toggle('inEditor',v==='editor'); document.body.classList.toggle('inReader',v==='reader');
   if(v!=='reader'){ var af=$('annotateFab'); if(af) af.classList.add('hidden'); }
-  let sr=$('searchResults'); if(sr) sr.classList.add('hidden');
   let lh=$('libHint'); if(lh) lh.style.visibility='';
   syncHashForView(v);
   if(v==='library') renderLibrary();
@@ -462,6 +465,15 @@ function toggleTtsBar(){ let b=$('ttsBar'); b.classList.toggle('hidden'); if(!b.
 function isLinkedNb(it){ return !!it && it.kind==='notebook' && !!it.pdfBookId; }
 function linkedNbFor(bookId){ return S.items.find(i=>i.kind==='notebook' && i.pdfBookId===bookId); }
 function itemPages(it){ if(it.kind==='notebook') return it.pages.length; if(it.kind==='pdf') return it.numPages||0; if(it.kind==='epub') return it.chapters?it.chapters.length:0; return 1 }
+function plural(n,one,many){ return n===1? one : (many||one+'s'); }
+/* Reading progress for a shelf card, as a percent. Notebooks count the
+   page they are open on; PDFs the page, EPUBs the chapter. Never opened
+   (openedAt 0) reads 0, not a guess. */
+function itemProgress(it){
+  if(it.kind==='notebook'){ let t=itemPages(it)||1; return (it.openedAt? Math.min(100,Math.round((it.cur+1)/t*100)) : 0); }
+  if(it.kind==='pdf'){ let t=it.numPages||0; return t? Math.min(100,Math.round((it.page||1)/t*100)) : 0; }
+  let t=it.chapters?it.chapters.length:0; return t? Math.min(100,Math.round(((it.ch||0)+1)/t*100)) : 0;
+}
 function renderLibrary(){
   let q=($('globalSearch').value||'').toLowerCase().trim();
   /* P5: with no query in the box the shelf chrome is always restored,
@@ -473,15 +485,36 @@ function renderLibrary(){
     if(!q) return true;
     return n.title.toLowerCase().includes(q);
   });
-  $('statNotebooks').textContent=S.items.filter(i=>i.kind==='notebook' && !i.pdfBookId).length;
-  $('statBooks').textContent=S.items.filter(i=>i.kind!=='notebook').length;
-  $('statPages').textContent=S.items.filter(i=>!isLinkedNb(i)).reduce((a,n)=>a+itemPages(n),0);
-  $('statAnnos').textContent=S.items.reduce((a,n)=>a+((n.annotations||[]).length),0);
+  /* Recent tab: most recently opened first. openedAt is a timestamp set
+     by openNotebook/openBook and persisted; 0 means never opened, and
+     those keep their shelf order at the end (Array.sort is stable). */
+  if(S.recent) items.sort((a,b)=>(b.openedAt||0)-(a.openedAt||0));
+  let nbCount=S.items.filter(i=>i.kind==='notebook' && !i.pdfBookId).length;
+  let bkCount=S.items.filter(i=>i.kind!=='notebook').length;
+  let pgCount=S.items.filter(i=>!isLinkedNb(i)).reduce((a,n)=>a+itemPages(n),0);
+  let anCount=S.items.reduce((a,n)=>a+((n.annotations||[]).length),0);
+  $('statNotebooks').textContent=nbCount;
+  $('statBooks').textContent=bkCount;
+  $('statPages').textContent=pgCount;
+  $('statAnnos').textContent=anCount;
+  /* The "1 annotations" bug was real: these labels were static HTML, so
+     a single annotation read "1 annotations". They are set here now. */
+  let setLab=(id,v)=>{ let el=$(id); if(el) el.textContent=v; };
+  setLab('statNotebooksLabel',plural(nbCount,'notebook'));
+  setLab('statBooksLabel',plural(bkCount,'book'));
+  setLab('statPagesLabel',plural(pgCount,'page'));
+  setLab('statAnnosLabel',plural(anCount,'annotation'));
+  /* Keep the mobile tab bar in step with the sort state. */
+  let tS=$('tabShelf'), tR=$('tabRecent');
+  if(tS) tS.classList.toggle('active',!S.recent);
+  if(tR) tR.classList.toggle('active',!!S.recent);
+  if(tS) tS.setAttribute('aria-current',!S.recent?'page':'false');
+  if(tR) tR.setAttribute('aria-current',S.recent?'page':'false');
   /* P11: the shelf is only "empty" when nothing is on it at all, the
      built-in sample book counts, so the banner no longer claims a fresh,
      empty shelf while the sample book sits right below it. */
   $('emptyState').classList.toggle('hidden', S.items.length>0);
-  $('libHint').textContent=q? items.length+(items.length===1?' match':' matches')+'. Search also looks inside notes, books and annotations.' : '';
+  $('libHint').textContent=q? items.length+(items.length===1?' match':' matches')+'. Search also looks inside notes, books and annotations.' : (S.recent?'Recently opened first.':'');
   $('libraryGrid').innerHTML=items.map(n=>{
     let cov=coverFor(n);
     let kindLabel = n.kind==='notebook'? 'Notebook' : n.kind==='pdf'? 'PDF' : 'EPUB';
@@ -490,10 +523,11 @@ function renderLibrary(){
       : n.kind==='pdf'? (n.numPages||'?')+(n.numPages===1?' page':' pages')
       : (n.chapters?n.chapters.length:0)+(n.chapters&&n.chapters.length===1?' chapter':' chapters');
     let openAct= n.kind==='notebook'? 'openNotebook(\''+n.id+'\')' : 'openBook(\''+n.id+'\')';
+    let prog=itemProgress(n);
     let menu='<button type="button" onclick="event.stopPropagation();'+openAct+'">'+icon(n.kind==='notebook'?'notebook':'book-2')+(n.kind==='notebook'?'Open notebook':'Read book')+'</button>'
       + (n.kind==='pdf'? '<button type="button" onclick="event.stopPropagation();annotatePdf(\''+n.id+'\')">'+icon('pencil')+'Annotate</button>':'')
       + '<button type="button" class="danger" onclick="event.stopPropagation();askDeleteItem(\''+n.id+'\')">'+icon('trash')+'Delete</button>';
-    return '<article class="bookCard"><button type="button" class="book" style="background:'+cov.bg+';color:'+cov.ink+'" onclick="'+openAct+'"><span class="srOnly">Open </span><span class="bookSpine" style="background:'+cov.spine+'"></span><span class="bookFace"><span class="bookKind">'+icon(kindIcon,'ic-sm')+kindLabel+'</span><span class="bookTitle">'+esc(n.title).split('_').join('_&#8203;')+'</span><span class="bookMeta"><span>'+count+'</span><span>'+(n.sample?'Sample':'Edited '+esc(n.updated||'just now'))+'</span></span></span></button>'
+    return '<article class="bookCard"><button type="button" class="book" style="background:'+cov.bg+';color:'+cov.ink+'" onclick="'+openAct+'"><span class="srOnly">Open </span><span class="bookSpine" style="background:'+cov.spine+'"></span><span class="bookFace"><span class="bookKind">'+icon(kindIcon,'ic-sm')+kindLabel+'</span><span class="bookTitle">'+esc(n.title).split('_').join('_&#8203;')+'</span><span class="bookProgress" aria-hidden="true"><span style="width:'+prog+'%"></span></span><span class="srOnly">'+prog+'% read</span><span class="bookMeta"><span>'+count+'</span><span>'+(n.sample?'Sample':'Edited '+esc(n.updated||'just now'))+'</span></span></span></button>'
       +'<button type="button" class="bookMenu" aria-label="Options for '+esc(n.title)+'" aria-haspopup="true" onclick="toggleCardMenu(this)">'+icon('dots','ic-sm')+'</button>'
       +'<div class="bookActions">'+menu+'</div></article>';
   }).join('') || '<p class="kbd">Nothing matches this filter.</p>';
@@ -555,48 +589,217 @@ function updateStatsPanel(){
    so leaving the grid up let it flash "Nothing matches this filter"
    behind the (full-text) results dropdown, which also covered the
    chips. Both come back when the query is cleared or results close. */
-function setSearchChrome(active){
-  let g=$('libraryGrid'); if(g) g.classList.toggle('hidden',active);
-  let cr=$('chipRow'); if(cr) cr.classList.toggle('hidden',active);
+/* ============ command palette (Pass 1) ============
+   The header search is now a trigger; the search itself lives in a
+   centred <dialog> grouped by Books & PDFs, Notebooks & Backlinks,
+   Annotations and Quick Actions. Every entry is real: the same
+   full-text matching the old dropdown used (titles, notebook pages /
+   stickies / on-page text / equations, EPUB chapters, PDF text cache,
+   annotations), and actions that call the existing flows. No fake
+   entries. The old dropdown (#searchResults) and its show/hide
+   helpers are gone with it. */
+function paletteActions(){
+  return [
+    {label:'New notebook', sub:'Create a blank notebook', act:()=>openNewNotebook()},
+    {label:'Import a PDF', sub:'Open a PDF from your files', act:()=>$('pdfImport').click()},
+    {label:'Import an EPUB', sub:'Open an EPUB from your files', act:()=>$('epubImport').click()},
+    {label:'Parallel Read', sub:'Read two books side by side', act:()=>prOpenPicker('first')},
+    {label:'Focus timer', sub:'Start a 25 minute focus session', act:()=>openTimer()},
+    {label:'Export backup', sub:'Download all notebooks and books as JSON', act:()=>exportBackup()},
+    {label:'Toggle theme', sub:'Switch between light and dark', act:()=>toggleTheme()},
+    {label:'Open sample book', sub:'The Art of Slow Reading', act:()=>openBook(SAMPLE_ID)}
+  ];
 }
-function onSearchInput(){
-  let q=($('globalSearch').value||'').trim().toLowerCase();
-  let box=$('searchResults');
-  if(S.view==='library') renderLibrary();
-  setSearchChrome(q.length>0);
-  if(q.length<2){ box.classList.add('hidden'); S.searchResults=[]; $('libHint').style.visibility=''; return; }
+/* Backlinks for a notebook: other notebooks whose pages link to it
+   with [[Title]]. Counted only for the few notebook results shown. */
+function backlinkCount(nb){
+  let n=0;
+  S.items.forEach(i=>{ if(i.kind==='notebook' && !i.pdfBookId && i.id!==nb.id && i.pages.some(p=>p.text.includes('[['+nb.title+']]'))) n++; });
+  return n;
+}
+/* The old onSearchInput matching, refactored to return flat results
+   tagged with their palette group instead of rendering a dropdown. */
+function searchItemsFlat(q){
   let res=[];
   S.items.forEach(it=>{
     if(isLinkedNb(it)) return; /* annotation stores never surface in search */
-    if(it.title.toLowerCase().includes(q)) res.push({label:it.title, sub:(it.kind==='notebook'?'Notebook':'Book')+' · title match', act:()=> it.kind==='notebook'? openNotebook(it.id): openBook(it.id)});
+    if(it.title.toLowerCase().includes(q)) res.push({label:it.title, sub:(it.kind==='notebook'?'Notebook':it.kind==='pdf'?'PDF':'EPUB')+' · title match', act:()=> it.kind==='notebook'? openNotebook(it.id): openBook(it.id), group:it.kind==='notebook'?'notebooks':'books'});
     if(it.kind==='notebook') it.pages.forEach((p,pi)=>{
       let idx=p.text.toLowerCase().indexOf(q);
-      if(idx>=0) res.push({label:it.title+', page '+(pi+1), sub:'“…'+esc(p.text.slice(Math.max(0,idx-30),idx+60))+'…”', act:()=>{openNotebook(it.id); switchPage(pi);}});
-      (p.stickies||[]).forEach(st=>{ if(st.text.toLowerCase().includes(q)) res.push({label:it.title+', sticky, page '+(pi+1), sub:esc(st.text.slice(0,80)), act:()=>{openNotebook(it.id); switchPage(pi);}}); });
-      (p.texts||[]).forEach(t=>{ if(String(t.text).toLowerCase().includes(q)) res.push({label:it.title+', on-page text, page '+(pi+1), sub:esc(String(t.text).slice(0,80)), act:()=>{openNotebook(it.id); switchPage(pi);}}); });
-      (p.texs||[]).forEach(t=>{ if(String(t.tex).toLowerCase().includes(q)) res.push({label:it.title+', equation, page '+(pi+1), sub:esc(String(t.tex).slice(0,80)), act:()=>{openNotebook(it.id); switchPage(pi);}}); });
-      if(p.board && p.board.strokes.length && 'board'.includes(q)) res.push({label:it.title+', floating board, page '+(pi+1), sub:'This page has board work', act:()=>{openNotebook(it.id); switchPage(pi); toggleBoard(true);}});
+      if(idx>=0) res.push({label:it.title+', page '+(pi+1), sub:'“…'+esc(p.text.slice(Math.max(0,idx-30),idx+60))+'…”', act:()=>{openNotebook(it.id); switchPage(pi);}, group:'notebooks'});
+      (p.stickies||[]).forEach(st=>{ if(st.text.toLowerCase().includes(q)) res.push({label:it.title+', sticky, page '+(pi+1), sub:esc(st.text.slice(0,80)), act:()=>{openNotebook(it.id); switchPage(pi);}, group:'notebooks'}); });
+      (p.texts||[]).forEach(t=>{ if(String(t.text).toLowerCase().includes(q)) res.push({label:it.title+', on-page text, page '+(pi+1), sub:esc(String(t.text).slice(0,80)), act:()=>{openNotebook(it.id); switchPage(pi);}, group:'notebooks'}); });
+      (p.texs||[]).forEach(t=>{ if(String(t.tex).toLowerCase().includes(q)) res.push({label:it.title+', equation, page '+(pi+1), sub:esc(String(t.tex).slice(0,80)), act:()=>{openNotebook(it.id); switchPage(pi);}, group:'notebooks'}); });
+      if(p.board && p.board.strokes.length && 'board'.includes(q)) res.push({label:it.title+', floating board, page '+(pi+1), sub:'This page has board work', act:()=>{openNotebook(it.id); switchPage(pi); toggleBoard(true);}, group:'notebooks'});
     });
     if(it.kind==='epub' && it.chapters) it.chapters.forEach((c,ci)=>{
       let idx=c.text.toLowerCase().indexOf(q);
-      if(idx>=0) res.push({label:it.title+' · '+c.title, sub:'“…'+esc(c.text.slice(Math.max(0,idx-30),idx+60))+'…”', act:()=>{openBook(it.id); jumpToChapter(ci);}});
+      if(idx>=0) res.push({label:it.title+' · '+c.title, sub:'“…'+esc(c.text.slice(Math.max(0,idx-30),idx+60))+'…”', act:()=>{openBook(it.id); jumpToChapter(ci);}, group:'books'});
     });
     if(it.kind==='pdf' && it.textCache) Object.keys(it.textCache).forEach(pg=>{
       let idx=it.textCache[pg].toLowerCase().indexOf(q);
-      if(idx>=0) res.push({label:it.title+', PDF page '+pg, sub:'“…'+esc(it.textCache[pg].slice(Math.max(0,idx-30),idx+60))+'…”', act:()=>{openBook(it.id); jumpToPdfPage(+pg);}});
+      if(idx>=0) res.push({label:it.title+', PDF page '+pg, sub:'“…'+esc(it.textCache[pg].slice(Math.max(0,idx-30),idx+60))+'…”', act:()=>{openBook(it.id); jumpToPdfPage(+pg);}, group:'books'});
     });
-    (it.annotations||[]).forEach(a=>{ if(a.text.toLowerCase().includes(q)) res.push({label:it.title+', annotation', sub:'“'+esc(a.text.slice(0,80))+'”', act:()=> openBook(it.id)}); });
+    (it.annotations||[]).forEach(a=>{ if(a.text.toLowerCase().includes(q)) res.push({label:it.title+', annotation', sub:'“'+esc(a.text.slice(0,80))+'”'+(a.where?' · '+esc(a.where):''), act:()=> it.kind==='notebook'? openNotebook(it.id): openBook(it.id), group:'annotations'}); });
   });
-  S.searchResults=res.slice(0,14);
-  box.innerHTML= S.searchResults.length? S.searchResults.map((r,i)=>'<div class="srItem" onclick="runSearchResult('+i+')"><b>'+esc(r.label)+'</b><span>'+r.sub+'</span></div>').join('') : '<div class="srItem"><span>No matches inside your notes and books.</span></div>';
-  box.classList.remove('hidden');
-  /* P13: while the results dropdown is open, blank the status line under
-     it so the two never overlap/read through each other. */
-  $('libHint').style.visibility='hidden';
+  return res;
 }
-function runSearchResult(i){ let r=S.searchResults[i]; $('searchResults').classList.add('hidden'); $('libHint').style.visibility=''; setSearchChrome(false); if(r&&r.act) r.act(); }
-document.addEventListener('click',e=>{ if(!e.target.closest('.searchWrap')){ $('searchResults').classList.add('hidden'); let lh=$('libHint'); if(lh) lh.style.visibility=''; setSearchChrome(false); } });
-$('globalSearch').addEventListener('keydown',e=>{ if(e.key!=='Escape') return; e.currentTarget.value=''; $('searchResults').classList.add('hidden'); $('libHint').style.visibility=''; setSearchChrome(false); renderLibrary(); e.currentTarget.blur(); });
+function collectPalette(q){
+  let groups={books:[], notebooks:[], annotations:[], actions:[]};
+  if(!q){
+    /* No query: the shelf itself, recent first, plus every action. */
+    S.items.filter(i=>!isLinkedNb(i) && i.kind!=='notebook').slice(0,5).forEach(it=>groups.books.push({label:it.title, sub:(it.kind==='pdf'?'PDF':'EPUB')+' · '+(it.kind==='pdf'?(it.numPages||'?')+' pages':(it.chapters?it.chapters.length:0)+' chapters'), act:()=>openBook(it.id)}));
+    S.items.filter(i=>i.kind==='notebook' && !i.pdfBookId).slice().sort((a,b)=>(b.openedAt||0)-(a.openedAt||0)).slice(0,5).forEach(it=>{ let bl=backlinkCount(it); groups.notebooks.push({label:it.title, sub:'Notebook · '+itemPages(it)+' pages'+(bl?' · '+bl+(bl===1?' backlink':' backlinks'):''), act:()=>openNotebook(it.id)}); });
+    S.items.forEach(it=>{ if(isLinkedNb(it)) return; (it.annotations||[]).forEach(a=>{ if(groups.annotations.length<5) groups.annotations.push({label:it.title+', annotation', sub:'“'+esc(a.text.slice(0,80))+'”'+(a.where?' · '+esc(a.where):''), act:()=> it.kind==='notebook'? openNotebook(it.id): openBook(it.id)}); }); });
+    groups.actions=paletteActions();
+    return groups;
+  }
+  searchItemsFlat(q).forEach(r=>{ if(groups[r.group].length<5) groups[r.group].push(r); });
+  groups.actions=paletteActions().filter(a=>a.label.toLowerCase().includes(q));
+  return groups;
+}
+function renderPalette(q){
+  let box=$('paletteResults'); if(!box) return;
+  let groups=collectPalette(q);
+  let flat=[]; let html='';
+  [['books','Books & PDFs'],['notebooks','Notebooks & Backlinks'],['annotations','Annotations'],['actions','Quick Actions']].forEach(([key,title])=>{
+    let list=groups[key]; if(!list.length) return;
+    html+='<div class="palGroup" role="presentation">'+title+'</div>';
+    list.forEach(r=>{ let i=flat.length; flat.push(r); html+='<div class="palItem" role="option" aria-selected="false" data-pi="'+i+'" onclick="runPaletteResult('+i+')"><b>'+esc(r.label)+'</b><span>'+r.sub+'</span></div>'; });
+  });
+  S.paletteItems=flat;
+  if(!flat.length) html='<div class="palEmpty">No matches for “'+esc(q)+'”.</div>';
+  box.innerHTML=html;
+  if(S.paletteSel>=flat.length) S.paletteSel=flat.length?0:-1;
+  syncPaletteSel();
+}
+function syncPaletteSel(){
+  document.querySelectorAll('#paletteResults .palItem').forEach(el=>{
+    let on=+el.getAttribute('data-pi')===S.paletteSel;
+    el.classList.toggle('sel',on);
+    el.setAttribute('aria-selected',on?'true':'false');
+  });
+  let sel=document.querySelector('#paletteResults .palItem.sel'); if(sel) sel.scrollIntoView({block:'nearest'});
+}
+function openPalette(){
+  let d=$('paletteDialog'); if(!d) return;
+  if(!d.open) d.showModal();
+  S.paletteSel=-1; renderPalette('');
+  let s=$('globalSearch'); if(s){ s.focus(); s.select(); }
+}
+function closePalette(){ let d=$('paletteDialog'); if(d&&d.open) d.close(); }
+function runPaletteResult(i){
+  let r=S.paletteItems[i]; if(!r) return;
+  closePalette(); if(r.act) r.act();
+}
+function onSearchInput(){
+  S.paletteSel=-1;
+  renderPalette(($('globalSearch').value||'').trim().toLowerCase());
+}
+$('paletteDialog').addEventListener('close',()=>{
+  /* Closing clears the query so the shelf behind is unfiltered again. */
+  let s=$('globalSearch'); if(s) s.value='';
+  S.paletteSel=-1; S.paletteItems=[];
+  renderLibrary();
+});
+$('globalSearch').addEventListener('keydown',e=>{
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    if(!S.paletteItems.length) return;
+    e.preventDefault();
+    S.paletteSel=e.key==='ArrowDown'? Math.min(S.paletteItems.length-1,S.paletteSel+1) : Math.max(0,S.paletteSel-1);
+    syncPaletteSel();
+  }else if(e.key==='Enter'){
+    e.preventDefault();
+    runPaletteResult(S.paletteSel>=0?S.paletteSel:0);
+  }
+});
+
+/* ============ Pass 1: + New menu, shelf options drawer, tab bar ============ */
+function openShelfOptions(){
+  updateStorageBar();
+  let d=$('drawerInstallBtn'); if(d) d.style.display=($('installBtn').style.display==='none')?'none':'';
+  openDialog('librarySheet');
+}
+function fmtBytes(n){ if(n<1024) return n+' B'; if(n<1048576) return (n/1024).toFixed(1)+' KB'; if(n<1073741824) return (n/1048576).toFixed(1)+' MB'; return (n/1073741824).toFixed(2)+' GB'; }
+async function updateStorageBar(){
+  let fill=$('storageFill'), txt=$('storageText'); if(!fill||!txt) return;
+  try{
+    if(!navigator.storage||!navigator.storage.estimate) throw new Error('no estimate');
+    let e=await navigator.storage.estimate();
+    let used=e.usage||0, quota=e.quota||0;
+    let pct=quota? Math.min(100,Math.round(used/quota*100)) : 0;
+    fill.style.width=pct+'%';
+    txt.textContent=quota? fmtBytes(used)+' of '+fmtBytes(quota)+' used ('+pct+'%)' : fmtBytes(used)+' used';
+  }catch(err){ fill.style.width='0%'; txt.textContent='Storage use is not available in this browser.'; }
+}
+function newMenuAct(kind){
+  let m=$('newMenu'); if(m&&m.matches(':popover-open')) m.hidePopover();
+  if(kind==='notebook') openNewNotebook();
+  else if(kind==='pdf') $('pdfImport').click();
+  else if(kind==='epub') $('epubImport').click();
+  else if(kind==='parallel') prOpenPicker('first');
+}
+function setLibTab(tab){
+  if(tab==='shelf'){ S.recent=false; if(S.filter!=='all') filterLib('all'); else renderLibrary(); window.scrollTo({top:0}); }
+  else if(tab==='recent'){ S.recent=true; renderLibrary(); window.scrollTo({top:0}); }
+  else if(tab==='focus'){ openTimer(); }
+  else if(tab==='options'){ openShelfOptions(); }
+}
+/* + New menu: modern-web-guidance menu pattern — popover + focusgroup,
+   command invokers on both triggers (filter-bar button, mobile FAB).
+   Positioning is scripted on open (CSS anchor positioning broke for
+   the corner-anchored FAB — see styles.css). Fallbacks: arrow-key nav
+   when focusgroup is missing, manual toggle when invoker commands are
+   missing. */
+(function(){
+  let menu=$('newMenu'); if(!menu) return;
+  let triggers=[...document.querySelectorAll('[commandfor="newMenu"]')];
+  let lastKey=false;
+  triggers.forEach(t=>{
+    t.addEventListener('keydown',()=>{ lastKey=true; });
+    t.addEventListener('pointerdown',()=>{ lastKey=false; });
+    t.addEventListener('click',()=>{ menu._src=t; });
+  });
+  /* Invoker fallback: without commandForElement the command attribute
+     does nothing, so toggle the popover from script instead. */
+  if(!('commandForElement' in HTMLButtonElement.prototype)){
+    triggers.forEach(t=>t.addEventListener('click',e=>{ e.preventDefault(); menu.matches(':popover-open')? menu.hidePopover() : menu.showPopover({source:t}); }));
+  }
+  menu.addEventListener('toggle',e=>{
+    let open=e.newState==='open';
+    triggers.forEach(t=>t.setAttribute('aria-expanded',open?'true':'false'));
+    if(open){
+      /* Script positioning (not CSS anchor positioning — see styles.css):
+         below the trigger that opened it, flipping above when there is
+         no room, clamped to the viewport. Runs on every open so the
+         placement follows whichever trigger opened the menu. */
+      let src=menu._src||triggers[0];
+      let r=src.getBoundingClientRect();
+      menu.style.position='fixed'; menu.style.margin='0';
+      let top=r.bottom+6, left=Math.max(8,Math.min(r.right-menu.offsetWidth,window.innerWidth-menu.offsetWidth-8));
+      if(top+menu.offsetHeight>window.innerHeight-8) top=Math.max(8,r.top-menu.offsetHeight-6);
+      menu.style.top=top+'px'; menu.style.left=left+'px';
+      if(lastKey){ let first=menu.querySelector('[focusgroup] button'); if(first) first.focus(); }
+    }
+  });
+  /* focusgroup fallback: arrow keys + Home/End when the browser has
+     no native focusgroup (Chrome 150+ only). */
+  if(!('focusGroup' in HTMLElement.prototype)){
+    menu.querySelectorAll('[focusgroup~="menu"]').forEach(group=>{
+      group.setAttribute('role','menu');
+      group.querySelectorAll('button:not([role])').forEach(item=>item.setAttribute('role','menuitem'));
+      group.addEventListener('keydown',event=>{
+        if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key)) return;
+        let items=[...group.querySelectorAll('button')].filter(item=>!item.disabled);
+        let current=items.indexOf(document.activeElement);
+        if(current<0) return;
+        let next=event.key==='Home'?0:event.key==='End'?items.length-1:(current+(event.key==='ArrowUp'?-1:1)+items.length)%items.length;
+        event.preventDefault(); event.stopImmediatePropagation();
+        items[next].focus({preventScroll:true});
+      },true);
+    });
+  }
+})();
 
 /* ============ notebooks: create / open ============ */
 function openNewNotebook(){openDialog('newModal'); setTimeout(()=>$('newTitle').focus(),50)}
@@ -607,11 +810,12 @@ function createNotebook(){
   toast('Notebook created');
 }
 function createNotebookSilent(title,color,template){
-  let nb={id:uid(), kind:'notebook', title:title, color:color, template:template, pages:[blankPage()], cur:0, updated:'Just now', annotations:[]};
+  let nb={id:uid(), kind:'notebook', title:title, color:color, template:template, pages:[blankPage()], cur:0, updated:'Just now', openedAt:0, annotations:[]};
   S.items.unshift(nb); openNotebook(nb.id); return nb;
 }
 function openNotebook(id){
   let nb=S.items.find(i=>i.id===id); if(!nb||nb.kind!=='notebook') return;
+  nb.openedAt=Date.now(); /* Recent tab sorts on this; persisted by serializeLibrary */
   saveEditorToModel();
   S.curNbId=id;
   $('noteTitle').value=nb.title;
@@ -2390,6 +2594,7 @@ async function importEpub(f){
 /* ============ reader ============ */
 function openBook(id){
   let b=S.items.find(i=>i.id===id); if(!b||b.kind==='notebook') return;
+  b.openedAt=Date.now(); /* Recent tab sorts on this; persisted by serializeLibrary */
   if(b.kind==='pdf' && !b.doc){
     /* Not parsed yet is NOT the same as lost: parse from the stored
        bytes now (ensurePdfDoc re-reads the file record if needed) and
