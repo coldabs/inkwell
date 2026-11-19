@@ -152,7 +152,6 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 .navSearch{width:100%;max-width:560px;justify-self:center}
 .navSearch .search{min-height:44px;background:var(--paper)}
 .navSearch .search input{height:42px}
-.navSearch .searchResults{top:calc(100% + 12px)}
 .libraryTitle h1{font-family:var(--font-ui);font-size:clamp(2.4rem,6vw,3.4rem);font-weight:700;line-height:1.02;letter-spacing:-.03em;margin:0 0 14px}
 .lede{font-family:var(--font-ui);font-size:16px;line-height:1.55;color:var(--muted);max-width:52ch;margin:0}
 .searchWrap{position:relative;min-width:0}
@@ -163,12 +162,6 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 .search input:focus-visible{outline:none}
 .search input::placeholder{color:var(--muted)}
 .searchKbd{flex:0 0 auto;min-width:24px;min-height:24px;display:grid;place-items:center;border:1px solid var(--border);border-radius:var(--radius-xs);font-size:11px;line-height:1;color:var(--muted);padding:0 5px}
-.searchResults{position:absolute;top:calc(100% + 8px);left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-modal);max-height:56vh;max-height:56dvh;overflow:auto;z-index:60}
-.srItem{padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer}
-.srItem:last-child{border-bottom:0}
-.srItem:hover{background:var(--paper2)}
-.srItem b{display:block;font-size:13px;font-weight:600;line-height:1.35}
-.srItem span{display:block;font-size:12px;line-height:1.5;color:var(--muted);margin-top:2px}
 .shelfBar{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:28px}
 .chipRow{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap}
 .chip{min-height:44px;padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--surface);color:var(--muted);font-size:13px;font-weight:600;line-height:1}
@@ -194,7 +187,7 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 .bookSpine{width:11px;flex:0 0 auto;box-shadow:inset -1px 0 0 rgba(255,255,255,.18)}
 .bookFace{flex:1;min-width:0;display:flex;flex-direction:column;padding:18px 42px 16px 16px}
 .bookKind{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px}
-.bookTitle{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin:0;font-family:var(--font-ui);font-size:22px;font-weight:700;line-height:1.15;letter-spacing:-.02em;overflow-wrap:anywhere}
+.bookTitle{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0;font-family:var(--font-ui);font-size:22px;font-weight:700;line-height:1.15;letter-spacing:-.02em;overflow-wrap:anywhere}
 .bookMeta{margin-top:auto;padding-top:18px;font-size:11px;line-height:1.55;letter-spacing:.01em}
 .bookMeta span{display:block}
 .bookMenu{position:absolute;top:10px;right:10px;width:30px;height:30px;min-height:30px;padding:0;border:1px solid rgba(255,255,255,.28);border-radius:var(--radius-xs);background:rgba(0,0,0,.14);color:inherit;display:grid;place-items:center;z-index:2}
@@ -217,7 +210,6 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 .aboutPanel{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:32px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:24px;margin:0 0 28px}
 .aboutIntro h4{font-family:var(--font-ui);font-size:18px;font-weight:700;letter-spacing:-.01em;margin:0 0 10px}
 .aboutIntro p{font-family:var(--font-ui);font-size:14px;line-height:1.65;color:var(--text-soft);margin:0 0 10px}
-.aboutIntro .aboutCounts{font-family:var(--font-ui);font-size:12px;line-height:1.6;color:var(--muted);margin:0}
 .aboutStats{min-width:0}
 .listRow{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px}
 .listRow:last-child{border-bottom:0}
@@ -227,15 +219,6 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 .libraryFoot a{color:var(--text);text-decoration:none;border-bottom:1px solid var(--border-strong)}
 .libraryFoot a:hover{color:var(--accent);border-color:var(--accent)}
 
-/* ---------- bottom action rail ---------- */
-.bottomBar{position:fixed;left:0;right:0;bottom:0;z-index:45;background:transparent;pointer-events:none}
-/* Floating pill action rail (not a full-width bordered bar). */
-.bottomBarInner{max-width:720px;margin:0 auto 20px;display:flex;gap:8px;padding:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-pill);box-shadow:var(--shadow-modal);pointer-events:auto}
-.bottomBar .btn{white-space:nowrap}
-.btn.newMain{flex:1;justify-content:center;background:var(--accent);border-color:var(--accent);color:var(--accent-text);font-size:14px;min-height:46px;border-radius:var(--radius-pill)}
-.btn.newMain:hover{background:var(--text);border-color:var(--text);color:var(--surface)}
-.btn.outlineBlue{background:transparent;border-color:var(--border);color:var(--text);font-size:13px;min-height:46px;border-radius:var(--radius-pill)}
-.btn.outlineBlue:hover{border-color:var(--text)}
 
 /* ---------- editor frame ---------- */
 .editorTop{position:sticky;top:10px;z-index:30;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;background:var(--surface);background:color-mix(in srgb,var(--surface) 86%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:0;border-bottom:1px solid var(--border);border-radius:0}
@@ -687,7 +670,6 @@ dialog.sheet::backdrop{background:rgba(20,16,12,.45);overflow:hidden}
 
 /* Slim top bars, one row on mobile; the page fills the screen. */
 .masthead,.editorTop,.readerTop{min-height:52px;padding-top:env(safe-area-inset-top,0px)}
-.bottomBar{padding-bottom:env(safe-area-inset-bottom,0px)}
 
 /* 44px touch targets on coarse pointers. */
 
@@ -739,7 +721,6 @@ dialog.sheet::backdrop{background:rgba(20,16,12,.45);overflow:hidden}
   .libraryHead{padding:32px 0 24px}
   .aboutPanel{grid-template-columns:1fr;gap:20px;padding:18px}
   .libraryFoot{padding-top:20px;margin-top:24px}
-  .bottomBarInner{max-width:none;margin:0 16px calc(16px + env(safe-area-inset-bottom));padding:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-pill);box-shadow:var(--shadow-modal)}
   .editorTop{position:sticky;top:0;z-index:30;padding:6px 8px;gap:6px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
   .editorTop::-webkit-scrollbar{display:none}
   .editorTop .edFocus{display:none}
@@ -808,8 +789,6 @@ dialog.sheet::backdrop{background:rgba(20,16,12,.45);overflow:hidden}
   .bookMenu{top:8px;right:8px;width:28px;height:28px;min-height:28px}
   .searchKbd{display:none}
   .search{min-height:48px}
-  .bottomBar .btn{padding:0 10px;font-size:12px}
-  .btn.newMain{font-size:13px}
   .tbRowTools .tool{width:44px;height:44px;min-height:44px}
   .tbRowTools .iconBtn{width:44px;height:44px;min-width:44px;min-height:44px}
   .sticky{width:150px}
@@ -896,4 +875,126 @@ dialog.sheet::backdrop{background:rgba(20,16,12,.45);overflow:hidden}
   .prSelBar button{min-height:44px;padding:0 8px}
   .searchKbd{display:none}
   .panel .checkRow{min-height:44px;align-items:center}
+}
+
+/* ============ Pass 1: Library, Shelf Options & Command Palette ============
+   Gemini plan Pass 1. Header search is a trigger pill now; the search
+   itself is a centred modal. The floating bottom dock is gone: its
+   actions live in the + New menu (desktop, in the filter bar) and in
+   the mobile tab bar + terracotta FAB. */
+
+/* Header search trigger: looks like the old search pill, behaves as a
+   button. The real input lives inside the palette dialog. */
+.searchTrigger{width:100%;text-align:left;cursor:pointer;font:inherit;color:var(--text)}
+.searchTriggerText{flex:1;min-width:0;color:var(--muted);font-size:15px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* + New menu in the filter bar (hidden on mobile: the FAB opens it). */
+.newWrap{position:relative;margin-left:auto;flex:0 0 auto}
+.newBtn{white-space:nowrap}
+
+/* Command palette: native <dialog>, centred modal (dialog guide Rule 1).
+   No role/aria-modal — the native modal provides them. */
+dialog.palette{
+  width:min(600px,calc(100vw - 32px));
+  max-height:min(72vh,72dvh);
+  margin:max(24px,10vh) auto auto;
+  padding:0;border:1px solid var(--border);border-radius:var(--radius-md);
+  background:var(--surface);color:var(--text);box-shadow:var(--shadow-modal);
+}
+dialog.palette:modal{display:flex;flex-direction:column;overscroll-behavior:contain}
+dialog.palette::backdrop{background:rgba(20,16,12,.45);overflow:hidden}
+.paletteSearch{display:flex;align-items:center;gap:10px;padding:4px 14px;border-bottom:1px solid var(--border)}
+.paletteSearch input{flex:1;min-width:0;height:48px;border:0;background:transparent;color:var(--text);font-size:16px;outline:none}
+.paletteSearch input::placeholder{color:var(--muted)}
+.paletteResults{flex:1;min-height:0;overflow-y:auto;padding:6px 0 10px}
+.palGroup{padding:12px 16px 6px;font:600 11px/1.3 var(--font-ui);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.palItem{display:flex;flex-direction:column;gap:2px;padding:10px 16px;cursor:pointer;min-height:44px}
+.palItem:hover,.palItem.sel{background:var(--paper2)}
+.palItem b{display:block;font-size:14px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
+.palItem span{display:block;font-size:12px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}
+.palEmpty{padding:18px 16px;font-size:13px;color:var(--muted)}
+.paletteHint{margin:0;padding:10px 16px;border-top:1px solid var(--border);font-size:11px;line-height:1.6;color:var(--muted)}
+.paletteHint .searchKbd{display:inline-grid}
+
+/* + New menu popover (menu guide): anchored under its trigger, flips
+   at viewport edges. The JS anchor fallback covers browsers without
+   position-area. */
+.menuPop{
+  min-width:220px;margin:0;padding:4px;
+  border:1px solid var(--border);border-radius:var(--radius-md);
+  background:var(--surface);color:var(--text);box-shadow:var(--shadow-modal);
+}
+.menuPop:popover-open{display:block}
+/* No CSS anchor positioning for this menu: it broke for the corner-
+   anchored mobile FAB (Chrome 158 computed a 0x0 placement for the
+   bottom-right anchor — the menu opened but had no size, so its
+   buttons were not clickable). The menu is positioned from script on
+   open instead (see the toggle handler in app.js): below the trigger,
+   flipping above it when there is no room, clamped to the viewport. */
+[focusgroup~="menu"] button{
+  display:flex;align-items:center;gap:8px;width:100%;min-height:44px;
+  padding:9px 10px;border:0;border-radius:var(--radius-xs);
+  background:transparent;color:var(--text);font-size:13px;font-weight:500;text-align:left;
+}
+[focusgroup~="menu"] button:hover,[focusgroup~="menu"] button:focus-visible{background:var(--paper2)}
+[focusgroup~="menu"] button .ic{width:15px;height:15px;color:var(--muted);flex:0 0 auto}
+
+/* Shelf Options drawer: right slide-over on desktop, full-height sheet
+   on mobile (navigation-drawer guide: a modal <dialog> in the top
+   layer, Esc + light dismiss + Close button). */
+dialog.sheet.drawerRight{
+  margin:0 0 0 auto;max-height:none;height:100vh;height:100dvh;
+  width:min(420px,100vw);border-radius:0;border:0;border-left:1px solid var(--border);
+}
+@media (prefers-reduced-motion:no-preference){
+  dialog.sheet.drawerRight:modal{animation:drawerIn .18s ease}
+  @keyframes drawerIn{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
+}
+
+/* This Shelf stats: 2x2 metric cards + storage bar (real numbers). */
+.statGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.statCard{background:var(--paper2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;min-width:0}
+.statCard b{display:block;font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
+.statCard span{font-size:12px;line-height:1.4;color:var(--muted)}
+.storageBar{height:6px;border-radius:999px;background:var(--paper2);border:1px solid var(--border);overflow:hidden}
+.storageFill{display:block;height:100%;background:var(--accent);border-radius:999px}
+
+/* Thin reading-progress bar on each shelf card. The track follows the
+   cover ink colour; the fill is the terracotta accent. */
+.bookProgress{display:block;height:3px;border-radius:999px;background:color-mix(in srgb,currentColor 22%,transparent);margin:12px 0 0;overflow:hidden}
+.bookProgress span{display:block;height:100%;background:var(--accent);border-radius:999px}
+
+/* Mobile tab bar + terracotta FAB: phone only. The dock they replace
+   is gone on desktop, so the library no longer reserves 124px at the
+   bottom there. */
+.tabBar,.libFab{display:none}
+@media (min-width:769px){
+  .layout.shelf{padding-bottom:48px}
+}
+@media (max-width:768px){
+  dialog.sheet.drawerRight{width:100vw;height:100vh;height:100dvh;max-height:100dvh;border-left:0}
+  .newWrap{display:none}
+  .chipRow{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .chipRow::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto}
+  .tabBar{
+    display:flex;position:fixed;left:0;right:0;bottom:0;z-index:45;
+    background:var(--surface);border-top:1px solid var(--border);
+    padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));gap:4px;
+  }
+  .tabBtn{
+    flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;
+    min-height:48px;padding:6px 0 4px;border:0;background:transparent;
+    color:var(--muted);font-size:11px;font-weight:600;line-height:1.2;cursor:pointer;
+  }
+  .tabBtn .ic{width:22px;height:22px}
+  .tabBtn.active{color:var(--accent)}
+  .libFab{
+    display:grid;place-items:center;position:fixed;right:16px;
+    bottom:calc(78px + env(safe-area-inset-bottom,0px));z-index:46;
+    width:56px;height:56px;border:0;border-radius:50%;
+    background:var(--accent);color:var(--accent-text);box-shadow:var(--shadow-modal);cursor:pointer;
+  }
+  .libFab .ic{width:24px;height:24px}
+  .layout.shelf{padding-bottom:160px}
 }
