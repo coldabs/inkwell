@@ -29,7 +29,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="styles.css?v=2026-11-19-r2">
+<link rel="stylesheet" href="styles.css?v=2026-11-19-r3">
 </head>
 <body>
 <!-- Icons: Tabler Icons 3.52.0, MIT, https://tabler.io/icons -->
@@ -231,11 +231,12 @@
 
     <div class="bottomBar" id="libraryBar">
       <div class="bottomBarInner">
-        <button class="btn newMain" onclick="openNewNotebook()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-plus"></use></svg> New notebook</button>
+        <button class="btn newMain" onclick="openNewNotebook()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-plus"></use></svg> <span class="prLong">New notebook</span><span class="prShort">New</span></button>
         <label class="btn outlineBlue" for="pdfImport" aria-label="Import a PDF"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-file-type-pdf"></use></svg> PDF</label>
         <input id="pdfImport" type="file" accept=".pdf" class="hidden" onchange="handleImport(event)"/>
         <label class="btn outlineBlue" for="epubImport" aria-label="Import an EPUB"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-book"></use></svg> EPUB</label>
         <input id="epubImport" type="file" accept=".epub,.txt" class="hidden" onchange="handleImport(event)"/>
+        <button class="btn outlineBlue" type="button" onclick="prOpenPicker('first')" aria-label="Parallel Read"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-columns"></use></svg> <span class="prLong">Parallel Read</span><span class="prShort">Parallel</span></button>
       </div>
     </div>
   </section>
@@ -244,7 +245,7 @@
   <section id="view-editor" class="hidden" aria-label="Notebook editor">
     <div class="editorTop">
       <button class="iconBtn" onclick="showView('library')" aria-label="Back to library" title="Back to library"><svg class="ic" aria-hidden="true"><use href="#ticon-arrow-left"></use></svg></button>
-      <button type="button" class="btn small hidden" id="backToReadingBtn" onclick="backToReading()">← Back to reading</button><div class="titleField">
+      <button type="button" class="btn small hidden" id="backToReadingBtn" onclick="backToReading()"><span class="backLong">← Back to reading</span><span class="backShort">← Back</span></button><div class="titleField">
         <label class="srOnly" for="noteTitle">Notebook title</label>
         <input id="noteTitle" value="Untitled notebook" oninput="syncTitle()"/>
       </div>
@@ -273,7 +274,7 @@
         <button class="iconBtn" onclick="undoStroke()" aria-label="Undo" title="Undo"><svg class="ic" aria-hidden="true"><use href="#ticon-undo"></use></svg></button>
         <button class="iconBtn" onclick="redoStroke()" aria-label="Redo" title="Redo"><svg class="ic" aria-hidden="true"><use href="#ticon-redo"></use></svg></button>
         <span class="tbDivider" aria-hidden="true"></span>
-        <button type="button" class="btn" id="editorMoreBtn" commandfor="editorSheet" command="show-modal">More tools <svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg></button>
+        <button type="button" class="btn" id="editorMoreBtn" commandfor="editorSheet" command="show-modal"><span class="moreLong">More tools</span><span class="moreShort">More</span> <svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg></button>
       </div>
       <div class="statusBar" id="editorStatus" aria-live="polite"><span>Page <b id="statusPage">1 / 1</b></span><span>Layer <b id="statusLayer">Ink</b></span><span><button type="button" class="btn small" onclick="editorZoomBy(0.8)" aria-label="Zoom out">−</button> Zoom <b id="statusZoom">100%</b> <button type="button" class="btn small" onclick="editorZoomBy(1.25)" aria-label="Zoom in">+</button></span><span>Tool <b id="statusTool">Pen</b></span><span class="statusSpacer"></span><span id="statusHint">One finger draws. Two fingers scroll.</span></div>
 
@@ -379,13 +380,20 @@
       <select id="themeSel" onchange="setReaderTheme(this.value)" aria-label="Reading theme"><option value="">Default</option><option value="sepia">Sepia</option><option value="dark">Night</option></select>
       <button class="btn small" onclick="readerFont(-1)" aria-label="Decrease reading font size">A−</button>
       <button class="btn small" onclick="readerFont(1)" aria-label="Increase reading font size">A+</button>
-      </div> <div class="sheetRow"><span class="prZoom hidden" id="readerZoomGroup"><button type="button" class="btn" onclick="readerZoomBy(0.8)" title="Zoom out" aria-label="Zoom out">−</button><button type="button" class="btn prZoomLabel" id="readerZoomLabel" onclick="readerZoomBy(0)" title="Reset zoom">100%</button><button type="button" class="btn" onclick="readerZoomBy(1.25)" title="Zoom in" aria-label="Zoom in">+</button></span> <button class="btn" id="sideToggle" onclick="toggleReaderSide()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-list"></use></svg> Contents</button> <button class="btn" id="bookmarkBtn" onclick="toggleBookmark()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-bookmark"></use></svg> Bookmark</button> <button class="btn" id="parallelBtn" aria-pressed="false" onclick="toggleParallelRead()" title="Open this book beside a second book" aria-label="Parallel Read"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-columns"></use></svg> Parallel Read</button></div> </section> <section class="sheetSection"> <h3>Selected text</h3> <div class="sheetRow">
-      <button class="btn" onclick="highlightSelection()">Highlight</button>
-      <button class="btn" onclick="underlineSelection()">Underline</button>
-      <button class="btn" onclick="strikeSelection()">Strikethrough</button>
-      <button class="btn" onclick="lookupSelection()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-world"></use></svg> Dictionary / Wiki</button>
+      </div> <div class="sheetRow"><span class="prZoom hidden" id="readerZoomGroup"><button type="button" class="btn" onclick="readerZoomBy(0.8)" title="Zoom out" aria-label="Zoom out">−</button><button type="button" class="btn prZoomLabel" id="readerZoomLabel" onclick="readerZoomBy(0)" title="Reset zoom">100%</button><button type="button" class="btn" onclick="readerZoomBy(1.25)" title="Zoom in" aria-label="Zoom in">+</button></span> <button class="btn" id="sideToggle" onclick="toggleReaderSide()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-list"></use></svg> Contents</button> <button class="btn" id="bookmarkBtn" onclick="toggleBookmark()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-bookmark"></use></svg> Bookmark</button></div> </section> <section class="sheetSection"> <h3>Selected text</h3> <div class="sheetRow">
+      <button class="btn" onclick="readerSheetAction(highlightSelection)">Highlight</button>
+      <button class="btn" onclick="readerSheetAction(underlineSelection)">Underline</button>
+      <button class="btn" onclick="readerSheetAction(strikeSelection)">Strikethrough</button>
+      <button class="btn" onclick="readerSheetAction(lookupSelection)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-world"></use></svg> Dictionary / Wiki</button>
       <button class="btn" onclick="openOcrPanel()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-scan"></use></svg> OCR</button>
-      <button class="btn" onclick="toggleTtsBar()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-volume"></use></svg> Listen</button> </div> <p class="sheetNote">Select words in the book first, then choose what to do with them.</p> </section> </div> </dialog>
+      <button class="btn" onclick="readerSheetAction(toggleTtsBar)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-volume"></use></svg> Listen</button> </div> <p class="sheetNote">Select words in the book first, then choose what to do with them.</p> </section> </div> </dialog>
+
+    <div id="readerSelBar" class="prSelBar hidden" role="toolbar" aria-label="Text tools">
+      <button type="button" onpointerdown="event.preventDefault()" onclick="highlightSelection()"><mark class="prSelSample">Highlight</mark></button>
+      <button type="button" onpointerdown="event.preventDefault()" onclick="underlineSelection()"><span class="prSelUnderline">Underline</span></button>
+      <button type="button" onpointerdown="event.preventDefault()" onclick="strikeSelection()"><span class="prSelStrike">Strikethrough</span></button>
+      <button type="button" onpointerdown="event.preventDefault()" onclick="lookupSelection();readerHideSelBar()">Look up</button>
+    </div>
     
     <div id="readerGrid">
       <aside class="panel" id="readerSide">
@@ -423,7 +431,7 @@
           <div class="pdfHead">
             <div><b id="pdfName">PDF</b><span class="kbd" id="pdfMeta"></span></div>
             <div class="pdfHeadActions">
-              <button class="btn small" onclick="closePdf()">Close PDF</button>
+              <button class="btn small closePdfBtn" onclick="closePdf()">Close PDF</button>
             </div>
           </div>
           <p class="kbd" id="pdfStatus">Loading PDF…</p>
@@ -463,8 +471,8 @@
     <div id="parallelRead" class="hidden" aria-label="Parallel Read">
       <div class="prBar">
         <b class="prBarTitle">Parallel Read</b>
-        <label class="kbd prBarLabel" for="prRight">Beside it</label>
-        <select id="prRight" onchange="prPickRight(this.value)" aria-label="Second book"></select>
+        <label class="kbd prBarLabel">Beside it</label>
+        <button class="btn small" type="button" id="prRightBtn" onclick="prOpenPicker('second')" aria-label="Choose the second book"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-columns"></use></svg> <span id="prRightLabel">Choose a book</span></button>
         <label class="kbd prBarLabel" for="prSync">Sync</label>
         <select id="prSync" onchange="prSetSync(this.value)" aria-label="How the two books scroll together">
           <option value="unit">By chapter / page</option>
@@ -560,7 +568,22 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<script src="app.js?v=2026-11-19-r2"></script>
+<!-- PARALLEL READ PICKER: lives outside the three views so it opens from
+     the home screen and from inside Parallel Read alike (a dialog inside a
+     display:none view would not show). -->
+<dialog class="sheet" id="prPickSheet" closedby="any" aria-labelledby="prPickTitle">
+  <div class="sheetHead"><h2 id="prPickTitle">Pick a book</h2><form method="dialog"><button class="btn" type="submit">Close</button></form></div>
+  <div class="sheetBody">
+    <section class="sheetSection"><h3>On this device</h3><div id="prPickList" class="pickList"></div><p class="sheetNote hidden" id="prPickEmpty">No other books on the shelf yet — open one from your files below.</p></section>
+    <section class="sheetSection"><h3>Or open a file</h3>
+      <div class="sheetRow"><label class="btn" for="prPickImport"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-file-text"></use></svg> Open from files</label></div>
+      <input id="prPickImport" type="file" accept=".pdf,.epub,.txt" class="hidden" onchange="prPickImport(event)"/>
+      <p class="sheetNote">Pick a PDF, EPUB or text file from your device — it is imported and opens beside the other book.</p>
+    </section>
+  </div>
+</dialog>
+
+<script src="app.js?v=2026-11-19-r3"></script>
 <script>
 /* PWA: install prompt and offline app shell. */
 (function(){
