@@ -29,7 +29,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="styles.css?v=2026-11-19-r3">
+<link rel="stylesheet" href="styles.css?v=2026-11-19-r5">
 </head>
 <body>
 <!-- Icons: Tabler Icons 3.52.0, MIT, https://tabler.io/icons -->
@@ -386,13 +386,18 @@
       <button class="btn" onclick="readerSheetAction(strikeSelection)">Strikethrough</button>
       <button class="btn" onclick="readerSheetAction(lookupSelection)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-world"></use></svg> Dictionary / Wiki</button>
       <button class="btn" onclick="openOcrPanel()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-scan"></use></svg> OCR</button>
-      <button class="btn" onclick="readerSheetAction(toggleTtsBar)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-volume"></use></svg> Listen</button> </div> <p class="sheetNote">Select words in the book first, then choose what to do with them.</p> </section> </div> </dialog>
+      <button class="btn" onclick="readerSheetAction(toggleTtsBar)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-volume"></use></svg> Listen</button> </div> <div class="sheetRow selColorRow" data-selcolor-for="sheet"><span class="tool-label">Colour</span><span class="selDots"></span><label class="selSliderWrap">Intensity <input type="range" class="selSlider" min="0.25" max="1" step="0.05" value="1" aria-label="Highlight intensity"><span class="selSliderVal">100%</span></label></div> <p class="sheetNote">Select words in the book first, then choose what to do with them.</p> </section> </div> </dialog>
 
     <div id="readerSelBar" class="prSelBar hidden" role="toolbar" aria-label="Text tools">
-      <button type="button" onpointerdown="event.preventDefault()" onclick="highlightSelection()"><mark class="prSelSample">Highlight</mark></button>
-      <button type="button" onpointerdown="event.preventDefault()" onclick="underlineSelection()"><span class="prSelUnderline">Underline</span></button>
-      <button type="button" onpointerdown="event.preventDefault()" onclick="strikeSelection()"><span class="prSelStrike">Strikethrough</span></button>
-      <button type="button" onpointerdown="event.preventDefault()" onclick="lookupSelection();readerHideSelBar()">Look up</button>
+      <button type="button" onpointerdown="event.preventDefault()" onpointerup="barAct(event,'highlight','reader')" onclick="barAct(event,'highlight','reader')"><mark class="prSelSample">Highlight</mark></button>
+      <button type="button" onpointerdown="event.preventDefault()" onpointerup="barAct(event,'underline','reader')" onclick="barAct(event,'underline','reader')"><span class="prSelUnderline">Underline</span></button>
+      <button type="button" onpointerdown="event.preventDefault()" onpointerup="barAct(event,'strike','reader')" onclick="barAct(event,'strike','reader')"><span class="prSelStrike">Strikethrough</span></button>
+      <button type="button" onpointerdown="event.preventDefault()" onpointerup="barAct(event,'dictionary','reader')" onclick="barAct(event,'dictionary','reader')">Dictionary</button>
+      <button type="button" class="selColorBtn" onpointerdown="event.preventDefault()" onpointerup="barAct(event,'color','reader')" onclick="barAct(event,'color','reader')" aria-label="Mark colour"><span class="selColorDot" aria-hidden="true"></span></button>
+    </div>
+    <div id="selColorPop" class="selColorPop hidden" role="group" aria-label="Mark colour and intensity" data-selcolor-for="pop">
+      <div class="selDots"></div>
+      <label class="selSliderWrap">Intensity <input type="range" class="selSlider" min="0.25" max="1" step="0.05" value="1" aria-label="Highlight intensity"><span class="selSliderVal">100%</span></label>
     </div>
     
     <div id="readerGrid">
@@ -526,10 +531,11 @@
       <p class="kbd prHelp">Scroll either book and the other follows. The page numbers on the left belong to the book you are using, the one with the coloured edge. Scroll them, or tap one, to move through it. Zoom the book under the pointer with Ctrl + scroll or a pinch, or the book in use with the zoom buttons. Highlighting, Listen and OCR work in the normal reader. Tap Close to get back to it.</p>
     </div>
     <div id="prSelBar" class="prSelBar hidden" role="toolbar" aria-label="Mark the selected text">
-      <button type="button" onpointerdown="event.preventDefault()" onclick="annotateSelection('highlight')"><mark class="prSelSample">Highlight</mark></button>
-      <button type="button" onpointerdown="event.preventDefault()" onclick="annotateSelection('underline')"><span class="prSelUnderline">Underline</span></button>
-      <button type="button" onpointerdown="event.preventDefault()" onclick="annotateSelection('strike')"><span class="prSelStrike">Strikethrough</span></button>
-      <button type="button" onpointerdown="event.preventDefault()" onclick="lookupSelection();prHideSelBar()">Look up</button>
+      <button type="button" onpointerdown="event.preventDefault()" onpointerup="barAct(event,'highlight','pr')" onclick="barAct(event,'highlight','pr')"><mark class="prSelSample">Highlight</mark></button>
+      <button type="button" onpointerdown="event.preventDefault()" onpointerup="barAct(event,'underline','pr')" onclick="barAct(event,'underline','pr')"><span class="prSelUnderline">Underline</span></button>
+      <button type="button" onpointerdown="event.preventDefault()" onpointerup="barAct(event,'strike','pr')" onclick="barAct(event,'strike','pr')"><span class="prSelStrike">Strikethrough</span></button>
+      <button type="button" onpointerdown="event.preventDefault()" onpointerup="barAct(event,'dictionary','pr')" onclick="barAct(event,'dictionary','pr')">Dictionary</button>
+      <button type="button" class="selColorBtn" onpointerdown="event.preventDefault()" onpointerup="barAct(event,'color','pr')" onclick="barAct(event,'color','pr')" aria-label="Mark colour"><span class="selColorDot" aria-hidden="true"></span></button>
     </div>
   </section>
 </main>
@@ -583,7 +589,7 @@
   </div>
 </dialog>
 
-<script src="app.js?v=2026-11-19-r3"></script>
+<script src="app.js?v=2026-11-19-r5"></script>
 <script>
 /* PWA: install prompt and offline app shell. */
 (function(){
