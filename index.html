@@ -439,27 +439,22 @@
     <div class="readerTop">
       <button class="iconBtn" onclick="showView('library')" aria-label="Back to library" title="Back to library"><svg class="ic" aria-hidden="true"><use href="#ticon-arrow-left"></use></svg></button>
       <div class="seg" role="tablist" aria-label="Reading mode"><button class="active" id="modeScrollBtn" onclick="setReaderMode('scroll')">Scroll</button><button id="modePageBtn" onclick="setReaderMode('page')">Page</button></div>
-      <span class="prZoom hidden" id="readerZoomGroup"><button type="button" class="btn" onclick="readerZoomBy(0.8)" title="Zoom out" aria-label="Zoom out">−</button><button type="button" class="btn prZoomLabel" id="readerZoomLabel" onclick="readerZoomBy(0)" title="Reset zoom">100%</button><button type="button" class="btn" onclick="readerZoomBy(1.25)" title="Zoom in" aria-label="Zoom in">+</button></span><button class="btn" id="sideToggle" onclick="toggleReaderSide()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-list"></use></svg> Contents</button>
-      <button class="btn" id="bookmarkBtn" onclick="toggleBookmark()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-bookmark"></use></svg> Bookmark</button>
-      <button class="btn" id="parallelBtn" aria-pressed="false" onclick="toggleParallelRead()" title="Open this book beside a second book" aria-label="Parallel Read"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-columns"></use></svg> Parallel Read</button>
-      <button class="btn" id="readerMoreBtn" aria-expanded="false" onclick="toggleReaderMore(this)"><span id="readerMoreLabel">More</span> <svg class="ic ic-sm moreChevron" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg></button>
+      <button type="button" class="btn primary hidden" id="annotateFab" onclick="annotateCurrentPdf()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-pencil"></use></svg> Annotate</button> <button class="btn" id="readerMoreBtn" commandfor="readerSheet" command="show-modal"><span id="readerMoreLabel">More</span> <svg class="ic ic-sm moreChevron" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg></button>
       <span class="readerResume" id="resumeLabel"></span>
     </div>
-    <div class="readerTop moreRow" id="readerMore">
+    <progress id="readProgress" class="readProgress" max="100" value="0"></progress> <dialog class="sheet" id="readerSheet">   <div class="sheetHead"><h2>Reading options</h2><form method="dialog"><button class="btn" type="submit">Close</button></form></div>   <div class="sheetBody">     <section class="sheetSection">       <h3>Reading</h3>       <div class="sheetRow">
       <span class="tool-label">Theme</span>
       <select id="themeSel" onchange="setReaderTheme(this.value)" aria-label="Reading theme"><option value="">Default</option><option value="sepia">Sepia</option><option value="dark">Night</option></select>
       <button class="btn small" onclick="readerFont(-1)" aria-label="Decrease reading font size">A−</button>
       <button class="btn small" onclick="readerFont(1)" aria-label="Increase reading font size">A+</button>
-      <span class="tool-label">Selected text</span>
+      </div> <div class="sheetRow"><span class="prZoom hidden" id="readerZoomGroup"><button type="button" class="btn" onclick="readerZoomBy(0.8)" title="Zoom out" aria-label="Zoom out">−</button><button type="button" class="btn prZoomLabel" id="readerZoomLabel" onclick="readerZoomBy(0)" title="Reset zoom">100%</button><button type="button" class="btn" onclick="readerZoomBy(1.25)" title="Zoom in" aria-label="Zoom in">+</button></span> <button class="btn" id="sideToggle" onclick="toggleReaderSide()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-list"></use></svg> Contents</button> <button class="btn" id="bookmarkBtn" onclick="toggleBookmark()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-bookmark"></use></svg> Bookmark</button> <button class="btn" id="parallelBtn" aria-pressed="false" onclick="toggleParallelRead()" title="Open this book beside a second book" aria-label="Parallel Read"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-columns"></use></svg> Parallel Read</button></div> </section> <section class="sheetSection"> <h3>Selected text</h3> <div class="sheetRow">
       <button class="btn" onclick="highlightSelection()">Highlight</button>
       <button class="btn" onclick="underlineSelection()">Underline</button>
       <button class="btn" onclick="strikeSelection()">Strikethrough</button>
       <button class="btn" onclick="lookupSelection()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-world"></use></svg> Dictionary / Wiki</button>
       <button class="btn" onclick="openOcrPanel()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-scan"></use></svg> OCR</button>
-      <button class="btn" onclick="toggleTtsBar()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-volume"></use></svg> Listen</button>
-    </div>
-
-    <button type="button" class="annotateFab hidden" id="annotateFab" onclick="annotateCurrentPdf()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-pencil"></use></svg> Annotate this PDF</button>
+      <button class="btn" onclick="toggleTtsBar()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-volume"></use></svg> Listen</button> </div> <p class="sheetNote">Select words in the book first, then choose what to do with them.</p> </section> </div> </dialog>
+    
     <div id="readerGrid">
       <aside class="panel" id="readerSide">
         <h4>Contents</h4>
@@ -496,7 +491,6 @@
           <div class="pdfHead">
             <div><b id="pdfName">PDF</b><span class="kbd" id="pdfMeta"></span></div>
             <div class="pdfHeadActions">
-              <button class="btn small" onclick="annotateCurrentPdf()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-pencil"></use></svg> Annotate</button>
               <button class="btn small" onclick="closePdf()">Close PDF</button>
             </div>
           </div>
