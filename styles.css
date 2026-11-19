@@ -239,7 +239,6 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 .tool.active{background:var(--text);border-color:var(--text);color:var(--surface)}
 .tool.active:hover{background:var(--text)}
 .tbDivider{width:1px;height:22px;background:var(--border);margin:0 5px;flex:0 0 auto}
-#editorMoreBtn .moreShort{display:none}
 .tbBoardBtn{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;min-height:34px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-xs);background:transparent;color:var(--text);font-size:12px;font-weight:600;white-space:nowrap}
 .tbBoardBtn:hover{background:var(--paper2)}
 .tbBoardBtn[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:var(--surface)}
@@ -277,6 +276,9 @@ input[type=color].colorPick{width:28px;height:28px;min-height:28px;flex:0 0 auto
 
 /* ---------- editor workspace ---------- */
 .editorWrap{display:grid;grid-template-columns:188px minmax(0,1fr) 252px;gap:24px;align-items:start;margin-top:18px}
+/* The editor gets a wider frame than the shelf so the page takes more of
+   a desktop screen (the 1240px cap left the stage at ~54% of 1280px). */
+body.inEditor #mainLayout{max-width:1440px}
 .editorWrap>*{min-width:0}
 .panel{background:transparent;border:0;border-top:1px solid var(--border);border-radius:0;padding:12px 0 0}
 .panel h4{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
@@ -304,7 +306,10 @@ input[type=color].colorPick{width:28px;height:28px;min-height:28px;flex:0 0 auto
 .stageWrap{display:grid;gap:16px}
 .stageWrap.split{grid-template-columns:1fr 1fr}
 .zoomScroll{overflow:auto;border-radius:var(--radius-xs)}
-.canvasShell{position:relative;overflow:hidden;background:var(--paper);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-sheet)}
+/* Clear of the floating pill toolbar: the pill sits 12px down from the
+   stage top and is ~54px tall, so without this the page title hides
+   underneath it at scroll position 0. The margin scrolls with the page. */
+.canvasShell{position:relative;overflow:hidden;background:var(--paper);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-sheet);margin-top:76px}
 .canvasStack{position:relative;width:100%}
 .canvasStack canvas{display:block;width:100%;height:auto}
 #bgCanvas{position:relative}
@@ -662,6 +667,11 @@ dialog.sheet::backdrop{background:rgba(20,16,12,.45);overflow:hidden}
   -webkit-overflow-scrolling:touch;
 }
 .sheetSection{padding:12px 0;border-top:1px solid var(--border)}
+/* Inspector option rows: same roomy flex row the old tool popover used,
+   so a label and its slider sit on one line (the Smooth label was
+   wrapping underneath its slider as a plain block). */
+.sheetSection .popRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0}
+.sheetSection .popRow input[type=range]{flex:1;min-width:110px}
 .sheetSection:first-child{border-top:0}
 .sheetSection>h3{font:600 12px/1.3 var(--font-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
 .sheetRow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -734,8 +744,6 @@ dialog.sheet::backdrop{background:rgba(20,16,12,.45);overflow:hidden}
   .tbRowTools{flex-wrap:nowrap;overflow-x:auto;gap:2px}
   .tbRowTools .tbDivider{display:none}
   .statusBar{display:none}
-  #editorMoreBtn .moreShort{display:inline}
-  #editorMoreBtn .moreLong{display:none}
   .tbRowOpts{flex-wrap:wrap;overflow:visible;gap:8px;padding:6px 0}
   .sizeGroup{flex:1 1 100%;justify-content:flex-start}
   .sizeGroup input[type=range]{flex:1;width:auto}
@@ -997,4 +1005,110 @@ dialog.sheet.drawerRight{
   }
   .libFab .ic{width:24px;height:24px}
   .layout.shelf{padding-bottom:160px}
+}
+
+/* ============ Pass 2: Notebook Studio, Floating Pill Toolbar & Insert Inspector ============
+   Gemini plan Pass 2. The editor's stacked rows collapse into one top bar
+   plus a floating pill over the canvas; the More tools sheet becomes a
+   side inspector (drawerRight) on desktop and a 4-tab bottom sheet on
+   mobile. Guides used: toolbar (role=toolbar, focusgroup roving stop,
+   aria-pressed state, separators), navigation-drawer (modal <dialog>
+   drawer, Esc/backdrop/Close dismiss), switch (native checkbox + switch
+   attribute, styled fallback), dialog (native <dialog> sheets).
+   No ids or data-* attributes were renamed; every control that lived in
+   the old toolbars/modals is still reachable. */
+
+/* --- top bar: one row; Board / Split / Export go icon-only on narrow screens --- */
+.editorTop .tbBoardBtn{flex:0 0 auto}
+#splitTopBtn{flex:0 0 auto;white-space:nowrap}
+@media (max-width:1024px){
+  .editorTop .tbLabel{display:none}
+  .editorTop .tbBoardBtn,.editorTop #splitTopBtn,.editorTop #exportBtn{min-width:44px;padding:0 10px;justify-content:center}
+}
+
+/* --- floating pill toolbar over the canvas (toolbar guide: single tab
+   stop via focusgroup, groups + separators, toggled state from
+   aria-pressed). The pill is anchored to .stageWrap so it stays put
+   while the canvas scrolls/zooms; the floating board (z-index 8) still
+   sits above it when open. --- */
+.stageWrap{position:relative}
+.toolbar{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:6;display:flex;flex-direction:row;align-items:center;gap:4px;width:max-content;max-width:calc(100% - 16px);margin-top:0;padding:4px 6px;background:var(--surface);background:color-mix(in srgb,var(--surface) 92%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:999px;box-shadow:var(--shadow-modal)}
+.toolbar .tbRow{flex:1 1 auto;min-width:0;min-height:0;width:auto;border:0}
+.toolbar [role="group"]{display:flex;align-items:center;gap:2px;flex:0 0 auto}
+.toolbar .tool[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:var(--surface)}
+.toolbar .tool[aria-pressed="true"]:hover{background:var(--text)}
+.pillInsert{flex:0 0 auto;white-space:nowrap;border-radius:999px;background:var(--accent);border-color:transparent;color:var(--accent-text)}
+.pillInsert:hover{background:var(--accent)}
+.shapePop{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);display:none;gap:2px;padding:6px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-modal);z-index:70}
+.shapePop.open{display:flex}
+.shapePop .tool{width:38px;height:38px;min-height:38px;padding:0;border:1px solid transparent;border-radius:var(--radius-xs);background:transparent;color:var(--text);display:grid;place-items:center;flex:0 0 auto}
+.shapePop .tool .ic{width:19px;height:19px}
+.shapePop .tool:hover{background:var(--paper2)}
+.shapePop .tool[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:var(--surface)}
+.toolbar.compact{padding:2px 4px}
+.toolbar.minimal .tbDivider{display:none}
+.toolbar.minimal .pillInsert .tbLabel{display:none}
+@media (pointer:coarse){
+  .shapePop .tool{width:44px;height:44px;min-height:44px}
+}
+@media (max-width:1024px){
+  .toolbar{top:8px;max-width:calc(100% - 12px)}
+  .toolbar .tbDivider{display:none}
+  .pillInsert .tbLabel{display:none}
+  .pillInsert{min-width:44px;padding:0 12px;justify-content:center}
+}
+
+/* --- tabbed left rail: Pages | Layers --- */
+.railTabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:12px}
+.railTab{flex:1;min-height:44px;padding:8px 4px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer}
+.railTab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
+
+/* --- inspector: side drawer on desktop, 4-tab bottom sheet on mobile --- */
+#editorSheet .sheetGrip{display:none}
+.sheetTabs{display:none}
+@media (max-width:768px){
+  dialog.sheet#editorSheet.drawerRight{width:min(560px,100vw);height:auto;max-height:92dvh;margin:auto auto 0;border:1px solid var(--border);border-left:1px solid var(--border);border-radius:18px 18px 0 0}
+  #editorSheet .sheetGrip{display:block;width:40px;height:5px;border-radius:999px;background:var(--border-strong);margin:10px auto 0;cursor:grab;touch-action:none;flex:none}
+  .sheetTabs{display:flex;flex:none;gap:4px;padding:0 12px;border-bottom:1px solid var(--border)}
+  .sheetTab{flex:1;min-width:0;min-height:48px;padding:8px 2px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sheetTab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
+  .sheetTabPanel[hidden]{display:none}
+}
+@media (min-width:769px){
+  .sheetTabPanel[hidden]{display:block}
+}
+
+/* --- switches (switch guide: native checkbox + switch attribute,
+   custom track/knob fallback so Chrome renders the same switch) --- */
+#editorSheet label.switchRow{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:48px;padding:8px 0;font-size:13px;font-weight:500;cursor:pointer}
+#editorSheet label.switchRow span{flex:1}
+.switchRow input[type="checkbox"][switch]{appearance:none;-webkit-appearance:none;width:48px;height:28px;min-height:28px;margin:0;border:1px solid var(--border-strong);border-radius:999px;background:var(--paper2);position:relative;cursor:pointer;flex:0 0 auto;transition:background .15s ease}
+.switchRow input[type="checkbox"][switch]::after{content:"";position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .15s ease}
+.switchRow input[type="checkbox"][switch]:checked{background:var(--accent);border-color:var(--accent)}
+.switchRow input[type="checkbox"][switch]:checked::after{transform:translateX(20px)}
+.switchRow input[type="checkbox"][switch]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.popChecks{display:grid;gap:2px}
+
+/* --- Insert 3x2 tile grid --- */
+.insertGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.insertTile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:64px;padding:10px 6px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:12px;font-weight:600;line-height:1.25;text-align:center;cursor:pointer}
+.insertTile:hover{background:var(--paper2)}
+.insertTile .ic{width:20px;height:20px;color:var(--muted)}
+.insertTile span{overflow-wrap:anywhere}
+@media (pointer:coarse){.insertTile{min-height:56px}}
+
+/* --- Page colour swatches --- */
+.pageSwatches{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pageSwatch{width:32px;height:32px;min-height:32px}
+.pageSwatch.active{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--text)}
+
+/* --- mobile: the left rail's content lives in the sheet tabs, so the rail hides --- */
+#pagesPanel.mobileMoved{display:none}
+#editorSheet .sheetGrip:active{cursor:grabbing}
+
+/* --- Long-press fix: suppress the native copy/paste callout on reader
+   prose (touch only). Selection itself is untouched (no user-select:none),
+   and the app's own selection bar keeps working off selectionchange. --- */
+@media (pointer:coarse){
+  #readerArticle, #pdfView .textLayer, #parallelRead .textLayer, #parallelRead .prPane{-webkit-touch-callout:none}
 }
