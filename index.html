@@ -141,7 +141,7 @@
         <button class="iconBtn" id="themeToggle" type="button" onclick="toggleTheme()" aria-label="Switch to dark theme" title="Switch theme">
           <svg class="ic" aria-hidden="true"><use href="#ticon-moon"></use></svg>
         </button>
-        <button class="iconBtn" type="button" onclick="toggleLibUtils(this)" aria-expanded="false" aria-controls="libUtils" aria-label="Shelf options" title="Shelf options">
+        <button class="iconBtn" type="button" commandfor="librarySheet" command="show-modal" aria-label="Shelf options" title="Shelf options">
           <svg class="ic" aria-hidden="true"><use href="#ticon-adjustments"></use></svg>
         </button>
       </div>
@@ -177,34 +177,34 @@
 
     <div id="libraryGrid" class="grid"></div>
 
-    <div id="libUtils" class="libraryUtils hidden">
-      <div class="utilsColumn">
-        <h4>Library</h4>
+    <dialog class="sheet" id="librarySheet">
+      <div class="sheetHead"><h2>Shelf options</h2><form method="dialog"><button class="btn" type="submit">Close</button></form></div>
+      <div class="sheetBody">
+      <section class="sheetSection">
+        <h3>Library</h3>
         <div class="utilsRow">
           <button class="btn" onclick="exportBackup()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-download"></use></svg> Export backup</button>
           <label class="btn" for="backupImport"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-upload"></use></svg> Restore backup</label>
           <input id="backupImport" type="file" accept=".json" class="hidden" onchange="importBackup(event)"/>
         </div>
-      </div>
-      <div class="utilsColumn">
-        <h4>Samples</h4>
+      </section>>
+      <section class="sheetSection">
+        <h3>Samples</h3>
         <div class="utilsRow">
           <button class="btn" onclick="openBook(SAMPLE_ID)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-book-2"></use></svg> Open sample book</button>
           <button class="btn" onclick="openBook(SAMPLE_PDF_ID)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-file-type-pdf"></use></svg> Open demo PDF</button>
         </div>
-      </div>
-      <div class="utilsColumn">
-        <h4>Workspace</h4>
+      </section>>
+      <section class="sheetSection">
+        <h3>Workspace</h3>
         <div class="utilsRow">
           <button class="btn" onclick="openTimer()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-clock"></use></svg> <span id="timerLabel">Focus 25:00</span></button>
-          <button class="btn" onclick="toggleAbout()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-info-circle"></use></svg> About this shelf</button>
         </div>
-      </div>
-    </div>
+      </section>>
 
-    <div id="aboutPanel" class="aboutPanel hidden">
+    <div class="sheetSection" id="aboutPanel">
       <div class="aboutIntro">
-        <h4>About this shelf</h4>
+        <h3>This shelf</h3>
         <p>Inkwell keeps handwriting, PDFs and EPUBs in one library. Everything is stored in this browser on this device, so it is here when you close the tab. Backup gives you a copy for another device.</p>
         <p class="aboutCounts">On this shelf: <b id="statNotebooks">0</b> notebooks · <b id="statBooks">0</b> books · <b id="statPages">0</b> pages · <b id="statAnnos">0</b> annotations.</p>
       </div>
@@ -218,7 +218,9 @@
       </div>
     </div>
 
-    <footer class="libraryFoot">
+        </div>
+    </dialog>
+  <footer class="libraryFoot">
       <p>Inkwell. Local-first notes and reading.</p>
       <p><a href="https://github.com/coldabs/inkwell" target="_blank" rel="noopener">Source on GitHub</a> <span aria-hidden="true">·</span> Icons by <a href="https://tabler.io/icons" target="_blank" rel="noopener">Tabler</a></p>
     </footer>
