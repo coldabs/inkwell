@@ -752,6 +752,15 @@ dialog.sheet::backdrop{background:rgba(20,16,12,.45);overflow:hidden}
   .sizeGroup{flex:1 1 100%;justify-content:flex-start}
   .sizeGroup input[type=range]{flex:1;width:auto}
   .canvasShell{border-radius:var(--radius-xs)}
+  /* Hand fix: .zoomScroll never had vertical scroll room — its height
+     was its content (scrollHeight == clientHeight at every width and
+     zoom) — so all vertical panning fell through to window.scrollBy and
+     the page scrolled away under the toolbar. Capping the stage height
+     on phones/tablets makes the page pan inside the stage, like a note
+     app; the window fallback still takes any remainder. At zoom 1 the
+     page fits the cap, so nothing changes; zoomed in, the stage gains
+     real vertical room. Desktop keeps document scrolling. */
+  .zoomScroll{max-height:max(300px,calc(100vh - 170px));max-height:max(300px,calc(100dvh - 170px))}
   .textArea{font-size:16px;min-height:96px}
   .readerTop{position:static;flex-wrap:nowrap;padding:6px 8px;gap:6px;overflow-x:auto;scrollbar-width:none}
   .readerTop::-webkit-scrollbar{display:none}
@@ -1064,6 +1073,17 @@ dialog.sheet.drawerRight{
 #mainToolbar .colorPop{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);display:none;flex-wrap:wrap;gap:8px;max-width:calc(100vw - 24px);padding:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-modal);z-index:70}
 #mainToolbar .colorPop.open{display:flex}
 #mainToolbar .colorPop .swatch{width:24px;height:24px;min-height:24px}
+/* Floating zoom control (separate − / % / +): fixed to the viewport's
+   bottom-right while editing, so it never fights the pill or the top bar
+   for place and never scrolls away with the page. Same floating-pill
+   language as the toolbar (surface, blur, border, shadow). Hidden
+   outside the editor (body.inEditor is set by showView). */
+.zoomFab{position:fixed;right:12px;bottom:12px;z-index:40;display:none;align-items:center;gap:2px;padding:4px 6px;background:var(--surface);background:color-mix(in srgb,var(--surface) 92%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:999px;box-shadow:var(--shadow-modal)}
+body.inEditor .zoomFab{display:flex}
+.zoomFabBtn{width:36px;height:36px;min-height:36px;display:grid;place-items:center;padding:0;border:1px solid transparent;border-radius:999px;background:transparent;color:var(--text)}
+.zoomFabBtn:hover{background:var(--paper2)}
+.zoomFabPct{min-width:44px;min-height:36px;padding:0 6px;border:0;border-radius:999px;background:transparent;color:var(--text);font-size:12px;font-weight:600}
+.zoomFabPct:hover{background:var(--paper2)}
 .toolbar.compact{padding:2px 4px}
 .toolbar.minimal .tbDivider{display:none}
 .toolbar.minimal .pillInsert .tbLabel{display:none}
@@ -1075,6 +1095,14 @@ dialog.sheet.drawerRight{
   .toolbar .tbDivider{display:none}
   .pillInsert .tbLabel{display:none}
   .pillInsert{min-width:44px;padding:0 12px;justify-content:center}
+  /* Hand fix: the pill gains the Hand tool, so its tools shrink from
+     44px to 36px visual at <=1024px — the 44px tap area is kept via
+     ::after (the same trick the colour dot and sheet swatches use), so
+     Select/Hand/Pen/Highlighter/Eraser/dot/Lasso/Shapes all stay
+     visible at 390px and only Undo/Redo sit in the row overflow, as
+     before. The colour dot keeps its own 24px width and wider ::after. */
+  #mainToolbar .tbRowTools .tool:not(.pillColorBtn){position:relative;width:36px;height:36px;min-height:36px}
+  #mainToolbar .tbRowTools .tool:not(.pillColorBtn)::after{content:"";position:absolute;inset:-4px}
 }
 
 /* --- tabbed left rail: Pages | Layers --- */
