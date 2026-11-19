@@ -2065,10 +2065,30 @@ function pageAction(i,act,ev){
   if(act==='down' && i<nb.pages.length-1){ let t=nb.pages[i+1]; nb.pages[i+1]=nb.pages[i]; nb.pages[i]=t; nb.cur=i+1; }
   loadPageIntoEditor();
 }
+/* Page-list thumbnails are LAZY. renderPages used to compose a full-resolution
+   (1200x1697, ~8 MB) canvas for EVERY page and keep it in p._thumb — for a
+   2000-page annotation notebook that retained ~16 GB and the tab was
+   OOM-killed when opening Annotate on a long PDF. Now each thumb is composed
+   transiently (drawn, then dropped), only for pages near the current one or
+   scrolled into view, and the thumb canvases are 150x100 (they display at
+   ~110px wide on phones). */
+let pageThumbIO=null;
+function drawPageThumb(i){
+  let nb=curNb(); if(!nb) return;
+  let p=nb.pages[i]; if(!p) return;
+  let th=document.querySelector('canvas[data-thumb="'+i+'"]'); if(!th) return;
+  let v=(p._v===undefined?-1:p._v); /* fresh pages have no _v; store -1 so "drawn" is recordable */
+  if(th._drawnV!==undefined && th._drawnV===v) return;
+  let comp=composePage(p, nb.template); /* transient: drawn, then GC'd */
+  let x=th.getContext('2d'); x.clearRect(0,0,150,100); x.fillStyle='#fff'; x.fillRect(0,0,150,100);
+  let iw=comp.width, ih=comp.height, ts=Math.min(150/iw,100/ih);
+  x.drawImage(comp,(150-iw*ts)/2,(100-ih*ts)/2,iw*ts,ih*ts);
+  th._drawnV=v;
+}
 function renderPages(){
   let nb=curNb(); if(!nb) return;
   $('pageList').innerHTML=nb.pages.map((p,i)=>{
-    return '<div class="pageThumb '+(i===nb.cur?'active':'')+'" onclick="switchPage('+i+')"><canvas width="300" height="200" data-thumb="'+i+'"></canvas>'
+    return '<div class="pageThumb '+(i===nb.cur?'active':'')+'" onclick="switchPage('+i+')"><canvas width="150" height="100" data-thumb="'+i+'"></canvas>'
     +'<div class="ptRow"><span class="kbd">Page '+(i+1)+(p.board&&p.board.strokes.length?' · board':'')+(p.bgPdf?' · PDF p.'+p.bgPdf.page:'')+'</span><span class="ptBtns">'
     +'<button class="miniBtn" title="Move up" aria-label="Move page up" onclick="pageAction('+i+',\'up\',event)">'+icon('arrow-up')+'</button>'
     +'<button class="miniBtn" title="Move down" aria-label="Move page down" onclick="pageAction('+i+',\'down\',event)">'+icon('arrow-down')+'</button>'
@@ -2076,11 +2096,11 @@ function renderPages(){
     +'<button class="miniBtn" title="Delete page" aria-label="Delete page" onclick="pageAction('+i+',\'del\',event)">'+icon('trash')+'</button></span></div></div>';
   }).join('');
   $('statEditorPages').textContent=nb.pages.length; updateStatusBar();
-  nb.pages.forEach((p,i)=>{
-    let th=document.querySelector('canvas[data-thumb="'+i+'"]'); if(!th) return;
-    if(!p._thumb || p._thumbV!==p._v){ p._thumb=composePage(p, nb.template); p._thumbV=p._v; }
-    let x=th.getContext('2d'); x.clearRect(0,0,300,200); x.fillStyle='#fff'; x.fillRect(0,0,300,200); let iw=p._thumb.width, ih=p._thumb.height, ts=Math.min(300/iw,200/ih); x.drawImage(p._thumb,(300-iw*ts)/2,(200-ih*ts)/2,iw*ts,ih*ts);
-  });
+  /* draw the pages around the current one now; the rest draw when scrolled into view */
+  for(let i=Math.max(0,nb.cur-12); i<=Math.min(nb.pages.length-1,nb.cur+12); i++) drawPageThumb(i);
+  if(pageThumbIO) pageThumbIO.disconnect();
+  pageThumbIO=new IntersectionObserver(es=>{ es.forEach(en=>{ if(en.isIntersecting){ drawPageThumb(+en.target.dataset.thumb); pageThumbIO.unobserve(en.target); } }); },{rootMargin:'300px'});
+  document.querySelectorAll('#pageList canvas[data-thumb]').forEach(c=>pageThumbIO.observe(c));
   scheduleSave();
 }
 
