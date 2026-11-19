@@ -29,7 +29,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="styles.css?v=2026-11-19-r11">
+<link rel="stylesheet" href="styles.css?v=2026-11-19-r12">
 </head>
 <body>
 <!-- Icons: Tabler Icons 3.52.0, MIT, https://tabler.io/icons -->
@@ -324,6 +324,7 @@
     <div class="toolbar" id="mainToolbar" role="toolbar" aria-label="Writing tools" focusgroup="toolbar wrap" aria-controls="inkCanvas">
       <div class="tbRow tbRowTools" aria-label="Tools">
         <button class="tool" data-tool="select" aria-pressed="false" onclick="setTool('select',this)" title="Select, drag a box around strokes to move them" aria-label="Select strokes"><svg class="ic" aria-hidden="true"><use href="#ticon-pointer"></use></svg></button>
+        <button class="tool" data-tool="hand" aria-pressed="false" onclick="setTool('hand',this)" title="Hand, scroll the page" aria-label="Hand tool"><svg class="ic" aria-hidden="true"><use href="#ticon-hand-stop"></use></svg></button>
         <div role="group" aria-label="Draw">
           <button class="tool active" data-tool="pen" aria-pressed="true" onclick="setTool('pen',this)" title="Pen, pressure sensitive" aria-label="Pen"><svg class="ic" aria-hidden="true"><use href="#ticon-pencil"></use></svg></button>
           <button class="tool" data-tool="highlighter" aria-pressed="false" onclick="setTool('highlighter',this)" title="Highlighter, separate layer" aria-label="Highlighter"><svg class="ic" aria-hidden="true"><use href="#ticon-highlighter"></use></svg></button>
@@ -403,7 +404,7 @@
             </div>
             <div id="stickyLayer"></div>
           </div></div>
-          <div id="selBar"><span class="kbd" id="selInfo">Selection</span><button class="btn small" onclick="duplicateSelection()">Duplicate</button><button class="btn small" onclick="copySelection()">Copy</button><button class="btn small" onclick="pasteSelection()">Paste</button><button class="btn small" onclick="rotateSelection(-15)">Rotate left</button><button class="btn small" onclick="rotateSelection(15)">Rotate right</button><button class="btn small" onclick="scaleSelection(0.85)">Smaller</button><button class="btn small" onclick="scaleSelection(1.18)">Bigger</button><button class="btn small" onclick="flipSelection('x')"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-flip-horizontal"></use></svg> Flip</button><button class="btn small" onclick="flipSelection('y')"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-flip-vertical"></use></svg> Flip</button><button class="btn small" onclick="bringSelectionFront()">Bring to front</button><button class="btn small danger" onclick="deleteSelection()">Delete</button><button class="btn small" onclick="clearSelection()">Clear</button><span class="kbd">Drag inside the blue box to move the selected strokes. Copy and paste work across pages.</span></div>
+          <div id="selBar"><span class="kbd" id="selInfo">Selection</span><button class="btn small" onclick="duplicateSelection()">Duplicate</button><button class="btn small" onclick="copySelection()">Copy</button><button class="btn small" onclick="pasteSelection()">Paste</button><button class="btn small" onclick="rotateSelection(-15)">Rotate left</button><button class="btn small" onclick="rotateSelection(15)">Rotate right</button><button class="btn small" onclick="scaleSelection(0.85)">Smaller</button><button class="btn small" onclick="scaleSelection(1.18)">Bigger</button><button class="btn small" onclick="flipSelection('x')"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-flip-horizontal"></use></svg> Flip</button><button class="btn small" onclick="flipSelection('y')"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-flip-vertical"></use></svg> Flip</button><button class="btn small" onclick="bringSelectionFront()">Bring to front</button><button class="btn small danger" onclick="deleteSelection()">Delete</button><button class="btn small" onclick="clearSelection()" title="Deselect the strokes (they stay on the page)">Deselect</button><span class="kbd">Drag inside the blue box to move the selected strokes. Copy and paste work across pages.</span></div>
           <div class="noteBlock">
             <div class="noteBlockHead"><span class="runningHead">Written notes</span><span class="kbd" id="wordCount">0 words</span></div>
             <textarea id="noteText" class="textArea" placeholder="Type here, or write above and use Handwriting to text. Link notebooks with [[Title]]."></textarea>
@@ -428,6 +429,15 @@
         <div class="listRow"><span>Strokes on page</span><b id="statPageStrokes">0</b></div>
         <div class="listRow"><span>Session writing</span><b id="statWrite2">0m</b></div>
       </aside>
+    </div>
+    <!-- Floating zoom control: separate − / % / + for the notebook, kept
+         out of the crowded pill and top bar. It floats at the viewport's
+         bottom-right while editing, in the same floating-pill language as
+         the toolbar; tapping the % resets to 100%. -->
+    <div class="zoomFab" id="zoomFab" role="group" aria-label="Notebook zoom">
+      <button type="button" class="zoomFabBtn" onclick="editorZoomBy(0.8)" aria-label="Zoom out" title="Zoom out"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-out"></use></svg></button>
+      <button type="button" class="zoomFabPct" id="zoomFabPct" onclick="editorZoomBy(0)" aria-label="Reset zoom to 100 percent" title="Reset zoom to 100%">100%</button>
+      <button type="button" class="zoomFabBtn" onclick="editorZoomBy(1.25)" aria-label="Zoom in" title="Zoom in"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-in"></use></svg></button>
     </div>
   </section>
 
@@ -659,7 +669,7 @@
   </div>
 </dialog>
 
-<script src="app.js?v=2026-11-19-r11"></script>
+<script src="app.js?v=2026-11-19-r12"></script>
 <script>
 /* PWA: install prompt and offline app shell. */
 (function(){
