@@ -147,7 +147,7 @@ function bgPdfImgData(bg){
 function serializeLibrary(){
   return { v:1, savedAt:Date.now(), stats:S.stats,
     items:S.items.map(it=>{
-      if(it.kind==='notebook') return {id:it.id,kind:'notebook',title:it.title,color:it.color,template:it.template,cur:it.cur,updated:it.updated,openedAt:it.openedAt||0,annotations:it.annotations||[],pdfBookId:it.pdfBookId||null,
+      if(it.kind==='notebook') return {id:it.id,kind:'notebook',title:it.title,color:it.color,template:it.template,cur:it.cur,updated:it.updated,openedAt:it.openedAt||0,annotations:it.annotations||[],pdfBookId:it.pdfBookId||null,splitBookId:it.splitBookId||null,
         pages:(it.pages||[]).map(p=>({ink:p.ink||[],hi:p.hi||[],text:p.text||'',stickies:p.stickies||[],table:p.table||null,texts:p.texts||[],texs:p.texs||[],bgColor:p.bgColor||'#fffdf6',
           images:(p.images||[]).map(im=>({id:im.id,x:im.x,y:im.y,w:im.w,h:im.h,src:im.src})),
           board:p.board?{color:p.board.color,strokes:p.board.strokes,view:p.board.view,geom:p.board.geom||null}:null,
@@ -217,7 +217,7 @@ async function restoreLibrary(token){
   for(let raw of data.items){
    try{
     if(raw.kind==='notebook'){
-      let nb={id:raw.id,kind:'notebook',title:raw.title||'Untitled notebook',color:raw.color||'#b4552d',template:raw.template||'lined',cur:raw.cur||0,updated:raw.updated||'',openedAt:raw.openedAt||0,annotations:raw.annotations||[],pdfBookId:raw.pdfBookId||null,pages:[]};
+      let nb={id:raw.id,kind:'notebook',title:raw.title||'Untitled notebook',color:raw.color||'#b4552d',template:raw.template||'lined',cur:raw.cur||0,updated:raw.updated||'',openedAt:raw.openedAt||0,annotations:raw.annotations||[],pdfBookId:raw.pdfBookId||null,splitBookId:raw.splitBookId||null,pages:[]};
       for(let rp of (raw.pages||[])){
         let p=blankPage();
         p.ink=rp.ink||[]; p.hi=rp.hi||[]; p.text=rp.text||''; p.stickies=rp.stickies||[]; p.table=rp.table||null;
@@ -832,9 +832,12 @@ function openNotebook(id){
   if(window.matchMedia('(max-width:860px)').matches) editorZoomBy(0);
   requestAnimationFrame(()=>{ renderCanvasTexts(); });
   renderLibrary();
-  /* warm this notebook's remaining page backgrounds in the background,
-     one at a time, so turning a page (or exporting) finds them ready */
-  (async()=>{ for(let pg of nb.pages){ await decodeBgPdfImg(pg); } })();
+  /* warm the next few page backgrounds in the background, one at a time,
+     so turning a page finds them ready. Warming the whole notebook used
+     to render every page of a long PDF up front — the same memory blow-up
+     as the old annotatePdf — so only the three pages after the current
+     one are warmed, and the loop stops if the user opens another book. */
+  (async()=>{ for(let k=1;k<=3 && nb.cur+k<nb.pages.length;k++){ if(S.curNbId!==id) return; await decodeBgPdfImg(nb.pages[nb.cur+k]); } })();
 }
 function syncTitle(){ let nb=curNb(); if(nb){ nb.title=$('noteTitle').value; nb.updated='Just now'; } refreshLinks(); scheduleSave(); }
 function saveEditorToModel(){
@@ -2039,6 +2042,10 @@ function loadPageIntoEditor(){
   S.selection=[]; S.selRect=null; let sb=$('selBar'); if(sb) sb.classList.remove('open');
   redrawAll(); renderStickies(); renderTable(); renderPages(); refreshLinks(); updateWordCount(); updateAudioUI(); renderCanvasTexts(); renderCanvasImages(); renderTexLayer(); let btr=$('backToReadingBtn'); if(btr) btr.classList.toggle('hidden',!nb.pdfBookId);
   if(!$('floatingBoard').classList.contains('hidden')) loadBoard();
+  /* Split View follows the notebook: refresh the pane only when the
+     book it should show has changed, so page switches never reset
+     the reader's scroll position. */
+  if(S.split){ let sb=splitBookFor(curNb()); let pane=$('splitPane'); if(pane && (sb&&sb.id)!==(pane.dataset.bookId||'')){ if(sb) renderSplitBook(pane,sb); else renderSplitPicker(pane); } }
 }
 function switchPage(i){
   let nb=curNb(); if(!nb) return;
@@ -2335,12 +2342,48 @@ function toggleSplit(){
   let fb=$('floatingBoard');
   if(fb && !fb.classList.contains('hidden') && !boardFull){ applyBoardGeom(boardGeomFromEl()); queueBoardSize(); }
   if(S.split){
-    let b=curBook()||S.items.find(i=>i.kind==='epub');
-    if(b && b.kind==='epub'){ let c=b.chapters[b.ch]; pane.innerHTML='<span class="badge">'+esc(b.title)+'</span><h3>'+esc(c.title)+'</h3>'+c.html; }
-    else if(b && b.kind==='pdf' && b.textCache){ pane.innerHTML='<span class="badge">'+esc(b.title)+'</span><h3>Page '+b.page+'</h3><p>'+esc((b.textCache[b.page]||'Open the PDF in the reader once so its text is ready here.').slice(0,2200))+'</p>'; }
-    else pane.innerHTML='<h3>Nothing to read yet</h3><p>Open or import a book and it will appear here beside your notebook.</p>';
+    let b=splitBookFor(curNb());
+    if(b) renderSplitBook(pane,b);
+    else renderSplitPicker(pane);
   }
 }
+/* Split View book picker: the pane shows the notebook's picked book
+   (persisted per notebook as splitBookId, like parallelWith on books),
+   else the book open in the reader, else a chooser of the real books.
+   Nothing is invented: an empty library keeps "Nothing to read yet". */
+function splitBookFor(nb){
+  let b=nb && nb.splitBookId ? S.items.find(i=>i.id===nb.splitBookId && (i.kind==='epub'||i.kind==='pdf')) : null;
+  if(b) return b;
+  let c=curBook();
+  return (c && (c.kind==='epub'||c.kind==='pdf')) ? c : null;
+}
+function renderSplitBook(pane,b){
+  pane.dataset.bookId=b.id;
+  let head='<div class="splitHead"><span class="badge">'+esc(b.title)+'</span><button type="button" class="btn small" onclick="splitShowPicker()">Change book</button></div>';
+  if(b.kind==='epub'){ let c=(b.chapters||[])[b.ch]||{title:'',html:''}; pane.innerHTML=head+'<h3>'+esc(c.title)+'</h3>'+c.html; }
+  else if(b.kind==='pdf'){ pane.innerHTML=head+'<h3>Page '+b.page+'</h3><p>'+esc((b.textCache[b.page]||'Open the PDF in the reader once so its text is ready here.').slice(0,2200))+'</p>'; }
+  else pane.innerHTML=head+'<h3>Nothing to read yet</h3><p>Open or import a book and it will appear here beside your notebook.</p>';
+}
+function renderSplitPicker(pane){
+  pane.dataset.bookId='';
+  let books=S.items.filter(i=>i.kind==='pdf'||i.kind==='epub');
+  if(!books.length){ pane.innerHTML='<h3>Nothing to read yet</h3><p>Open or import a book and it will appear here beside your notebook.</p>'; return; }
+  pane.innerHTML='<h3>Read beside this notebook</h3><p class="kbd">Pick a book to open beside the notebook.</p>';
+  let list=document.createElement('div');
+  books.forEach(b=>{
+    let row=document.createElement('button');
+    row.type='button'; row.className='pickRow'; row.onclick=()=>splitPickBook(b.id);
+    let meta=b.kind==='pdf' ? ((b.numPages||'?')+' pages · PDF') : (((b.chapters||[]).length)+' chapters · EPUB');
+    row.innerHTML='<span class="pickDot" style="background:'+esc(b.color||'#4a5a74')+'"></span><span class="pickMain"><b>'+esc(b.title)+'</b><span class="kbd">'+esc(meta)+'</span></span><span class="pickGo" aria-hidden="true">›</span>';
+    list.appendChild(row);
+  });
+  pane.appendChild(list);
+}
+function splitPickBook(id){
+  let nb=curNb(); if(nb){ nb.splitBookId=id; scheduleSave(); }
+  let b=S.items.find(i=>i.id===id); if(b) renderSplitBook($('splitPane'),b);
+}
+function splitShowPicker(){ renderSplitPicker($('splitPane')); }
 
 /* ============ LaTeX equations on the page (KaTeX rendering) ============ */
 const TEX_TEMPLATES={frac:'\\frac{a}{b}', sqrt:'\\sqrt{x^2 + y^2}', int:'\\int_0^1 f(x)\\,dx', sum:'\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}', matrix:'\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}', pyth:'a^2 + b^2 = c^2'};
@@ -2975,16 +3018,31 @@ function pdfRefresh(container,io){
   container.querySelectorAll('.pdfHolder').forEach(h=>{ if(h._drawn||h._drawing) pdfReleasePage(h); io.unobserve(h); io.observe(h); });
 }
 /* the whole book's text, read in the background, pages are only drawn
-   near the screen now, but search should still find text on every page */
+   near the screen now, but search should still find text on every page.
+   The fill runs a few pages per idle slot (requestIdleCallback, with a
+   timeout so it still progresses on a busy page) — the old fixed pace
+   read every page straight through at open, so a 500-page PDF spent
+   ~2s of CPU at first open and starved the reader on phones. Pages the
+   reader actually views fill the cache on demand when they are drawn
+   (renderPdfTextLayer), so the current page is searchable right away. */
 async function pdfFillTextCache(book,isLive){
   if(!book.textCache) book.textCache={};
   for(let n=1;n<=book.numPages;n++){
     if(!isLive()) return;
     if(book.textCache[n]) continue;
     try{ let tc=await (await book.doc.getPage(n)).getTextContent(); book.textCache[n]=tc.items.map(i=>i.str||'').join(' ').replace(/\s+/g,' ').trim()||(book.ocrPages&&book.ocrPages[n]?book.ocrPages[n].text||'':''); }catch(e){}
-    if(n%8===0) await new Promise(r=>setTimeout(r,30));
+    if(n%4===0) await pdfIdleSlot();
   }
   scheduleSave();
+}
+/* wait for a quiet moment on the main thread before the next batch of
+   background work; falls back to a short timer where requestIdleCallback
+   is unavailable */
+function pdfIdleSlot(){
+  return new Promise(r=>{
+    if(typeof requestIdleCallback==='function') requestIdleCallback(()=>r(),{timeout:2000});
+    else setTimeout(r,100);
+  });
 }
 /* selectable text over a drawn page; positions in CSS pixels from the page's CSS-size viewport */
 async function renderPdfTextLayer(page,cssVp,holder,book,pageNum){
@@ -3586,14 +3644,18 @@ async function annotatePdf(id){
   let existing=S.items.find(i=>i.kind==='notebook' && i.pdfBookId===id);
   if(existing){ openNotebook(existing.id); toast('Opened your annotations for this PDF'); return; }
   toast('Preparing annotation pages…');
+  /* Lazy: record each page's size only (cheap, no rasterisation) and let
+     decodeBgPdfImg render a page's background when it is actually viewed.
+     Rendering every page up front built one full-size canvas per page —
+     ~8 MB each, ~1 GB for a 120-page PDF — and crashed the tab on phones
+     when opening annotation on a long PDF. This is the same lazy shape
+     prInkNotebook already uses. */
+  let sizes=[]; try{ sizes=await pdfPageSizes(b); }catch(e){}
   let nb={id:uid(),kind:'notebook',title:'Annotations for '+b.title,color:'#1e3a5f',template:'blank',cur:0,updated:'Just now',annotations:[],pdfBookId:id,pages:[]};
   for(let n=1;n<=b.numPages;n++){
     let pg=blankPage();
-    try{ let page=await b.doc.getPage(n); let v0=page.getViewport({scale:1}); let vp=page.getViewport({scale:CW/v0.width});
-      let cv=document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
-      await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
-      pg.bgPdf={img:cv,page:n,bookTitle:b.title,w:v0.width,h:v0.height};
-    }catch(e){}
+    let sz=sizes[n-1]||[612,792];
+    pg.bgPdf={img:null,imgData:null,page:n,bookTitle:b.title,w:sz[0],h:sz[1]};
     nb.pages.push(pg);
   }
   S.items.unshift(nb); openNotebook(nb.id);
