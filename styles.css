@@ -318,7 +318,8 @@ body.inEditor #mainLayout{max-width:1440px}
 .canvasStack{position:relative;width:100%}
 .canvasStack canvas{display:block;width:100%;height:auto}
 #bgCanvas{position:relative}
-#hiCanvas,#inkCanvas{position:absolute;inset:0;height:100%}
+#hiCanvas,#inkCanvas,#liveCanvas{position:absolute;inset:0;height:100%}
+#liveCanvas{pointer-events:none}
 #inkCanvas{touch-action:none;cursor:crosshair}
 .noteBlock{margin-top:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden}
 .noteBlockHead{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--border)}
@@ -331,7 +332,26 @@ body.inEditor #mainLayout{max-width:1440px}
 #selBar{display:none;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;padding:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xs)}
 #selBar.open{display:flex}
 #selBar .kbd{font-size:11px}
-.splitPane{overflow:auto;max-height:640px;padding:20px;background:var(--paper);border:1px solid var(--border);border-radius:var(--radius-sm);margin-top:76px}
+.splitPane{overflow:auto;max-height:640px;padding:20px;background:var(--paper);border:1px solid var(--border);border-radius:var(--radius-sm);margin-top:76px;touch-action:pan-x pan-y}
+/* Split View alignment: in split mode the pane is a column — the book
+   fills the body and the controls sit in a footer UNDER it, so the page
+   starts at the pane's top edge, level with the notebook page (both
+   clear the pill with the same 76px). The pane's height is synced to
+   the notebook page in JS; align-self:start keeps it from stretching
+   to the whole notebook column. */
+.stageWrap.split .splitPane{max-height:none;padding:0;display:flex;flex-direction:column;overflow:hidden;align-self:start}
+.splitPaneBody{flex:1 1 auto;min-height:0;overflow:auto;padding:0 12px 12px}
+.splitPaneFoot{flex:none;border-top:1px solid var(--border);background:var(--surface);padding:6px 8px;display:flex;flex-direction:column;gap:6px}
+.splitPaneFoot .splitHead{margin-bottom:0;flex-wrap:nowrap}
+.splitPaneFoot .splitPdfNav{margin-bottom:0;flex-wrap:nowrap}
+.splitPaneFoot .btn{min-width:28px;padding:0 4px}
+.splitPaneFoot .splitZoomGroup .btn{min-width:28px}
+.splitHead .badge{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+/* Narrow panes: the title badge is dropped so Change + zoom fit on one
+   row — with it, the footer wrapped to three rows at phone widths and
+   the page shrank. The book is the one just picked; its title is also
+   in the picker. */
+@media (max-width:600px){ .splitPaneFoot .splitHead .badge{display:none} }
 /* Same clearance as .canvasShell: the floating pill sits over the top of
    the stage, and without this it covers the pane's book badge and
    "Change book" button on narrow widths. */
@@ -343,6 +363,8 @@ body.inEditor #mainLayout{max-width:1440px}
    canvas sizing, text layer and density cap as the main reader. */
 .splitPdfNav{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 10px}
 .splitPdfNav .kbd{flex:1;text-align:center}
+.splitZoomGroup{display:flex;align-items:center;gap:6px;margin-left:auto}
+.splitZoomGroup .btn{min-width:36px}
 #tableHost .panel{margin-top:14px;padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm)}
 table.inkTable{width:100%;border-collapse:collapse}
 table.inkTable td,table.inkTable th{border:1px solid var(--border);padding:8px;text-align:left;min-width:70px;font-size:13px}
@@ -378,6 +400,7 @@ table.inkTable td:focus{outline:2px solid var(--accent);outline-offset:-2px}
 mark{background:#F2D887;color:#1A1A1A;padding:0 2px;border-radius:2px}
 .reader.dark mark{background:#FFE98A;color:#111}
 #readerSide{position:sticky;top:76px;max-height:calc(100vh - 96px);max-height:calc(100dvh - 96px);overflow-y:auto}
+#readerSide .sideClose{display:none}
 .tocItem{padding:9px 2px;border-bottom:1px solid var(--border);color:var(--text-soft);font-size:13px;line-height:1.4;cursor:pointer}
 .tocItem:hover{color:var(--accent)}
 .thumbItem{margin-bottom:8px;padding:5px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xs);cursor:pointer}
@@ -779,7 +802,9 @@ dialog.sheet::backdrop{background:rgba(20,16,12,.45);overflow:hidden}
   .closePdfBtn{display:none}
   #readerGrid{grid-template-columns:1fr;gap:16px}
   #readerSide{display:none}
-  #readerSide.open{display:block}
+  #readerSide.open{display:block;position:fixed;top:0;left:0;bottom:0;width:min(320px,86vw);z-index:60;overflow-y:auto;margin-top:0;border-radius:0;border-right:1px solid var(--border);box-shadow:0 0 32px rgba(0,0,0,.28)}
+  #readerSide.open h4{display:flex;justify-content:space-between;align-items:center}
+  #readerSide.open .sideClose{display:inline-flex}
   #sideToggle{display:inline-flex}
   .reader{padding:24px 18px 32px;border-radius:var(--radius-xs)}
   #pdfView{padding:12px}
@@ -869,6 +894,18 @@ dialog.sheet::backdrop{background:rgba(20,16,12,.45);overflow:hidden}
   .prShort{display:inline}
   .prBody{height:calc(100vh - 116px);height:calc(100dvh - 116px);min-height:200px}
   .prHelp{display:none}
+}
+
+/* Split View on short landscape screens (phone/tablet turned sideways):
+   at these widths the pill is in normal flow above the stage, so the
+   76px clearance both panes carry is empty space — cutting it to 12px
+   pulls both panes up together (they stay aligned) and keeps the
+   pane's footer — Prev / Next / zoom — near the fold instead of below
+   it. The pane height itself is the scroller's visible window (see
+   syncSplitPaneHeight), so the footer stays reachable. */
+@media (max-height:520px) and (orientation:landscape){
+  .stageWrap.split .canvasShell,.stageWrap.split .splitPane{margin-top:12px}
+  .stageWrap.split .splitPaneFoot{padding:4px 6px;gap:4px}
 }
 
 /* Bottom sheets are centred dialogs on wider screens. */
