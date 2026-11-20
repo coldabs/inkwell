@@ -952,8 +952,8 @@ function drawBackground(){
   paintTemplate(bgX, nb.template, p);
 }
 function strokeRadius(p,size,tool,dirAng){
-  if(tool==='calligraphy'){ let f=0.22+0.78*Math.abs(Math.sin((dirAng||0)-0.785)); return Math.max(0.7, size*1.7*f*(0.45+0.55*(p.p||0.5))); }
-  return Math.max(0.6, size*(0.32+0.95*(p.p||0.5)));
+  if(tool==='calligraphy'){ let f=0.22+0.78*Math.abs(Math.sin((dirAng||0)-0.785)); return Math.max(0.7, size*1.7*f*(0.45+0.55*(p.p==null?0.5:p.p))); }
+  return Math.max(0.6, size*(0.32+0.95*(p.p==null?0.5:p.p)));
 }
 const DASH_PATTERNS={dashed:[14,10],dotted:[1.5,9],dashdot:[16,8,2.5,8]};
 function dashFor(st){ return (st.style && st.style!=='solid' && DASH_PATTERNS[st.style])? DASH_PATTERNS[st.style].map(v=>v*(0.7+st.size*0.22)) : []; }
@@ -986,7 +986,7 @@ function drawStroke(ctx,st,p){
     /* Dashed/dotted pen strokes are drawn as a dashed centreline, a filled
        outline cannot dash. Pressure still drives the line width. */
     ctx.save(); ctx.strokeStyle=col; ctx.setLineDash(dashFor(st)); ctx.lineCap='round'; ctx.lineJoin='round';
-    for(let i=1;i<pts.length;i++){ ctx.lineWidth=Math.max(0.8, st.size*(0.5+1.5*((pts[i-1].p||0.5)+(pts[i].p||0.5))/2)); ctx.beginPath(); ctx.moveTo(pts[i-1].x,pts[i-1].y); ctx.lineTo(pts[i].x,pts[i].y); ctx.stroke(); }
+    for(let i=1;i<pts.length;i++){ ctx.lineWidth=Math.max(0.8, st.size*(0.5+1.5*((pts[i-1].p==null?0.5:pts[i-1].p)+(pts[i].p==null?0.5:pts[i].p))/2)); ctx.beginPath(); ctx.moveTo(pts[i-1].x,pts[i-1].y); ctx.lineTo(pts[i].x,pts[i].y); ctx.stroke(); }
     ctx.restore(); return;
   }
   if(pts.length===1){ ctx.fillStyle=col; ctx.beginPath(); ctx.arc(pts[0].x,pts[0].y,Math.max(1.1,st.size*0.6),0,7); ctx.fill(); return; }
@@ -1475,11 +1475,53 @@ let editorZoom=1; let readerZoom=1; let readerZoomT=null;
 function editorZoomBy(f){ editorZoom= f===0? 1 : Math.max(0.5, Math.min(2.5, editorZoom*f)); S.zoom=editorZoom; $('canvasShell').style.width=(editorZoom*100)+'%'; var zl=$('zoomLabel'); if(zl) zl.textContent=Math.round(editorZoom*100)+'%'; var zs=$('zoomSlider'); if(zs) zs.value=Math.round(editorZoom*100); var zp=$('zoomFabPct'); if(zp) zp.textContent=Math.round(editorZoom*100)+'%'; updateStatusBar(); clearTimeout(zoomRescaleT); zoomRescaleT=setTimeout(rescaleCanvases,140); } function readerZoomBy(f){ readerZoom=prClampZoom(f===0?1:readerZoom*f); let b=curBook(); if(b) b.readerZoom=readerZoom; let host=$('pdfPages'); if(host) host.style.width=(readerZoom*100)+'%'; let zl3=$('readerZoomLabel'); if(zl3) zl3.textContent=Math.round(readerZoom*100)+'%'; clearTimeout(readerZoomT); readerZoomT=setTimeout(()=>{ if(host) pdfRefresh(host,pdfDrawIO); },120); } let readerPinch=null; function readerTouchStart(e){ if(!e.touches||e.touches.length!==2) return; let b=curBook(); if(!b||b.kind!=='pdf') return; let host=$('pdfPages'); if(!host) return; let a=e.touches[0],c=e.touches[1],r=host.getBoundingClientRect(); readerPinch={host:host,d0:Math.max(20,Math.hypot(a.clientX-c.clientX,a.clientY-c.clientY)),z0:readerZoom,s:1}; e.preventDefault(); host.style.transformOrigin=((a.clientX+c.clientX)/2-r.left)+'px '+((a.clientY+c.clientY)/2-r.top)+'px'; } function readerTouchMove(e){ if(!readerPinch||!e.touches||e.touches.length!==2) return; e.preventDefault(); let a=e.touches[0],c=e.touches[1]; let z=prClampZoom(readerPinch.z0*Math.hypot(a.clientX-c.clientX,a.clientY-c.clientY)/readerPinch.d0); readerPinch.s=z/readerPinch.z0; readerPinch.host.style.transform='scale('+readerPinch.s+')'; } function readerTouchEnd(e){ if(!readerPinch||(e.touches&&e.touches.length>=2)) return; let p=readerPinch; readerPinch=null; p.host.style.transform=''; p.host.style.transformOrigin=''; if(Math.abs(p.s-1)>0.02) readerZoomBy(p.s); } (function(){ let pv=$('pdfView'); if(!pv) return; pv.style.touchAction='pan-x pan-y'; pv.addEventListener('touchstart',readerTouchStart,{passive:false}); pv.addEventListener('touchmove',readerTouchMove,{passive:false}); pv.addEventListener('touchend',readerTouchEnd,{passive:false}); pv.addEventListener('touchcancel',readerTouchEnd,{passive:false}); })();
 function setPageBg(v){ let p=curPageObj(); if(!p) return; p.bgColor=v; bumpV(p); drawBackground(); renderPages(); }
 
+/* Xiaomi Focus Pen (8192 pressure levels, tilt, barrel button): pen-first
+   mode, a pressure curve with a dead zone, and a hover ring.
+   - Pen-first: once a pen has been used on this device, a finger pans
+     instead of drawing. The user can switch finger drawing back on with
+     the "Pen only" toggle in the toolbar; that choice wins over the latch.
+     Stored in localStorage (same try/catch pattern as the theme key);
+     mouse drawing is never affected. Until a pen has been used, nothing
+     changes: one finger still draws, two fingers still scroll.
+   - Pressure curve: the pen reports 0..1 over 8192 levels, so raw pressure
+     is far too jumpy at the light end. Below 0.04 nothing draws at all
+     (hover-pressure noise), above it the response is eased (power 1.25)
+     so a light stroke stays visibly thin and a firm stroke reaches full
+     width. Applies to pen + highlighter; the eraser ignores pressure.
+   - Barrel button: already mapped by applyStylusButton (button 5 / middle
+     / buttons bit 32) via the "Pen button" select. The pen's Bluetooth
+     shortcut button does NOT arrive as a pointer event in Chrome, so
+     there is nothing to map it to here.
+   - Tilt is not used: the calligraphy nib already keys off stroke
+     direction, and nothing else in the stroke engine takes an angle. */
+const PEN_DEADZONE=0.04, PEN_ONLY_KEY='inkwell-pen-only', PEN_SEEN_KEY='inkwell-pen-seen';
+let penSeen=false, penOnlyStored=null;
+try{ penSeen=localStorage.getItem(PEN_SEEN_KEY)==='1'; let v=localStorage.getItem(PEN_ONLY_KEY); penOnlyStored= v==='1'? true : v==='0'? false : null; }catch(e){}
+function penOnlyActive(){ return penOnlyStored!==null? penOnlyStored : penSeen; }
+function syncPenOnlyUI(){ let on=penOnlyActive(); document.querySelectorAll('[data-pen-only-btn]').forEach(b=>{ b.classList.toggle('active',on); b.setAttribute('aria-pressed',on?'true':'false'); }); }
+function togglePenOnly(){ let on=!penOnlyActive(); penOnlyStored=on; try{ localStorage.setItem(PEN_ONLY_KEY,on?'1':'0'); }catch(e){} syncPenOnlyUI(); toast(on? 'Pen only: the pen draws, your finger scrolls' : 'Finger drawing on again — tap Pen only to switch it back'); }
+function notePenSeen(){ if(penSeen) return; penSeen=true; try{ localStorage.setItem(PEN_SEEN_KEY,'1'); }catch(e){} syncPenOnlyUI(); toast('Pen seen — your finger now scrolls instead of drawing. Tap Pen only in the toolbar to change it.'); }
+function penPressureCurve(raw){ if(!(raw>0)) return 0; if(raw<PEN_DEADZONE) return 0; return Math.pow((raw-PEN_DEADZONE)/(1-PEN_DEADZONE),1.25); }
+/* Hover ring: a ring at the pen tip, sized to the stroke the pen would
+   make and tinted with the current colour. Moved with transform only
+   (compositor), shown/hidden with opacity. */
+let penHoverEl=null;
+function penHoverRingEl(){ if(penHoverEl) return penHoverEl; let d=document.createElement('div'); d.id='penHoverRing'; d.setAttribute('aria-hidden','true'); document.body.appendChild(d); penHoverEl=d; return d; }
+function showPenHoverRing(x,y,diameterPx,color,cursorEl){ let d=penHoverRingEl(); d.style.width=diameterPx+'px'; d.style.height=diameterPx+'px'; d.style.borderColor=color||'#18202B'; d.style.transform='translate('+(x-diameterPx/2)+'px,'+(y-diameterPx/2)+'px)'; d.style.opacity='1'; if(cursorEl) cursorEl.style.cursor='none'; }
+function hidePenHoverRing(cursorEl){ if(penHoverEl) penHoverEl.style.opacity='0'; if(cursorEl) cursorEl.style.cursor=''; }
+function penHoverMove(e){
+  if(S.tool!=='pen' && S.tool!=='calligraphy' && S.tool!=='highlighter'){ hidePenHoverRing(inkC); return; }
+  let size=+$('brushSize').value||4, rect=inkC.getBoundingClientRect(), scale=rect.width/CW;
+  let w=(S.tool==='highlighter'? size*4.5 : S.tool==='calligraphy'? size*1.7 : size*1.4)*scale;
+  showPenHoverRing(e.clientX,e.clientY,Math.max(6,w),S.color,inkC);
+}
+syncPenOnlyUI();
+
 /* pointer drawing */
 let drawing=false, curStroke=null, lastPt=null, lastT=0, eraseChanged=false;
 function canvasPos(e,r){ r=r||inkC.getBoundingClientRect(); return { x:(e.clientX-r.left)*(CW/r.width), y:(e.clientY-r.top)*(PH/r.height) }; }
 function pointerPressure(e,pt){
-  if(e.pointerType==='pen' && e.pressure && e.pressure>0) return e.pressure;
+  if(e.pointerType==='pen' && e.pressure && e.pressure>0) return penPressureCurve(e.pressure);
   if(lastPt){ let d=Math.hypot(pt.x-lastPt.x,pt.y-lastPt.y); return Math.max(0.2,Math.min(1, 1.05 - d/46)); }
   return 0.6;
 }
@@ -1500,7 +1542,7 @@ function shouldDraw(e){ return S.tool!=='hand'; }
    after the pan ends is ignored until it lifts, so lifting one finger
    never drops the other back into a stroke mid-page. A touch that lands
    while a stylus is down is treated as a palm, not a pan. */
-let inkPtrs=new Map(), panMid=null, handPan=null, panDead=new Set(), strokeUndoPushed=false, pinchZoom=null;
+let inkPtrs=new Map(), panMid=null, handPan=null, panDead=new Set(), strokeUndoPushed=false, pinchZoom=null, gesturePtr=null, strokePtr=null;
 function updateInkTouchAction(){ inkC.style.touchAction='none'; inkC.style.cursor= S.tool==='hand'? 'grab' : 'crosshair'; }
 function zoomScroller(){ return inkC.closest? inkC.closest('.zoomScroll') : null; }
 function panViewportBy(dx,dy){
@@ -1518,6 +1560,7 @@ function panViewportBy(dx,dy){
 }
 function inkPtrMid(){ let ps=Array.from(inkPtrs.values()); return ps.length>=2? {x:(ps[0].x+ps[1].x)/2, y:(ps[0].y+ps[1].y)/2} : null; } function inkPtrDist(){ let ps=Array.from(inkPtrs.values()); return ps.length>=2?Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y):0; }
 function abortGestureForPan(){
+  gesturePtr=null; strokePtr=null;
   let wasMove=!!moveDrag;
   if(curStroke){ if(strokeUndoPushed && S.undoStack.length) S.undoStack.pop(); curStroke=null; }
   liveX.clearRect(0,0,CW,PH);
@@ -1569,8 +1612,10 @@ function applyStylusButton(e){
 }
 inkC.addEventListener('pointerup',()=>{ if(barrelSavedTool!==null){ S.tool=barrelSavedTool; barrelSavedTool=null; } });
 inkC.addEventListener('pointercancel',()=>{ if(barrelSavedTool!==null){ S.tool=barrelSavedTool; barrelSavedTool=null; } });
+inkC.addEventListener('pointerleave',()=>hidePenHoverRing(inkC));
 inkC.addEventListener('pointerdown',e=>{
   inkPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY,type:e.pointerType});
+  if(e.pointerType==='pen'){ notePenSeen(); hidePenHoverRing(inkC); }
   if(inkPtrs.size===2){
     /* Second finger down: abandon whatever the first finger was doing and
        turn the gesture into a two-finger pan. Skipped when a stylus is
@@ -1585,10 +1630,12 @@ inkC.addEventListener('pointerdown',e=>{
     return;
   }
   if(inkPtrs.size>2 || panMid || panDead.has(e.pointerId)) return;
+  gesturePtr=e.pointerId; /* the pointer that starts the gesture owns it: a resting palm moving mid-gesture is ignored in pointermove */
   applyStylusButton(e);
   if(!curPageObj()) return;
-  if(S.tool==='hand'){
-    /* Hand tool: one finger pans, through the same manual pan as two fingers. */
+  if(S.tool==='hand' || (e.pointerType==='touch' && penOnlyActive())){
+    /* Hand tool: one finger pans, through the same manual pan as two fingers.
+       Pen only: with the latch on, a finger pans too — only the pen draws. */
     e.preventDefault();
     try{ inkC.setPointerCapture(e.pointerId); }catch(err){}
     handPan={x:e.clientX,y:e.clientY};
@@ -1627,20 +1674,28 @@ inkC.addEventListener('pointerdown',e=>{
     renderLive(); return;
   }
   e.preventDefault(); inkC.setPointerCapture(e.pointerId);
-  drawing=true; eraseChanged=false; snapshotUndo(); strokeUndoPushed=true;
+  drawing=true; eraseChanged=false; snapshotUndo(); strokeUndoPushed=true; strokePtr=e.pointerId;
   let pt=pt0; pt.p=pointerPressure(e,pt); lastPt=pt;
   if(S.tool==='eraser'){
     if(S.eraserMode==='whiteout'){ let pg=curPageObj(); curStroke={tool:'pen', color:(pg&&pg.bgColor)||'#fffdf6', size:Math.max(10,+$('brushSize').value*3), points:[pt]}; curStroke._layer='ink'; curStroke._whiteout=true; renderLive(); return; }
     eraseAt(pt); return;
   }
   if(isShapeTool(S.tool)){ let sx=snapVal(pt.x), sy=snapVal(pt.y); curStroke={tool:'shape', shape:S.tool, color:S.color, size:+$('brushSize').value, fill:!!$('fillTgl').checked, style:S.strokeStyle, points:[{x:sx,y:sy},{x:sx,y:sy}]}; curStroke._layer='ink'; renderLive(); return; }
-  curStroke={tool:S.tool, color:S.color, size:+$('brushSize').value, style:S.strokeStyle, points:[pt]};
+  /* Dead zone: a pen resting below 0.04 pressure starts an empty stroke;
+     points arrive with the first real press, and an empty stroke is
+     dropped on lift (see endStroke) instead of leaving a hairline. */
+  curStroke={tool:S.tool, color:S.color, size:+$('brushSize').value, style:S.strokeStyle, points:(pt.p>0?[pt]:[])};
   if(S.recording) curStroke.t=Date.now()-S.recStart;
   curStroke._layer= S.tool==='highlighter'? 'hi':'ink';
   renderLive();
 });
 inkC.addEventListener('pointermove',e=>{
   if(inkPtrs.has(e.pointerId)) inkPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY,type:e.pointerType});
+  if(e.pointerType==='pen'){
+    if(e.buttons===0 && !drawing && !panMid && !handPan && gesturePtr===null) penHoverMove(e);
+    else hidePenHoverRing(inkC);
+  }
+  if(gesturePtr!==null && e.pointerId!==gesturePtr && !panMid) return; /* a resting palm moving while another pointer owns the gesture */
   if(panMid){
     let m=inkPtrMid(); if(!m) return;
     let dx=m.x-panMid.x, dy=m.y-panMid.y; panMid=m;
@@ -1677,6 +1732,7 @@ inkC.addEventListener('pointermove',e=>{
     if(curStroke && curStroke.tool==='shape' && curStroke._compassCenter){ let c=curStroke._compassCenter; let r=Math.hypot(pt.x-c.x,pt.y-c.y); curStroke.points=[{x:c.x-r,y:c.y-r},{x:c.x+r,y:c.y+r}]; renderLive(); lastPt=pt; return; }
     if(curStroke && curStroke.tool==='shape'){ curStroke.points[1]={x:snapVal(pt.x),y:snapVal(pt.y)}; renderLive(); lastPt=pt; return; }
     if(lastPt){ let keep=1-(S.stabilize||0)/100; pt.x=lastPt.x+(pt.x-lastPt.x)*keep; pt.y=lastPt.y+(pt.y-lastPt.y)*keep; } // input stabilization (streamline): Smooth slider sets how much jitter is filtered
+    if(pt.p<=0 && curStroke && (curStroke.tool==='pen'||curStroke.tool==='calligraphy'||curStroke.tool==='highlighter')){ lastPt=pt; return; } /* dead zone: below 0.04 pressure, no point */
     if(S.tool==='eraser'){ eraseAt(pt); lastPt=pt; return; }
     if(curStroke){ curStroke.points.push(pt); renderLive(); }
     lastPt=pt;
@@ -1690,6 +1746,10 @@ function endStroke(){
   if(S.tool==='vspace'){ if(vspaceDrag) finishVspace(); return; }
   if(!drawing) return; drawing=false;
   let p=curPageObj();
+  if(curStroke && p && curStroke.points.length===0){ /* pen never pressed past the dead zone: no mark, drop the undo snapshot too */
+    if(strokeUndoPushed && S.undoStack.length) S.undoStack.pop();
+    curStroke=null; lastPt=null; strokeUndoPushed=false; return;
+  }
   if(curStroke && p){
     let layer=curStroke._layer||'ink';
     let finalStroke=curStroke;
@@ -1707,6 +1767,8 @@ function endStroke(){
 function inkPointerUp(e){
   let wasPan=!!panMid, wasHand=!!handPan;
   inkPtrs.delete(e.pointerId); panDead.delete(e.pointerId);
+  if(e.pointerId===gesturePtr) gesturePtr=null;
+  if(e.pointerId===strokePtr) strokePtr=null;
   if(wasPan){ if(inkPtrs.size<2){ panMid=null; pinchZoom=null; } return; }
   if(panDead.size) return; /* a finger left over from a pan never draws */
   if(wasHand){ handPan=null; return; }
@@ -3993,6 +4055,61 @@ function undoLastAnnotation(){
   toast(gone?'Undid last annotation':'Undo didn’t clear that mark — reopen the book to clear it');
 }
 let readerActiveTool='', readerPointerDown=false, readerAutoMarkT=null, _lastReaderTool='highlight', _armedHintShown={};
+/* Xiaomi Focus Pen in the reader: dragging the pen across text selects
+   it instead of scrolling the page, and a palm landing mid-selection
+   neither scrolls nor collapses the selection. The browser's native
+   pen-drag selection is not reliable here because #pdfView declares
+   touch-action pan-x pan-y (needed for finger scrolling), so the
+   selection is built in JS: anchor on pen pointerdown with
+   caretRangeFromPoint, extend on pen pointermove, apply on pointerup
+   through the same auto-mark timer as a touch selection. While the pen
+   selection is active, the two scroll containers get touch-action none
+   (their previous value is restored on lift) so the browser never
+   hijacks the drag as a scroll. Pen long-press: the pen pointerdown is
+   preventDefaulted, and the coarse-gated contextmenu prevention above
+   already covers the reader. */
+let penSel=null;
+function penSelTarget(e){
+  if(S.view!=='reader' || PR.on) return null;
+  let t=e.target; if(!t || !t.closest) return null;
+  if(t.closest('a,button,input,select,textarea,[contenteditable="true"]')) return null;
+  if(t.closest('#pdfView .textLayer')) return 'pdf';
+  if(t.closest('#readerArticle')) return 'epub';
+  return null;
+}
+function penSelStart(e){
+  if(!penSelTarget(e)) return false;
+  if(!document.caretRangeFromPoint) return false;
+  let r=document.caretRangeFromPoint(e.clientX,e.clientY); if(!r) return false;
+  e.preventDefault();
+  let sel=getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  let pv=$('pdfView'), rb=$('readerBody');
+  penSel={moved:false, savedTA:{pv:pv?pv.style.touchAction:'', rb:rb?rb.style.touchAction:''}};
+  if(pv) pv.style.touchAction='none'; if(rb) rb.style.touchAction='none';
+  return true;
+}
+function penSelMove(e){
+  if(!penSel || e.pointerType!=='pen' || !(e.buttons&1)) return;
+  e.preventDefault();
+  if(!document.caretRangeFromPoint) return;
+  let r=document.caretRangeFromPoint(e.clientX,e.clientY); if(!r) return;
+  let sel=getSelection(); if(!sel.rangeCount) return;
+  try{ sel.extend(r.startContainer,r.startOffset); penSel.moved=true; }catch(_){}
+}
+function penSelEnd(){
+  if(!penSel) return;
+  let pv=$('pdfView'), rb=$('readerBody');
+  if(pv) pv.style.touchAction=penSel.savedTA.pv; if(rb) rb.style.touchAction=penSel.savedTA.rb;
+  if(!penSel.moved){ let sel=getSelection(); sel.removeAllRanges(); } /* a pen tap is not a selection */
+  penSel=null;
+}
+document.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='pen'){ if(penSelStart(e)) return; }
+  else if(e.pointerType==='touch' && penSel){ e.preventDefault(); e.stopImmediatePropagation(); } /* palm during a pen selection: no scroll, no collapse, no panel close */
+},true);
+document.addEventListener('pointermove',e=>{ if(penSel) penSelMove(e); },true);
+document.addEventListener('pointerup',e=>{ if(e.pointerType==='pen') penSelEnd(); },true);
+document.addEventListener('pointercancel',e=>{ if(e.pointerType==='pen') penSelEnd(); },true);
 function toggleReaderToolPanel(forceOpen){ let p=$('readerToolPanel'); if(!p) return; let show=typeof forceOpen==='boolean'? forceOpen : p.classList.contains('hidden'); p.classList.toggle('hidden',!show); let fab=$('readerToolFab'); if(fab) fab.setAttribute('aria-expanded',show?'true':'false'); syncReaderToolUI(); }
 function toggleReaderTool(tool){
   readerActiveTool=(readerActiveTool===tool)?'':tool;
@@ -4022,9 +4139,9 @@ function syncReaderToolUI(){
   let qu=$('readerQuickUndo'); if(qu) qu.classList.toggle('hidden',!hasMarks);
 }
 function scheduleAutoReaderMark(){ clearTimeout(readerAutoMarkT); if(!readerActiveTool||readerPointerDown||PR.on||S.view!=='reader') return; readerAutoMarkT=setTimeout(()=>{ if(!readerActiveTool||readerPointerDown||PR.on||S.view!=='reader') return; let sel=readerSelection(); if(sel&&sel.toString().trim()) annotateSelection(readerActiveTool); },500); }
-document.addEventListener('pointerdown',e=>{ readerPointerDown=true; clearTimeout(readerAutoMarkT); let p=$('readerToolPanel'); if(p&&!p.classList.contains('hidden')&&!e.target.closest('#readerToolPanel')&&!e.target.closest('#readerToolFab')&&!e.target.closest('#readerFab')) toggleReaderToolPanel(false); },true);
-document.addEventListener('pointerup',()=>{ readerPointerDown=false; if(readerActiveTool&&!PR.on&&S.view==='reader') scheduleAutoReaderMark(); },true);
-document.addEventListener('pointercancel',()=>{ readerPointerDown=false; },true);
+document.addEventListener('pointerdown',e=>{ if(penSel && e.pointerType==='touch') return; /* palm during a pen selection */ readerPointerDown=true; clearTimeout(readerAutoMarkT); let p=$('readerToolPanel'); if(p&&!p.classList.contains('hidden')&&!e.target.closest('#readerToolPanel')&&!e.target.closest('#readerToolFab')&&!e.target.closest('#readerFab')) toggleReaderToolPanel(false); },true);
+document.addEventListener('pointerup',e=>{ if(penSel && e.pointerType==='touch') return; /* palm lifting must not end the pen's selection early */ readerPointerDown=false; if(readerActiveTool&&!PR.on&&S.view==='reader') scheduleAutoReaderMark(); },true);
+document.addEventListener('pointercancel',e=>{ if(penSel && e.pointerType==='touch') return; readerPointerDown=false; },true);
 /* --- "<Tool> color" bottom sheet (reference video r06: colour grid + Opacity slider) --- */
 const TOOL_COLORS=['#0A84FF','#30D158','#FFE600','#FF9F0A','#FF3B30','#BF5AF2','#64D2FF','#7EE787','#FFF3A3','#FFD9B3','#FF6482','#E84393','#FFFFFF','#E8E4DA','#AEAEB2','#6E6E73','#3A3A3C','#000000'];
 let _colorSheetTool='highlight', _toolColorGridBuilt=false;
@@ -5075,10 +5192,32 @@ function prOpenInEditor(){
   toast('The same page in the editor, everything you add here shows in Parallel Read too');
 }
 /* page coordinates (the notebook page's) of a pointer over a page */
+/* Pen hover ring on Parallel Read surfaces (same ring as the editor,
+   sized from the surface's own scale). A hovering pen has no pointerdown,
+   so it is not in PRA.ptrs — the pane is found from the event target. */
+function prHoverRec(e){
+  for(let side of ['L','R']){ let P=PR.panes[side]; if(!P) continue;
+    if(e.target && e.target.closest && e.target.closest(prSurfSel(P))) return {side:side}; }
+  return null;
+}
+function prHoverSurface(e,rec){
+  if(!rec) return null;
+  let P=PR.panes[rec.side]; if(!P) return null;
+  let h=e.target && e.target.closest? e.target.closest(prSurfSel(P)) : null;
+  return h||null;
+}
+function prHoverMove(e,rec){
+  let h=prHoverSurface(e,rec); if(!h){ hidePenHoverRing(null); return; }
+  let P=PR.panes[rec.side], n=prSurfN(h), g=prGeomOf(P,n,prInkPageOf(P,n,false),h);
+  if(!g||!g.dw) return;
+  let r=h.getBoundingClientRect(), scale=r.width/g.dw;
+  let w=(PRA.tool==='highlighter'? PRA.size*4.5 : PRA.size*1.4)*scale;
+  showPenHoverRing(e.clientX,e.clientY,Math.max(6,w),prInkColor(),h);
+}
 function prInkPoint(P,h,e){
   let r=h.getBoundingClientRect(), n=prSurfN(h), g=prGeomOf(P,n,prInkPageOf(P,n,false),h);
   let fx=(e.clientX-r.left)/r.width, fy=(e.clientY-r.top)/r.height, p;
-  if(e.pointerType==='pen' && e.pressure>0) p=e.pressure;
+  if(e.pointerType==='pen' && e.pressure>0) p=penPressureCurve(e.pressure);
   else if(PRA.last){ let d=Math.hypot(e.clientX-PRA.last.x,e.clientY-PRA.last.y); p=Math.max(0.25,Math.min(1,1.05-d/30)); } /* mouse / finger: faster = thinner */
   else p=0.6;
   return {x:g.ox+fx*g.dw, y:g.oy+fy*g.dh, p:p};
@@ -5137,10 +5276,12 @@ function prInkDown(side,e){
   if(!PR.on || !PRA.inkOn[side]) return; /* this book is not being annotated: it reads, selects and scrolls as usual */
   let P=PR.panes[side]; if(!P) return;
   PRA.ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY,type:e.pointerType,side:side});
+  if(e.pointerType==='pen') notePenSeen();
   if(PRA.barSide!==side){ PRA.barSide=side; prRenderInkBar(); }
   let all=[...PRA.ptrs.values()], touches=all.filter(p=>p.type==='touch');
   if(e.pointerType==='touch' && all.some(p=>p.type==='pen')) return;            /* a palm resting while the pen draws */
   if(touches.length>=2){ prInkCancel(); PRA.pan={side:side, mid:prMid(touches)}; e.preventDefault(); return; } /* two fingers: scroll */
+  if(e.pointerType==='touch' && penOnlyActive()){ prInkCancel(); PRA.pan={side:side, mid:{x:e.clientX,y:e.clientY}, single:e.pointerId}; e.preventDefault(); return; } /* Pen only: one finger scrolls */
   if(PRA.pan) return;
   let h=e.target.closest && e.target.closest(prSurfSel(P)); if(!h || !P.el.contains(h) || !prSurfReady(P,h)) return;
   e.preventDefault();
@@ -5151,7 +5292,7 @@ function prInkDown(side,e){
   if(SHAPE_TOOLS.indexOf(PRA.tool)>=0){
     PRA.stroke={tool:'shape', shape:PRA.tool, color:PRA.penColor, size:PRA.size, fill:!!PRA.fill && (PRA.tool==='rect'||PRA.tool==='ellipse'), style:PRA.style, points:[{x:pt.x,y:pt.y},{x:pt.x,y:pt.y}]};
   } else {
-    PRA.stroke={tool:PRA.tool, color:prInkColor(), size:PRA.size, style: PRA.tool==='highlighter'? 'solid' : PRA.style, points:[pt]};
+    PRA.stroke={tool:PRA.tool, color:prInkColor(), size:PRA.size, style: PRA.tool==='highlighter'? 'solid' : PRA.style, points:(pt.p>0?[pt]:[])};
   }
   PRA.strokeHolder=h; PRA.strokeSide=side; PRA.strokePtr=e.pointerId; PRA.last={x:e.clientX,y:e.clientY};
   prRenderInk(P,h);
@@ -5159,7 +5300,9 @@ function prInkDown(side,e){
 function prInkMove(e){
   if(!PRA.inkOn.L && !PRA.inkOn.R) return;
   let rec=PRA.ptrs.get(e.pointerId); if(rec){ rec.x=e.clientX; rec.y=e.clientY; }
+  if(e.pointerType==='pen' && e.buttons===0 && !PRA.stroke && !PRA.pan && !PRA.erase){ prHoverMove(e,rec||prHoverRec(e)); } else if(e.pointerType==='pen'){ hidePenHoverRing(prHoverSurface(e,rec)); }
   if(PRA.pan){
+    if(PRA.pan.single){ let r2=PRA.ptrs.get(PRA.pan.single); if(!r2) return; let P=PR.panes[PRA.pan.side]; if(P){ P.el.scrollTop-=(r2.y-PRA.pan.mid.y); P.el.scrollLeft-=(r2.x-PRA.pan.mid.x); } PRA.pan.mid={x:r2.x,y:r2.y}; e.preventDefault(); return; }
     let touches=[...PRA.ptrs.values()].filter(p=>p.type==='touch'); if(touches.length<2) return;
     let m=prMid(touches), P=PR.panes[PRA.pan.side];
     if(P){ P.el.scrollTop-=(m.y-PRA.pan.mid.y); P.el.scrollLeft-=(m.x-PRA.pan.mid.x); }
@@ -5171,19 +5314,20 @@ function prInkMove(e){
   e.preventDefault();
   let P=PR.panes[PRA.strokeSide], h=PRA.strokeHolder; if(!P) return;
   if(PRA.stroke.tool==='shape'){ let pt=prInkPoint(P,h,e); PRA.stroke.points[1]={x:pt.x,y:pt.y}; }
-  else (e.getCoalescedEvents? e.getCoalescedEvents() : [e]).forEach(ev=>{ PRA.stroke.points.push(prInkPoint(P,h,ev)); PRA.last={x:ev.clientX,y:ev.clientY}; });
+  else (e.getCoalescedEvents? e.getCoalescedEvents() : [e]).forEach(ev=>{ let q=prInkPoint(P,h,ev); if(q.p<=0) return; /* dead zone */ PRA.stroke.points.push(q); PRA.last={x:ev.clientX,y:ev.clientY}; });
   if(!PRA.raf) PRA.raf=requestAnimationFrame(()=>{ PRA.raf=0; if(PRA.stroke && PR.panes[PRA.strokeSide]) prRenderInk(PR.panes[PRA.strokeSide],PRA.strokeHolder); });
 }
 function prInkUp(e){
   if(!PRA.ptrs.has(e.pointerId)) return;
   PRA.ptrs.delete(e.pointerId);
-  if(PRA.pan){ if([...PRA.ptrs.values()].filter(p=>p.type==='touch').length<2) PRA.pan=null; return; }
+  if(PRA.pan){ if(PRA.pan.single){ if(e.pointerId===PRA.pan.single) PRA.pan=null; return; } if([...PRA.ptrs.values()].filter(p=>p.type==='touch').length<2) PRA.pan=null; return; }
   if(PRA.erase){ if(e.pointerId===PRA.erase.ptr){ PRA.erase=null; prRenderInkBar(); } return; }
   if(!PRA.stroke || e.pointerId!==PRA.strokePtr) return; /* a palm lifting does not end the pen's stroke */
   let st=PRA.stroke, side=PRA.strokeSide, P=PR.panes[side], h=PRA.strokeHolder;
   PRA.stroke=null; PRA.strokeHolder=null; PRA.strokeSide=null; PRA.strokePtr=null; PRA.last=null;
   if(!P || !h) return;
   if(st.tool==='shape' && Math.hypot(st.points[1].x-st.points[0].x, st.points[1].y-st.points[0].y)<3){ prRenderInk(P,h); return; } /* a tap is not a shape */
+  if(st.points.length===0){ prRenderInk(P,h); return; } /* pen never pressed past the dead zone */
   let n=prSurfN(h), pg=prInkPageOf(P,n,true);
   prInkSnapshot(P.book,pg,n);
   (st.tool==='highlighter'? pg.hi : pg.ink).push(st); S.stats.strokes++; bumpV(pg);
