@@ -764,6 +764,7 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px);over
   .masthead{grid-template-columns:auto minmax(220px,1fr) auto;gap:12px}
   .editorWrap{grid-template-columns:1fr}
   .editorWrap .stageWrap{order:-1}
+  #linksToggleBtn{display:inline-flex}
   #pageList{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
   #pageList .pageThumb{margin-bottom:0}
   .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-top:12px}
@@ -1204,8 +1205,24 @@ body.inEditor .zoomFab{display:flex}
 .pageSwatch{width:32px;height:32px;min-height:32px}
 .pageSwatch.active{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--text)}
 
-/* --- mobile: the left rail's content lives in the sheet tabs, so the rail hides --- */
-#pagesPanel.mobileMoved{display:none}
+/* --- mobile: a side panel hidden by the mobileMoved class stays out of
+   the layout entirely — the left rail (its content moved to the sheet
+   tabs) and the links panel (closed by default, one tap away) both
+   use it, so the page fills the screen. --- */
+.panel.side.mobileMoved{display:none}
+/* "This notebook" as Gemini's desktop mockup draws it: one compact row,
+   big number over a small label, three across — the rail keeps its
+   stats without the old full-width rows. */
+.statRow3{display:flex;gap:6px;padding:4px 0 2px}
+.statCell{flex:1;min-width:0;text-align:center}
+.statNum{font-size:22px;font-weight:700;line-height:1.15}
+.statLabel{font-size:12px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* The Links toggle lives in the editor top bar but only matters where
+   the panel can be closed (≤1024px); on wider screens the panel is
+   always open, so the button stays hidden. (Scoped to min-width:1025px:
+   a bare display:none here would beat the ≤1024px inline-flex rule
+   below it in the cascade, hiding the toggle everywhere.) */
+@media (min-width:1025px){#linksToggleBtn{display:none}}
 #editorSheet .sheetGrip:active{cursor:grabbing}
 
 /* --- Long-press fix: suppress the native copy/paste callout on reader
