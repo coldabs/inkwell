@@ -1,6 +1,15 @@
 /* ============ utils ============ */
 function $(id){return document.getElementById(id)}
 let _uid=1; function uid(){return 'id'+(Date.now().toString(36))+(_uid++)}
+/* Marks saved before r21 carry no id, so undo could never match their
+   spans. Give each id-less annotation a fresh id when a book is loaded
+   or restored; the id only targets the mark's spans. Returns true when
+   at least one id was assigned. */
+function backfillAnnoIds(list){
+  let changed=false;
+  (list||[]).forEach(a=>{ if(a&&!a.id){ a.id=uid(); changed=true; } });
+  return changed;
+}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 let toastT=null;
 function toast(msg,ms){let t=$('toast');t.textContent=msg;t.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>t.style.display='none',ms||2600)}
@@ -267,6 +276,12 @@ async function restoreLibrary(token){
      running (e.g. on the starter shelf) survives the swap */
   let preExisting=S.items.filter(i=> items.every(r=>r.id!==i.id));
   S.items=items.concat(preExisting);
+  /* Backfill ids for legacy marks (see backfillAnnoIds): without an id
+     undo cannot match a mark's spans, so every id-less annotation gets
+     one now, and the list is re-saved so the ids stick. */
+  let backfilled=false;
+  S.items.forEach(it=>{ if(it.annotations&&backfillAnnoIds(it.annotations)) backfilled=true; });
+  if(backfilled) scheduleSave();
   return true;
 }
 /* Turn a PDF book's stored bytes into a readable pdf.js doc, on demand.
@@ -3006,7 +3021,7 @@ function importBackup(e){
           pages:(nb.pages&&nb.pages.length?nb.pages:[{}]).map(p=>({ink:p.ink||[],hi:p.hi||[],text:p.text||'',stickies:p.stickies||[],table:p.table||null,texts:p.texts||[],texs:p.texs||[],images:(p.images||[]).map(im=>({id:uid(),x:im.x,y:im.y,w:im.w,h:im.h,src:im.src})),bgColor:p.bgColor||'#fffdf6',board:p.board?{color:p.board.color,strokes:p.board.strokes,view:p.board.view||{x:0,y:0,k:1},geom:p.board.geom||null}:null,audio:null,bgPdf:p.bgPdf?{img:null,page:p.bgPdf.page,bookTitle:p.bgPdf.bookTitle}:null}))};
         S.items.unshift(item);
       });
-      (data.bookNotes||[]).forEach(bn=>{ let b=S.items.find(i=>i.title===bn.title && i.kind===bn.kind); if(b){ b.bookmarks=bn.bookmarks||b.bookmarks; b.annotations=bn.annotations||b.annotations; b.parallelNotes=bn.parallelNotes||{}; } });
+      (data.bookNotes||[]).forEach(bn=>{ let b=S.items.find(i=>i.title===bn.title && i.kind===bn.kind); if(b){ b.bookmarks=bn.bookmarks||b.bookmarks; b.annotations=bn.annotations||b.annotations; backfillAnnoIds(b.annotations); b.parallelNotes=bn.parallelNotes||{}; } });
       relinkPdfBackgrounds();
       renderLibrary(); toast('Backup restored. '+data.notebooks.length+' notebook(s)');
     }catch(err){ toast('That file is not a readable Inkwell backup'); }
@@ -3890,7 +3905,93 @@ function annotateSelection(kind){
 }
 function highlightSelection(){ annotateSelection('highlight'); }
 function underlineSelection(){ annotateSelection('underline'); }
-function undoLastAnnotation(){ let b=curBook(); if(!b||!b.annotations||!b.annotations.length){ toast('Nothing to undo'); return; } let last=b.annotations.pop(); if(last&&last.id){ document.querySelectorAll('[data-hl][data-anno-id="'+last.id+'"]').forEach(el=>{ let p=el.parentNode; while(el.firstChild) p.insertBefore(el.firstChild,el); p.removeChild(el); p.normalize(); }); } renderReaderSide(); renderLibrary(); syncReaderToolUI(); scheduleSave(); toast('Undid last annotation'); }
+/* Undo fallback: a mark whose spans cannot be found by id (legacy marks
+   saved before r21 carry no id) is removed by repainting its page or
+   chapter from the annotation list, which no longer holds it. Only the
+   text-layer wrappers are stripped and re-applied — the same wrap the
+   layer does when it is first drawn — so the PDF canvas is untouched.
+   Each repaint returns 'removed' (spans were on screen and are gone),
+   'absent' (the page/chapter is not in the DOM, so the mark is not
+   visible), or 'kept' (repainted, but the mark is still there). */
+function unwrapMarkSpans(root){
+  root.querySelectorAll('[data-hl]').forEach(el=>{
+    let p=el.parentNode;
+    while(el.firstChild) p.insertBefore(el.firstChild,el);
+    p.removeChild(el);
+  });
+  root.normalize();
+}
+function repaintPdfLayerMarks(layer,b,pageNum){
+  let before=layer.querySelectorAll('[data-hl]').length;
+  if(!before) return 'absent';
+  unwrapMarkSpans(layer);
+  (b.annotations||[]).forEach(a=>{
+    if(a.where==='PDF page '+pageNum)
+      (wrapTextAcross(layer,a.text,a.kind||'highlight',a.color,a.opacity,a.id)||wrapTextOnce(layer,a.text,a.kind||'highlight',a.color,a.opacity,a.id));
+  });
+  return layer.querySelectorAll('[data-hl]').length<before ? 'removed' : 'kept';
+}
+function repaintPdfMarksForUndo(b,pageNum){
+  let out='absent';
+  document.querySelectorAll('#pdfPages .pdfPage[data-page="'+pageNum+'"] .textLayer').forEach(layer=>{
+    let r=repaintPdfLayerMarks(layer,b,pageNum);
+    if(r==='removed') out='removed'; else if(r==='kept') out='kept';
+  });
+  if(PR.on){ ['L','R'].forEach(s=>{
+    let P=PR.panes[s]; if(!P||P.book!==b||!P.el) return;
+    let pg=P.el.querySelector('.pdfPage[data-page="'+pageNum+'"]');
+    let layer=pg&&pg.querySelector('.textLayer'); if(!layer) return;
+    let r=repaintPdfLayerMarks(layer,b,pageNum);
+    if(r==='removed') out='removed'; else if(r==='kept') out='kept';
+  }); }
+  return out;
+}
+function repaintEpubMarksForUndo(b,chapterIdx){
+  let container = b.mode==='page'
+    ? (chapterIdx===b.ch ? $('readerBody') : null)
+    : document.querySelector('[data-ch="'+chapterIdx+'"]');
+  if(!container) return 'absent';
+  let before=container.querySelectorAll('[data-hl]').length;
+  if(!before) return 'absent';
+  unwrapMarkSpans(container);
+  reapplyAnnotations();
+  return container.querySelectorAll('[data-hl]').length<before ? 'removed' : 'kept';
+}
+function undoLastAnnotation(){
+  let b=curBook();
+  if(!b||!b.annotations||!b.annotations.length){ toast('Nothing to undo'); return; }
+  let last=b.annotations.pop();
+  let unwrapped=0;
+  if(last&&last.id){
+    document.querySelectorAll('[data-hl][data-anno-id="'+last.id+'"]').forEach(el=>{
+      unwrapped++;
+      let p=el.parentNode;
+      while(el.firstChild) p.insertBefore(el.firstChild,el);
+      p.removeChild(el); p.normalize();
+    });
+  }
+  let gone = last&&last.id
+    ? document.querySelectorAll('[data-hl][data-anno-id="'+last.id+'"]').length===0
+    : true; /* no id to match: only the repaint below can clear the mark */
+  if(!unwrapped){
+    /* Legacy mark, or a mark whose spans were never drawn: repaint its
+       page or chapter from the list, which no longer holds it. */
+    try{
+      let res='absent';
+      if(b.kind==='pdf'){
+        let m=/PDF page\s+(\d+)/.exec(last&&last.where||'');
+        res=repaintPdfMarksForUndo(b, m? +m[1] : (b.page||1));
+      } else {
+        let m=/Chapter\s+(\d+)/.exec(last&&last.where||'');
+        res=repaintEpubMarksForUndo(b, m? (+m[1]-1) : (b.ch||0));
+      }
+      if(last&&last.id) gone=document.querySelectorAll('[data-hl][data-anno-id="'+last.id+'"]').length===0;
+      else gone=(res!=='kept');
+    }catch(e){ gone=false; }
+  }
+  renderReaderSide(); renderLibrary(); syncReaderToolUI(); scheduleSave();
+  toast(gone?'Undid last annotation':'Undo didn’t clear that mark — reopen the book to clear it');
+}
 let readerActiveTool='', readerPointerDown=false, readerAutoMarkT=null, _lastReaderTool='highlight', _armedHintShown={};
 function toggleReaderToolPanel(forceOpen){ let p=$('readerToolPanel'); if(!p) return; let show=typeof forceOpen==='boolean'? forceOpen : p.classList.contains('hidden'); p.classList.toggle('hidden',!show); let fab=$('readerToolFab'); if(fab) fab.setAttribute('aria-expanded',show?'true':'false'); syncReaderToolUI(); }
 function toggleReaderTool(tool){
@@ -4731,7 +4832,7 @@ function prAnnotateSelection(kind){
 function prReapplyEpubMarks(P){
   (P.book.annotations||[]).forEach(a=>{
     let m=/Chapter\s+(\d+)/.exec(a.where||''); if(!m) return;
-    let sec=P.el.querySelector('section[data-unit="'+(+m[1]-1)+'"]'); if(sec) (wrapTextAcross(sec,a.text,a.kind||'highlight',a.color,a.opacity)||wrapTextOnce(sec,a.text,a.kind||'highlight',a.color,a.opacity));
+    let sec=P.el.querySelector('section[data-unit="'+(+m[1]-1)+'"]'); if(sec) (wrapTextAcross(sec,a.text,a.kind||'highlight',a.color,a.opacity,a.id)||wrapTextOnce(sec,a.text,a.kind||'highlight',a.color,a.opacity,a.id));
   });
 }
 /* the little bar beside a selection */
