@@ -201,7 +201,7 @@ function decodeBgPdfImg(p){
   if(!p || !p.bgPdf || p.bgPdf.img) return Promise.resolve();
   if(p.bgPdf._decodeP) return p.bgPdf._decodeP;
   let work;
-  if(p.bgPdf.imgData) work=dataUrlToCanvas(p.bgPdf.imgData).then(c=>{ p.bgPdf.img=c; });
+  if(p.bgPdf.imgData) work=dataUrlToCanvas(p.bgPdf.imgData).then(c=>{ p.bgPdf.img=c; bumpV(p); /* refresh its thumbnail and save the picture, same as the PDF-draw path below */ });
   else {
     /* no stored picture yet, a page of an annotation notebook started from Parallel Read: draw it
        from the PDF itself, once, at the editor's page width (then it is saved like any other) */
@@ -217,7 +217,7 @@ function decodeBgPdfImg(p){
       bumpV(p); /* refresh its thumbnail and save the picture */
     })();
   }
-  p.bgPdf._decodeP=work.catch(()=>{}).then(()=>{ p.bgPdf._decodeP=null; let nb=curNb(); if(nb && nb.pages[nb.cur]===p && S.view==='editor'){ redrawAll(); renderPages(); } syncSplitPaneHeight(); splitRefitCurrentPage(); });
+  p.bgPdf._decodeP=work.catch(()=>{}).then(()=>{ p.bgPdf._decodeP=null; let nb=curNb(); if(nb && nb.pages[nb.cur]===p && S.view==='editor'){ redrawAll(); renderPages(); } /* the page's background just landed — refresh its thumbnail too, so the Pages panel shows the PDF preview instead of the blank template it was drawn with before the decode. This also covers warmed pages and the stored-picture path, whose decodes never reach renderPages. */ if(p.bgPdf && p.bgPdf.img && nb && nb.pages.indexOf(p)>=0) drawPageThumb(nb.pages.indexOf(p)); syncSplitPaneHeight(); splitRefitCurrentPage(); });
   return p.bgPdf._decodeP;
 }
 async function restoreLibrary(token){
@@ -2197,7 +2197,7 @@ function renderPages(){
   /* draw the pages around the current one now; the rest draw when scrolled into view */
   for(let i=Math.max(0,nb.cur-12); i<=Math.min(nb.pages.length-1,nb.cur+12); i++) drawPageThumb(i);
   if(pageThumbIO) pageThumbIO.disconnect();
-  pageThumbIO=new IntersectionObserver(es=>{ es.forEach(en=>{ if(en.isIntersecting){ drawPageThumb(+en.target.dataset.thumb); pageThumbIO.unobserve(en.target); } }); },{rootMargin:'300px'});
+  pageThumbIO=new IntersectionObserver(es=>{ es.forEach(en=>{ if(en.isIntersecting){ let i=+en.target.dataset.thumb; drawPageThumb(i); let pg=curNb()&&curNb().pages[i]; /* keep watching until the page's PDF background has landed, so a thumbnail first drawn blank (before its decode) is redrawn with the preview when the user scrolls to it */ if(!pg||!pg.bgPdf||pg.bgPdf.img) pageThumbIO.unobserve(en.target); } }); },{rootMargin:'300px'});
   document.querySelectorAll('#pageList canvas[data-thumb]').forEach(c=>pageThumbIO.observe(c));
   scheduleSave();
 }
@@ -4002,7 +4002,7 @@ async function annotatePdf(id){
   let b=S.items.find(i=>i.id===id); if(!b||b.kind!=='pdf') return;
   if(!b.doc){ let ok=await ensurePdfDoc(b); if(!ok){ toast('This PDF\u2019s file could not be restored from this browser. Import the file again to annotate it.'); return; } }
   let existing=S.items.find(i=>i.kind==='notebook' && i.pdfBookId===id);
-  if(existing){ openNotebook(existing.id); toast('Opened your annotations for this PDF'); return; }
+  if(existing){ /* land on the page the user was reading (b.page, kept in sync by backToReading) instead of a stale last page: a notebook restored from an earlier session used to open on whatever page it was left on, which could be a blank page added at the end, and looked as if no PDF had loaded at all */ let pg=Math.max(1,Math.min(b.numPages||existing.pages.length,b.page||1)); let idx=existing.pages.findIndex(p=>p.bgPdf && p.bgPdf.page===pg); existing.cur= idx>=0 ? idx : Math.max(0,Math.min(existing.pages.length-1,pg-1)); openNotebook(existing.id); toast('Opened your annotations for this PDF'); return; }
   toast('Preparing annotation pages…');
   /* Lazy: record each page's size only (cheap, no rasterisation) and let
      decodeBgPdfImg render a page's background when it is actually viewed.
