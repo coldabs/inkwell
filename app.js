@@ -2241,6 +2241,40 @@ function switchPage(i){
   let nb=curNb(); if(!nb) return;
   saveEditorToModel(); nb.cur=i; S.undoStack=[]; S.redoStack=[];
   loadPageIntoEditor();
+  /* Tablet/phone flow: the thumbnails sit below the stage in the
+     single-column layout, so after jumping to a page from them, bring
+     the editor back into view — otherwise the new page loads above the
+     fold and the tap looks like it did nothing. Scroll the TOOLBAR,
+     not the canvas shell: the shell's top would land at the viewport
+     top and the pill toolbar would slide up under the sticky editor
+     top bar (its title input then eats taps meant for the pill — that
+     is exactly how the Hand button went dead on tablets). block:
+     'nearest' only scrolls when the toolbar is actually out of view
+     (same pattern as toggleBoard), so chevron taps at the top of the
+     page are untouched; scroll-margin-top on #mainToolbar clears the
+     sticky bar. */
+  if(window.matchMedia('(max-width:1024px)').matches){ var tb=$('mainToolbar'); if(tb) tb.scrollIntoView({block:'nearest'}); }
+}
+/* Page-navigation pill: step one page, clamping at the ends (the buttons
+   are disabled there too, so this is a second guard, not the only one). */
+function editorPageStep(d){
+  let nb=curNb(); if(!nb) return;
+  let i=nb.cur+d; if(i<0 || i>=nb.pages.length) return;
+  switchPage(i);
+}
+/* Page-navigation pill label: jump to the thumbnails. On phones the
+   thumbnails live in the inspector's Page tab (layoutEditorSheet moves
+   #railPages there at <=768px); on tablets (769-1024px) they stay in
+   #pagesPanel, which is stacked below the stage in the single-column
+   layout — so reveal that panel instead of opening an inspector tab
+   that has no thumbnails in it. */
+function openPageNavList(){
+  if(window.matchMedia('(max-width:768px)').matches){ openInspector('page'); return; }
+  var pp=$('pagesPanel'); if(!pp) return;
+  switchRailTab('pages');
+  var cur=document.querySelector('#pageList .pageThumb.active');
+  if(cur) cur.scrollIntoView({block:'nearest'});
+  else pp.scrollIntoView({block:'nearest'});
 }
 function addPage(){ let nb=curNb(); if(!nb) return; saveEditorToModel(); nb.pages.push(blankPage()); nb.cur=nb.pages.length-1; S.undoStack=[]; S.redoStack=[]; loadPageIntoEditor(); toast('Page added'); }
 function pageAction(i,act,ev){
@@ -2937,7 +2971,14 @@ function openInspector(section){
 function closeAllPopovers(){ closeAllToolPops(); closeExportPop(); }
 const TOOL_LABELS={pen:'Pen',calligraphy:'Calligraphy',highlighter:'Highlighter',eraser:'Eraser',hand:'Hand',select:'Select',text:'Text',line:'Line',rect:'Rectangle',ellipse:'Ellipse',arrow:'Arrow',spline:'Spline',compass:'Compass',lasso:'Lasso',vspace:'Vertical space'};
 function updateToolOptsUI(){ var label=TOOL_LABELS[S.tool]||'Tool'; var btn=$('toolOptsBtn'); if(btn) btn.innerHTML=label+' options '+icon('chevron-down','ic-sm'); var title=$('toolOptsTitle'); if(title) title.textContent=label+' options'; document.querySelectorAll('.toolOptSection').forEach(sec=>{ var tools=(sec.getAttribute('data-tools')||'').split(/\s+/); sec.classList.toggle('show', tools.indexOf(S.tool)>=0); }); }
-function updateStatusBar(){ var nb=curNb(); var sp=$('statusPage'); if(sp && nb) sp.textContent=(nb.cur+1)+' / '+nb.pages.length; var sl=$('statusLayer'); if(sl){ var inkOn=!$('layerInkTgl')||$('layerInkTgl').checked; var hiOn=!$('layerHiTgl')||$('layerHiTgl').checked; sl.textContent= S.tool==='highlighter'?'Highlight': (inkOn&&hiOn?'Ink + Highlight': inkOn?'Ink': hiOn?'Highlight':'None'); } var sz=$('statusZoom'); if(sz) sz.textContent=Math.round((typeof editorZoom!=='undefined'?editorZoom:1)*100)+'%'; var st=$('statusTool'); if(st) st.textContent=TOOL_LABELS[S.tool]||S.tool; }
+function updateStatusBar(){ var nb=curNb(); var sp=$('statusPage'); if(sp && nb) sp.textContent=(nb.cur+1)+' / '+nb.pages.length; var sl=$('statusLayer'); if(sl){ var inkOn=!$('layerInkTgl')||$('layerInkTgl').checked; var hiOn=!$('layerHiTgl')||$('layerHiTgl').checked; sl.textContent= S.tool==='highlighter'?'Highlight': (inkOn&&hiOn?'Ink + Highlight': inkOn?'Ink': hiOn?'Highlight':'None'); } var sz=$('statusZoom'); if(sz) sz.textContent=Math.round((typeof editorZoom!=='undefined'?editorZoom:1)*100)+'%'; var st=$('statusTool'); if(st) st.textContent=TOOL_LABELS[S.tool]||S.tool;
+  /* Page-navigation pill: same numbers as the status bar, updated on
+     every path that changes the page (renderPages calls this on every
+     loadPageIntoEditor, so thumbnail taps, Add page, link opens and
+     page actions all land here — no polling). */
+  var pl=$('pageNavLabel'); if(pl && nb) pl.textContent=(nb.cur+1)+' / '+nb.pages.length;
+  var pv=$('pageNavPrev'); if(pv) pv.disabled=!nb || nb.cur<=0;
+  var nx=$('pageNavNext'); if(nx) nx.disabled=!nb || nb.cur>=nb.pages.length-1; }
 function closeExportPop(){ var d=$('exportSheet'); if(d && d.open) d.close(); var b=$('exportBtn'); if(b) b.setAttribute('aria-expanded','false'); }
 function selectLayerStrokes(which){ let p=curPageObj(); if(!p) return; S.selection=(which==='ink'? p.ink : p.hi).slice(); drawSelectionOverlay(); toast(S.selection.length? S.selection.length+' stroke(s) selected on the '+(which==='ink'?'ink':'highlight')+' layer' : 'That layer is empty on this page'); }
 
