@@ -568,16 +568,22 @@ function renderLibrary(){
   const _libGrid = $('libraryGrid'); if (_libGrid && !_libGrid._deleteDelegated) { _libGrid._deleteDelegated = true; _libGrid.addEventListener('click', e => { const btn = e.target.closest('[data-delete-id]'); if (!btn) return; e.stopPropagation(); askDeleteItem(btn.dataset.deleteId); }); } _libGrid.innerHTML=items.map(n=>{
     let cov=coverFor(n);
     let kindLabel = n.kind==='notebook'? 'Notebook' : n.kind==='pdf'? 'PDF' : 'EPUB';
-    let kindIcon = n.kind==='notebook'? 'notebook' : n.kind==='pdf'? 'file-type-pdf' : 'book';
-    let count = n.kind==='notebook'? itemPages(n)+(itemPages(n)===1?' page':' pages')
-      : n.kind==='pdf'? (n.numPages||'?')+(n.numPages===1?' page':' pages')
-      : (n.chapters?n.chapters.length:0)+(n.chapters&&n.chapters.length===1?' chapter':' chapters');
     let openAct= n.kind==='notebook'? 'openNotebook(\''+n.id+'\')' : 'openBook(\''+n.id+'\')';
     let prog=itemProgress(n);
     let menu='<button type="button" onclick="event.stopPropagation();'+openAct+'">'+icon(n.kind==='notebook'?'notebook':'book-2')+(n.kind==='notebook'?'Open notebook':'Read book')+'</button>'
       + (n.kind==='pdf'? '<button type="button" onclick="event.stopPropagation();annotatePdf(\''+n.id+'\')">'+icon('pencil')+'Annotate</button>':'')
       + '<button type="button" class="danger" data-delete-id="'+esc(n.id)+'">'+icon('trash')+'Delete</button>';
-    return '<article class="bookCard"><button type="button" class="book" style="background:'+cov.bg+';color:'+cov.ink+'" onclick="'+openAct+'"><span class="srOnly">Open </span><span class="bookSpine" style="background:'+cov.spine+'"></span><span class="bookFace"><span class="bookKind">'+icon(kindIcon,'ic-sm')+kindLabel+'</span><span class="bookTitle">'+esc(n.title).split('_').join('_&#8203;')+'</span><span class="bookProgress" aria-hidden="true"><span style="width:'+prog+'%"></span></span><span class="srOnly">'+prog+'% read</span><span class="bookMeta"><span>'+count+'</span><span>'+(n.sample?'Sample':'Edited '+esc(n.updated||'just now'))+'</span></span></span></button>'
+    /* Pass 1 audit (mockups 11/15): the card is a white frame — the
+       coloured cover inside it, progress + meta BELOW the cover.
+       Desktop shows the title on the cover; at ≤1024px the title
+       moves below the cover in serif with the type label above the
+       bar. The button's accessible name comes from the srOnly span
+       so it survives the cover title being display:none on small
+       screens; the visible titles are aria-hidden duplicates. */
+    let titleHtml=esc(n.title).split('_').join('_&#8203;');
+    let edited=n.sample?'Sample':'Edited '+esc(n.updated||'just now');
+    return '<article class="bookCard"><button type="button" class="book" style="background:'+cov.bg+';color:'+cov.ink+'" onclick="'+openAct+'"><span class="srOnly">Open '+titleHtml+'</span><span class="bookSpine" style="background:'+cov.spine+'"></span><span class="bookFace"><span class="bookTitle bookTitleCover" aria-hidden="true">'+titleHtml+'</span></span></button>'
+      +'<div class="bookBelow"><span class="bookTitle bookTitleBelow">'+titleHtml+'</span><span class="bookKindBelow">'+kindLabel+'</span><span class="bookProgress" aria-hidden="true"><span style="width:'+prog+'%"></span></span><span class="srOnly">'+prog+'% read</span><span class="bookMeta"><span>'+prog+'% read</span><span>'+edited+'</span></span></div>'
       +'<button type="button" class="bookMenu" aria-label="Options for '+esc(n.title)+'" aria-haspopup="true" onclick="toggleCardMenu(this)">'+icon('dots','ic-sm')+'</button>'
       +'<div class="bookActions">'+menu+'</div></article>';
   }).join('') || '<p class="kbd">Nothing matches this filter.</p>';
@@ -622,15 +628,23 @@ function askDeleteItem(id){
     renderLibrary(); toast('Deleted');
   });
 }
+/* Pass 2 audit (mockup 17): the rail stats read "1 Page" not "1 Pages",
+   and the third stat is Words in this notebook, not Writing time. */
+function setStat(numId,labelId,n,one,many){ let num=$(numId); if(num) num.textContent=n; let lab=$(labelId); if(lab) lab.textContent=n===1?one:many; }
+function notebookWords(nb){ return nb.pages.reduce((a,p)=>a+(p.text.trim()?p.text.trim().split(/\s+/).length:0),0); }
 function updateStatsPanel(){
   let words=S.items.filter(i=>i.kind==='notebook').reduce((a,nb)=>a+nb.pages.reduce((b,p)=>b+(p.text.trim()?p.text.trim().split(/\s+/).length:0),0),0);
-  $('statWrite').textContent=Math.floor(S.stats.writeSec/60)+'m';
-  $('statRead').textContent=Math.floor(S.stats.readSec/60)+'m';
-  $('statStrokes').textContent=S.stats.strokes;
-  $('statPagesRead').textContent=Object.keys(S.stats.pagesRead).length;
-  $('statFocus').textContent=S.stats.focusDone;
-  $('statWords').textContent=words;
-  let w2=$('statWrite2'); if(w2) w2.textContent=Math.floor(S.stats.writeSec/60)+'m';
+  /* The About panel that held statWrite/statRead/statStrokes/
+     statPagesRead/statFocus/statWords was removed in the Pass 1 audit
+     (mockup 5 has no About section) — guard every one. */
+  let setTxt=(id,v)=>{ let el=$(id); if(el) el.textContent=v; };
+  setTxt('statWrite',Math.floor(S.stats.writeSec/60)+'m');
+  setTxt('statRead',Math.floor(S.stats.readSec/60)+'m');
+  setTxt('statStrokes',S.stats.strokes);
+  setTxt('statPagesRead',Object.keys(S.stats.pagesRead).length);
+  setTxt('statFocus',S.stats.focusDone);
+  setTxt('statWords',words);
+  let nb=curNb(); if(nb) setStat('statWrite2','statWrite2Label',notebookWords(nb),'Word','Words');
 }
 
 /* ============ library-wide search ============ */
@@ -654,7 +668,7 @@ function paletteActions(){
     {label:'Import a PDF', sub:'Open a PDF from your files', act:()=>$('pdfImport').click()},
     {label:'Import an EPUB', sub:'Open an EPUB from your files', act:()=>$('epubImport').click()},
     {label:'Parallel Read', sub:'Read two books side by side', act:()=>prOpenPicker('first')},
-    {label:'Focus timer', sub:'Start a 25 minute focus session', act:()=>openTimer()},
+    {label:'Start Focus 25:00', sub:'Start a 25 minute focus session', act:()=>openTimer()},
     {label:'Export backup', sub:'Download all notebooks and books as JSON', act:()=>exportBackup()},
     {label:'Toggle theme', sub:'Switch between light and dark', act:()=>toggleTheme()},
     {label:'Open sample book', sub:'The Art of Slow Reading', act:()=>openBook(SAMPLE_ID)}
@@ -673,7 +687,7 @@ function searchItemsFlat(q){
   let res=[];
   S.items.forEach(it=>{
     if(isLinkedNb(it)) return; /* annotation stores never surface in search */
-    if(it.title.toLowerCase().includes(q)) res.push({label:it.title, sub:(it.kind==='notebook'?'Notebook':it.kind==='pdf'?'PDF':'EPUB')+' · title match', act:()=> it.kind==='notebook'? openNotebook(it.id): openBook(it.id), group:it.kind==='notebook'?'notebooks':'books'});
+    if(it.title.toLowerCase().includes(q)) res.push({label:it.title, sub:(it.kind==='notebook'?'Notebook':it.kind==='pdf'?'PDF':'EPUB')+' · title match', act:()=> it.kind==='notebook'? openNotebook(it.id): openBook(it.id), group:it.kind==='notebook'?'notebooks':'books', kind:it.kind, prog:itemProgress(it)});
     if(it.kind==='notebook') it.pages.forEach((p,pi)=>{
       let idx=p.text.toLowerCase().indexOf(q);
       if(idx>=0) res.push({label:it.title+', page '+(pi+1), sub:'“…'+esc(p.text.slice(Math.max(0,idx-30),idx+60))+'…”', act:()=>{openNotebook(it.id); switchPage(pi);}, group:'notebooks'});
@@ -698,14 +712,16 @@ function collectPalette(q){
   let groups={books:[], notebooks:[], annotations:[], actions:[]};
   if(!q){
     /* No query: the shelf itself, recent first, plus every action. */
-    S.items.filter(i=>!isLinkedNb(i) && i.kind!=='notebook').slice(0,5).forEach(it=>groups.books.push({label:it.title, sub:(it.kind==='pdf'?'PDF':'EPUB')+' · '+(it.kind==='pdf'?(it.numPages||'?')+' pages':(it.chapters?it.chapters.length:0)+' chapters'), act:()=>openBook(it.id)}));
-    S.items.filter(i=>i.kind==='notebook' && !i.pdfBookId).slice().sort((a,b)=>(b.openedAt||0)-(a.openedAt||0)).slice(0,5).forEach(it=>{ let bl=backlinkCount(it); groups.notebooks.push({label:it.title, sub:'Notebook · '+itemPages(it)+' pages'+(bl?' · '+bl+(bl===1?' backlink':' backlinks'):''), act:()=>openNotebook(it.id)}); });
+    S.items.filter(i=>!isLinkedNb(i) && i.kind!=='notebook').slice(0,5).forEach(it=>groups.books.push({label:it.title, sub:(it.kind==='pdf'?'PDF':'EPUB')+' · '+(it.kind==='pdf'?(it.numPages||'?')+' pages':(it.chapters?it.chapters.length:0)+' chapters'), act:()=>openBook(it.id), kind:it.kind, prog:itemProgress(it)}));
+    S.items.filter(i=>i.kind==='notebook' && !i.pdfBookId).slice().sort((a,b)=>(b.openedAt||0)-(a.openedAt||0)).slice(0,5).forEach(it=>{ let bl=backlinkCount(it); groups.notebooks.push({label:it.title, sub:'Notebook · '+itemPages(it)+' pages'+(bl?' · '+bl+(bl===1?' backlink':' backlinks'):''), act:()=>openNotebook(it.id), kind:'notebook', prog:itemProgress(it)}); });
     S.items.forEach(it=>{ if(isLinkedNb(it)) return; (it.annotations||[]).forEach(a=>{ if(groups.annotations.length<5) groups.annotations.push({label:it.title+', annotation', sub:'“'+esc(a.text.slice(0,80))+'”'+(a.where?' · '+esc(a.where):''), act:()=> it.kind==='notebook'? openNotebook(it.id): openBook(it.id)}); }); });
     groups.actions=paletteActions();
     return groups;
   }
   searchItemsFlat(q).forEach(r=>{ if(groups[r.group].length<5) groups[r.group].push(r); });
-  groups.actions=paletteActions().filter(a=>a.label.toLowerCase().includes(q));
+  /* Mockup 1 (Pass 1 audit): Quick Actions always show, even with a
+     query typed — they are the fast path, not a search result. */
+  groups.actions=paletteActions();
   return groups;
 }
 function renderPalette(q){
@@ -715,7 +731,13 @@ function renderPalette(q){
   [['books','Books & PDFs'],['notebooks','Notebooks & Backlinks'],['annotations','Annotations'],['actions','Quick Actions']].forEach(([key,title])=>{
     let list=groups[key]; if(!list.length) return;
     html+='<div class="palGroup" role="presentation">'+title+'</div>';
-    list.forEach(r=>{ let i=flat.length; flat.push(r); html+='<div class="palItem" role="option" aria-selected="false" data-pi="'+i+'" onclick="runPaletteResult('+i+')"><b>'+esc(r.label)+'</b><span>'+r.sub+'</span></div>'; });
+    list.forEach(r=>{ let i=flat.length; flat.push(r);
+      /* Mockup 1 (Pass 1 audit): book rows carry a format pill +
+         progress pill on the right, and every row a ⌘1..⌘9 chip. */
+      let chips='';
+      if(r.kind) chips+='<span class="palPill">'+(r.kind==='notebook'?'Notebook':r.kind==='pdf'?'PDF':'EPUB')+'</span><span class="palPill">'+r.prog+'%</span>';
+      if(i<9) chips+='<kbd class="palKbd">⌘'+(i+1)+'</kbd>';
+      html+='<div class="palItem" role="option" aria-selected="false" data-pi="'+i+'" onclick="runPaletteResult('+i+')"><span class="palItemMain"><b>'+esc(r.label)+'</b><span>'+r.sub+'</span></span>'+(chips?'<span class="palChips">'+chips+'</span>':'')+'</div>'; });
   });
   S.paletteItems=flat;
   if(!flat.length) html='<div class="palEmpty">No matches for “'+esc(q)+'”.</div>';
@@ -753,7 +775,13 @@ $('paletteDialog').addEventListener('close',()=>{
   renderLibrary();
 });
 $('globalSearch').addEventListener('keydown',e=>{
-  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+  /* Mockup 1 (Pass 1 audit): ⌘1..⌘9 / Ctrl+1..9 jumps straight to a
+     result, matching the shortcut chips on the rows. */
+  if((e.metaKey||e.ctrlKey) && /^[1-9]$/.test(e.key)){
+    if(!S.paletteItems.length) return;
+    e.preventDefault();
+    runPaletteResult(+e.key-1);
+  }else if(e.key==='ArrowDown'||e.key==='ArrowUp'){
     if(!S.paletteItems.length) return;
     e.preventDefault();
     S.paletteSel=e.key==='ArrowDown'? Math.min(S.paletteItems.length-1,S.paletteSel+1) : Math.max(0,S.paletteSel-1);
@@ -779,7 +807,10 @@ async function updateStorageBar(){
     let used=e.usage||0, quota=e.quota||0;
     let pct=quota? Math.min(100,Math.round(used/quota*100)) : 0;
     fill.style.width=pct+'%';
-    txt.textContent=quota? fmtBytes(used)+' of '+fmtBytes(quota)+' used ('+pct+'%)' : fmtBytes(used)+' used';
+    /* Mockup 5 (Pass 1 audit): the storage line reads "X used ·
+       N annotations" — real data, not the quota percentage. */
+    let anCount=S.items.reduce((a,n)=>a+((n.annotations||[]).length),0);
+    txt.textContent=fmtBytes(used)+' used · '+anCount+(anCount===1?' annotation':' annotations');
   }catch(err){ fill.style.width='0%'; txt.textContent='Storage use is not available in this browser.'; }
 }
 function newMenuAct(kind){
@@ -1011,7 +1042,7 @@ function redrawLayer(which){
   ctx.clearRect(0,0,CW,PH);
   let cutoff=(typeof redrawLayer.cutoff==='number')? redrawLayer.cutoff : null;
   arr.forEach(st=>{ if(cutoff!==null && typeof st.t==='number' && st.t>cutoff) return; drawStroke(ctx,st,p); });
-  $('statPageStrokes').textContent=p.ink.length+p.hi.length;
+  setStat('statPageStrokes','statPageStrokesLabel',p.ink.length+p.hi.length,'Stroke','Strokes');
 }
 function redrawAll(){ syncPageHeight(); drawBackground(); redrawLayer('ink'); redrawLayer('hi'); }
 function composePage(p, template, out){
@@ -2171,11 +2202,12 @@ function layoutEditorSheet(){
     pp.appendChild(rp); pp.appendChild(rl); if(help) pp.appendChild(help);
     /* Restore the rail-tab state the buttons show (Pages by default). */
     switchRailTab(($('railTabLayers') && $('railTabLayers').getAttribute('aria-selected')==='true') ? 'layers' : 'pages');
-    /* #editorStatus is inside #stageWrap but NOT a direct child (it sits
-       in a wrapper div), so insert before it via its own parent. */
-    var anchor=$('editorStatus')||th;
-    var parent=anchor.parentNode;
-    parent.insertBefore(nb, anchor); parent.insertBefore(sr, anchor);
+    /* Pass 2 audit (mockup 17): on desktop the notes + audio live in
+       the .notesAudioRow flex row (side by side) — put them back in
+       the wrapper, not loose before the status bar. */
+    var wrap=document.querySelector('.notesAudioRow');
+    if(wrap){ wrap.appendChild(nb); wrap.appendChild(sr); }
+    else { var anchor=$('editorStatus')||th; var parent=anchor.parentNode; parent.insertBefore(nb, anchor); parent.insertBefore(sr, anchor); }
     pp.classList.remove('mobileMoved');
   }
   }catch(err){ try{ console.warn('layoutEditorSheet', err); }catch(e){} }
@@ -2320,7 +2352,7 @@ function renderPages(){
   let rowSig=nb.pages.map(p=>((p.bgPdf&&p.bgPdf.page)||0)+':'+((p.board&&p.board.strokes&&p.board.strokes.length)?1:0)).join(',');
   if(nb._pagesRowSig===rowSig && $('pageList').children.length===nb.pages.length){
     document.querySelectorAll('#pageList .pageThumb').forEach((el,i)=>el.classList.toggle('active',i===nb.cur));
-    $('statEditorPages').textContent=nb.pages.length; updateStatusBar();
+    setStat('statEditorPages','statEditorPagesLabel',nb.pages.length,'Page','Pages'); updateStatusBar();
     for(let i=Math.max(0,nb.cur-12); i<=Math.min(nb.pages.length-1,nb.cur+12); i++) drawPageThumb(i);
     scheduleSave(); return;
   }
@@ -2333,7 +2365,7 @@ function renderPages(){
     +'<button class="miniBtn" title="Duplicate" aria-label="Duplicate page" onclick="pageAction('+i+',\'dup\',event)">'+icon('copy')+'</button>'
     +'<button class="miniBtn" title="Delete page" aria-label="Delete page" onclick="pageAction('+i+',\'del\',event)">'+icon('trash')+'</button></span></div></div>';
   }).join('');
-  $('statEditorPages').textContent=nb.pages.length; updateStatusBar();
+  setStat('statEditorPages','statEditorPagesLabel',nb.pages.length,'Page','Pages'); updateStatusBar();
   /* draw the pages around the current one now; the rest draw when scrolled into view */
   for(let i=Math.max(0,nb.cur-12); i<=Math.min(nb.pages.length-1,nb.cur+12); i++) drawPageThumb(i);
   if(pageThumbIO) pageThumbIO.disconnect();
@@ -2951,6 +2983,37 @@ function openInspector(section){
   var b=$('pillInsertBtn'); if(b) b.setAttribute('aria-expanded','true');
   if(section && typeof switchSheetTab==='function') switchSheetTab(section);
 }
+/* Pass 2 audit (mockup 17): on desktop the pill's Insert button opens a
+   popover menu under the pill (menu guide: popover + focusgroup,
+   script-positioned like the + New menu); on phones it opens the
+   inspector sheet, as before. */
+function onPillInsertClick(){
+  if(window.matchMedia('(max-width:768px)').matches){ openInspector('insert'); return; }
+  let m=$('insertMenu'); if(!m) return;
+  if(m.matches(':popover-open')) m.hidePopover(); else m.showPopover({source:$('pillInsertBtn')});
+}
+function closeInsertMenu(){ let m=$('insertMenu'); if(m&&m.matches(':popover-open')) m.hidePopover(); }
+function focusWrittenNotes(){ let t=$('noteText'); if(t){ t.scrollIntoView({block:'center'}); t.focus(); } }
+(function(){
+  let menu=$('insertMenu'); if(!menu) return;
+  let btn=$('pillInsertBtn'); if(!btn) return;
+  let lastKey=false;
+  btn.addEventListener('keydown',()=>{ lastKey=true; });
+  btn.addEventListener('pointerdown',()=>{ lastKey=false; });
+  menu.addEventListener('toggle',e=>{
+    let open=e.newState==='open';
+    btn.setAttribute('aria-expanded',open?'true':'false');
+    if(!open) return;
+    /* Script positioning, below the trigger, flipping above when there
+       is no room, clamped to the viewport. */
+    let r=btn.getBoundingClientRect();
+    menu.style.position='fixed'; menu.style.margin='0';
+    let top=r.bottom+6, left=Math.max(8,Math.min(r.right-menu.offsetWidth,window.innerWidth-menu.offsetWidth-8));
+    if(top+menu.offsetHeight>window.innerHeight-8) top=Math.max(8,r.top-menu.offsetHeight-6);
+    menu.style.top=top+'px'; menu.style.left=left+'px';
+    if(lastKey){ let first=menu.querySelector('[focusgroup] button'); if(first) first.focus(); }
+  });
+})();
 /* Toolbar guide: focusgroup gives the roving tab stop natively; where
    it is unsupported, a small roving-tabindex fallback does the same. */
 (function(){
@@ -2971,7 +3034,7 @@ function openInspector(section){
 function closeAllPopovers(){ closeAllToolPops(); closeExportPop(); }
 const TOOL_LABELS={pen:'Pen',calligraphy:'Calligraphy',highlighter:'Highlighter',eraser:'Eraser',hand:'Hand',select:'Select',text:'Text',line:'Line',rect:'Rectangle',ellipse:'Ellipse',arrow:'Arrow',spline:'Spline',compass:'Compass',lasso:'Lasso',vspace:'Vertical space'};
 function updateToolOptsUI(){ var label=TOOL_LABELS[S.tool]||'Tool'; var btn=$('toolOptsBtn'); if(btn) btn.innerHTML=label+' options '+icon('chevron-down','ic-sm'); var title=$('toolOptsTitle'); if(title) title.textContent=label+' options'; document.querySelectorAll('.toolOptSection').forEach(sec=>{ var tools=(sec.getAttribute('data-tools')||'').split(/\s+/); sec.classList.toggle('show', tools.indexOf(S.tool)>=0); }); }
-function updateStatusBar(){ var nb=curNb(); var sp=$('statusPage'); if(sp && nb) sp.textContent=(nb.cur+1)+' / '+nb.pages.length; var sl=$('statusLayer'); if(sl){ var inkOn=!$('layerInkTgl')||$('layerInkTgl').checked; var hiOn=!$('layerHiTgl')||$('layerHiTgl').checked; sl.textContent= S.tool==='highlighter'?'Highlight': (inkOn&&hiOn?'Ink + Highlight': inkOn?'Ink': hiOn?'Highlight':'None'); } var sz=$('statusZoom'); if(sz) sz.textContent=Math.round((typeof editorZoom!=='undefined'?editorZoom:1)*100)+'%'; var st=$('statusTool'); if(st) st.textContent=TOOL_LABELS[S.tool]||S.tool;
+function updateStatusBar(){ var nb=curNb(); var sp=$('statusPage'); if(sp && nb) sp.textContent=(nb.cur+1)+' / '+nb.pages.length; var sl=$('statusLayer'); if(sl){ var inkOn=!$('layerInkTgl')||$('layerInkTgl').checked; var hiOn=!$('layerHiTgl')||$('layerHiTgl').checked; sl.textContent= S.tool==='highlighter'?'Highlight': (inkOn&&hiOn?'Ink + Highlight': inkOn?'Ink': hiOn?'Highlight':'None'); } var lc=$('layerChip'); if(lc) lc.textContent='Layer: '+(S.tool==='highlighter'?'Highlight':'Ink'); var sz=$('statusZoom'); if(sz) sz.textContent=Math.round((typeof editorZoom!=='undefined'?editorZoom:1)*100)+'%'; var st=$('statusTool'); if(st) st.textContent=TOOL_LABELS[S.tool]||S.tool;
   /* Page-navigation pill: same numbers as the status bar, updated on
      every path that changes the page (renderPages calls this on every
      loadPageIntoEditor, so thumbnail taps, Add page, link opens and
