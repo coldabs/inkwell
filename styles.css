@@ -1216,9 +1216,33 @@ body.inEditor .zoomFab{display:flex}
 .readerToolPanel.hidden{display:none}
 .readerToolRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .readerToolBtn{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:10px;border:1px solid var(--border);background:var(--paper2);color:var(--text);font:inherit;font-size:13px;cursor:pointer;}
-.readerToolBtn.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);}
+.readerToolBtn.active,.readerToolBtn[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);}
 .readerToolBtn:disabled{opacity:.45;cursor:not-allowed;}
 .readerToolColors{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+/* Floating annotation panel: one stacked row per tool — name arms it, the
+   round swatch beside it opens that tool's "<Tool> color" sheet. Rows are
+   44px, thumb-first on a phone (reference video r06). */
+.readerToolList{display:flex;flex-direction:column;gap:8px;}
+.readerToolItem{display:flex;gap:8px;align-items:center;}
+.readerToolItem .readerToolBtn{flex:1;justify-content:flex-start;min-height:44px;font-size:14px;}
+.readerToolSwatch{width:44px;height:44px;min-width:44px;min-height:44px;border-radius:999px;border:1px solid var(--border-strong);cursor:pointer;padding:0;box-shadow:var(--shadow-modal);background-image:linear-gradient(var(--sw,transparent),var(--sw,transparent)),repeating-conic-gradient(#c9c9c9 0% 25%,#fff 0% 50%);background-size:auto,14px 14px;}
+/* "<Tool> color" bottom sheet: colour grid + Opacity slider (reference r06) */
+.toolColorSheet{max-height:min(76vh,76dvh);}
+.toolColorGrid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;padding:14px 0 6px;}
+.toolColorCell{aspect-ratio:1;min-width:44px;min-height:44px;border-radius:12px;border:1px solid var(--border-strong);background:var(--cell);cursor:pointer;display:grid;place-items:center;padding:0;}
+.toolColorCell.sel{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--accent);}
+.toolColorCell .toolColorCheck{font-size:22px;font-weight:700;opacity:0;line-height:1;}
+.toolColorCell.sel .toolColorCheck{opacity:1;}
+.toolOpacityWrap{padding:8px 0 4px;display:flex;flex-direction:column;gap:8px;}
+.toolOpacityRow{display:flex;align-items:center;gap:10px;}
+.toolOpacityTrack{position:relative;flex:1;height:44px;border-radius:10px;border:1px solid var(--border-strong);background:repeating-conic-gradient(#c9c9c9 0% 25%,#fff 0% 50%);background-size:16px 16px;overflow:hidden;}
+.toolOpacityFill{position:absolute;left:0;top:0;bottom:0;width:60%;}
+.toolOpacityTrack input[type=range]{position:absolute;inset:0;width:100%;height:100%;margin:0;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer;}
+.toolOpacityTrack input[type=range]::-webkit-slider-runnable-track{background:transparent;}
+.toolOpacityTrack input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:28px;height:28px;border-radius:999px;background:var(--surface);border:2px solid var(--text);box-shadow:0 1px 4px rgba(0,0,0,.3);margin-top:8px;}
+.toolOpacityTrack input[type=range]::-moz-range-track{background:transparent;}
+.toolOpacityTrack input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:999px;background:var(--surface);border:2px solid var(--text);box-shadow:0 1px 4px rgba(0,0,0,.3);}
+.toolOpacityVal{font-size:13px;font-weight:600;min-width:44px;text-align:right;}
 .readerFabRow{display:flex;align-items:center;gap:8px;}
 .readerFab{width:48px;height:48px;border-radius:999px;background:var(--surface);color:var(--text);border:1px solid var(--border-strong);box-shadow:var(--shadow-modal);position:relative;display:grid;place-items:center;cursor:pointer;}
 .readerFab.armed{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent),var(--shadow-modal);}
