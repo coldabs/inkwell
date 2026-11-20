@@ -2079,8 +2079,14 @@ function loadPageIntoEditor(){
   if(!$('floatingBoard').classList.contains('hidden')) loadBoard();
   /* Split View follows the notebook: refresh the pane only when the
      book it should show has changed, so page switches never reset
-     the reader's scroll position. */
-  if(S.split){ let sb=splitBookFor(curNb()); let pane=$('splitPane'); if(pane && (sb&&sb.id)!==(pane.dataset.bookId||'')){ if(sb) renderSplitBook(pane,sb); else renderSplitPicker(pane); } }
+     the pane's scroll position. A PDF page that never drew (the editor
+     was still hidden when it was first asked for) is retried in place
+     instead — the host, not the whole pane, so the scroll stays put. */
+  if(S.split){ let sb=splitBookFor(curNb()); let pane=$('splitPane'); if(pane){
+    if(!sb) renderSplitPicker(pane);
+    else if((sb.id)!==(pane.dataset.bookId||'')) renderSplitBook(pane,sb);
+    else if(sb.kind==='pdf'){ let host=pane.querySelector('#splitPdfHost'); if(host&&!host.querySelector('canvas')&&!host.dataset.splitLoading) splitRenderPdfPage(pane,sb); }
+  } }
 }
 function switchPage(i){
   let nb=curNb(); if(!nb) return;
@@ -2416,8 +2422,62 @@ function renderSplitBook(pane,b){
   pane.dataset.bookId=b.id;
   let head='<div class="splitHead"><span class="badge">'+esc(b.title)+'</span><button type="button" class="btn small" onclick="splitShowPicker()">Change book</button></div>';
   if(b.kind==='epub'){ let c=(b.chapters||[])[b.ch]||{title:'',html:''}; pane.innerHTML=head+'<h3>'+esc(c.title)+'</h3>'+c.html; }
-  else if(b.kind==='pdf'){ pane.innerHTML=head+'<h3>Page '+b.page+'</h3><p>'+esc((b.textCache[b.page]||'Open the PDF in the reader once so its text is ready here.').slice(0,2200))+'</p>'; }
+  else if(b.kind==='pdf'){
+    pane.innerHTML=head+'<div class="splitPdfNav"><button type="button" class="btn small" onclick="splitPdfPage(-1)" aria-label="Previous page">‹ Prev</button><span class="kbd" id="splitPdfLabel">Page …</span><button type="button" class="btn small" onclick="splitPdfPage(1)" aria-label="Next page">Next ›</button></div><div class="splitPdfHost" id="splitPdfHost"><p class="kbd">Loading page…</p></div>';
+    splitRenderPdfPage(pane,b);
+  }
   else pane.innerHTML=head+'<h3>Nothing to read yet</h3><p>Open or import a book and it will appear here beside your notebook.</p>';
+}
+/* Split View PDF pages: the pane used to show only cached text, so a PDF
+   never opened in the reader showed "Open the PDF in the reader once…"
+   and a scanned/image PDF — no extractable text on any page — could
+   never show at all, however large or small. The pane now draws the
+   actual page with the reader's own lazy machinery (pdfDrawPage): one
+   page at a time, nothing eager, text layer included (which also fills
+   that page's text cache on demand). */
+let splitPdfGen=0;
+function splitPdfPage(d){
+  let nb=curNb(); if(!nb) return;
+  let b=splitBookFor(nb); if(!b||b.kind!=='pdf') return;
+  b.page=Math.max(1,Math.min(b.numPages||1,(b.page||1)+d));
+  scheduleSave();
+  let pane=$('splitPane'); if(pane) splitRenderPdfPage(pane,b);
+}
+async function splitRenderPdfPage(pane,b){
+  let gen=++splitPdfGen;
+  let host=pane.querySelector('#splitPdfHost'); if(!host) return;
+  let label=pane.querySelector('#splitPdfLabel');
+  b.page=Math.max(1,Math.min(b.numPages||1,b.page||1));
+  if(label) label.textContent='Page '+b.page+' of '+(b.numPages||'?');
+  /* free the previous page's bitmap (and cancel a draw still in flight) */
+  let old=host.querySelector('.pdfHolder'); if(old) pdfReleasePage(old);
+  host.innerHTML='<p class="kbd">Loading page…</p>';
+  host.dataset.splitLoading='1';
+  let ok=await ensurePdfDoc(b);
+  if(gen!==splitPdfGen||!pane.isConnected||pane.dataset.bookId!==b.id) return;
+  delete host.dataset.splitLoading;
+  if(!ok){ host.innerHTML='<p>This PDF\u2019s file could not be restored from this browser. Import the file again to read it.</p>'; return; }
+  b.page=Math.max(1,Math.min(b.numPages,b.page||1));
+  if(label) label.textContent='Page '+b.page+' of '+b.numPages;
+  host.innerHTML='';
+  let holder=document.createElement('div');
+  holder.className='pdfHolder'; holder.dataset.n=b.page;
+  let sz=(b._pageSizes&&b._pageSizes[b.page-1])||[612,792];
+  holder.style.aspectRatio=sz[0]+' / '+sz[1];
+  host.appendChild(holder);
+  let jump=(n)=>{ if(typeof n==='number'){ b.page=Math.max(1,Math.min(b.numPages,n)); scheduleSave(); splitRenderPdfPage(pane,b); } };
+  let live=()=>gen===splitPdfGen&&pane.isConnected&&pane.dataset.bookId===b.id&&holder.isConnected;
+  splitDrawWhenVisible(holder,b,pane,gen,live,jump,14);
+}
+/* pdfDrawPage draws nothing while the holder has no width (the editor
+   view is still hidden when a notebook first opens), so retry briefly
+   until it is visible; each attempt is cheap and the draw itself is
+   guarded by the generation token. */
+function splitDrawWhenVisible(holder,b,pane,gen,live,jump,left){
+  if(!live()||holder._drawn) return;
+  pdfDrawPage(b,+holder.dataset.n,holder,live,jump);
+  if(left<=0) return;
+  setTimeout(()=>{ if(live()&&!holder._drawn) splitDrawWhenVisible(holder,b,pane,gen,live,jump,left-1); },150);
 }
 function renderSplitPicker(pane){
   pane.dataset.bookId='';
