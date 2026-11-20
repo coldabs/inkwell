@@ -29,7 +29,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="styles.css?v=2026-11-20-r26">
+<link rel="stylesheet" href="styles.css?v=2026-11-20-r27">
 </head>
 <body>
 <!-- Icons: Tabler Icons 3.52.0, MIT, https://tabler.io/icons -->
@@ -121,17 +121,16 @@
 
 <main class="layout shelf" id="mainLayout">
   <!-- Library -->
-  <section id="view-library" aria-labelledby="shelfTitle">
+  <section id="view-library" aria-label="Your shelf">
     <header class="masthead">
       <a class="wordmark" href="#/">
         <span class="wordmarkName">Inkwell</span>
-        <span class="wordmarkTag">Notes &amp; reading</span>
       </a>
       <div class="searchWrap navSearch" role="search" aria-label="Search the shelf">
         <button type="button" class="search searchTrigger" id="paletteTrigger" onclick="openPalette()" aria-label="Search the shelf">
           <svg class="ic searchIcon" aria-hidden="true"><use href="#ticon-search"></use></svg>
           <span class="searchTriggerText">Search shelf…</span>
-          <kbd class="searchKbd" title="Press / to search">/</kbd>
+          <kbd class="searchKbd" title="Press Command K to search">⌘K</kbd>
         </button>
       </div>
       <div class="mastheadTools">
@@ -146,14 +145,6 @@
       </div>
     </header>
 
-    <div class="libraryHead">
-      <div class="libraryTitle">
-        <p class="runningHead">Your library</p>
-        <h1 id="shelfTitle">Your shelf</h1>
-        <p class="lede">Handwritten notebooks and long-form reading, kept on this device.</p>
-      </div>
-    </div>
-
     <div class="shelfBar">
       <div class="chipRow" id="chipRow" role="group" aria-label="Filter the shelf">
         <button class="chip active" data-filter="all" onclick="filterLib('all',this)">All</button>
@@ -163,7 +154,7 @@
       </div>
       <div class="newWrap">
         <button type="button" class="btn primary newBtn" id="newMenuTrigger" aria-haspopup="menu" aria-expanded="false" commandfor="newMenu" command="toggle-popover">
-          <svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-plus"></use></svg> New <svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg>
+          <svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-plus"></use></svg> New
         </button>
       </div>
       <input id="pdfImport" type="file" accept=".pdf" class="hidden" onchange="handleImport(event)"/>
@@ -200,64 +191,43 @@
     <div id="libraryGrid" class="grid"></div>
 
     <dialog class="sheet drawerRight" id="librarySheet" closedby="any">
-      <div class="sheetHead"><h2>Shelf options</h2><form method="dialog"><button class="btn" type="submit">Close</button></form></div>
+      <div class="sheetHead"><h2>Shelf Options</h2><form method="dialog"><button class="drawerClose" type="submit" aria-label="Close shelf options"><svg class="ic" aria-hidden="true"><use href="#ticon-x"></use></svg></button></form></div>
       <div class="sheetBody">
       <section class="sheetSection">
         <h3>This shelf</h3>
         <div class="statGrid">
-          <div class="statCard"><b id="statNotebooks">0</b><span id="statNotebooksLabel">notebooks</span></div>
-          <div class="statCard"><b id="statBooks">0</b><span id="statBooksLabel">books</span></div>
-          <div class="statCard"><b id="statPages">0</b><span id="statPagesLabel">pages</span></div>
-          <div class="statCard"><b id="statAnnos">0</b><span id="statAnnosLabel">annotations</span></div>
+          <div class="statCard"><span class="statIcon"><svg class="ic" aria-hidden="true"><use href="#ticon-notebook"></use></svg></span><span id="statNotebooksLabel">notebooks</span><b id="statNotebooks">0</b></div>
+          <div class="statCard"><span class="statIcon"><svg class="ic" aria-hidden="true"><use href="#ticon-book-2"></use></svg></span><span id="statBooksLabel">books</span><b id="statBooks">0</b></div>
+          <div class="statCard"><span class="statIcon"><svg class="ic" aria-hidden="true"><use href="#ticon-file-text"></use></svg></span><span id="statPagesLabel">pages</span><b id="statPages">0</b></div>
+          <div class="statCard"><span class="statIcon"><svg class="ic" aria-hidden="true"><use href="#ticon-highlighter"></use></svg></span><span id="statAnnosLabel">annotations</span><b id="statAnnos">0</b></div>
         </div>
-        <div class="storageBar" role="img" aria-label="Storage used"><span class="storageFill" id="storageFill" style="width:0%"></span></div>
-        <p class="sheetNote" id="storageText">Checking storage use…</p>
+        <div class="storageCard"><div class="storageBar" role="img" aria-label="Storage used"><span class="storageFill" id="storageFill" style="width:0%"></span></div><p class="sheetNote" id="storageText">Checking storage use…</p></div>
       </section>
       <section class="sheetSection">
-        <h3>Library</h3>
-        <div class="utilsRow">
-          <button class="btn" onclick="exportBackup()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-download"></use></svg> Export backup</button>
-          <label class="btn" for="backupImport"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-upload"></use></svg> Restore backup</label>
+        <h3>Library backup</h3>
+        <div class="drawerRows">
+          <button class="drawerRow" onclick="exportBackup()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-download"></use></svg><span>Export Backup JSON</span><svg class="ic ic-sm drawerChev" aria-hidden="true"><use href="#ticon-chevron-right"></use></svg></button>
+          <label class="drawerRow" for="backupImport"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-upload"></use></svg><span>Restore Backup</span><svg class="ic ic-sm drawerChev" aria-hidden="true"><use href="#ticon-chevron-right"></use></svg></label>
           <input id="backupImport" type="file" accept=".json" class="hidden" onchange="importBackup(event)"/>
         </div>
       </section>
       <section class="sheetSection">
-        <h3>Samples</h3>
-        <div class="utilsRow">
-          <button class="btn" onclick="openBook(SAMPLE_ID)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-book-2"></use></svg> Open sample book</button>
-          <button class="btn" onclick="openBook(SAMPLE_PDF_ID)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-file-type-pdf"></use></svg> Open demo PDF</button>
+        <h3>Quick launch</h3>
+        <div class="drawerRows">
+          <button class="drawerRow" onclick="openTimer()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-clock"></use></svg><span id="timerLabel">Start Focus 25:00</span><svg class="ic ic-sm drawerChev" aria-hidden="true"><use href="#ticon-chevron-right"></use></svg></button>
         </div>
       </section>
       <section class="sheetSection">
-        <h3>Workspace</h3>
-        <div class="utilsRow">
-          <button class="btn" onclick="openTimer()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-clock"></use></svg> <span id="timerLabel">Focus 25:00</span></button>
-          <button class="btn" id="drawerInstallBtn" onclick="$('installBtn').click()" style="display:none"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-download"></use></svg> Install Inkwell</button>
+        <h3>Samples &amp; app</h3>
+        <div class="drawerRows">
+          <button class="drawerRow" onclick="openBook(SAMPLE_ID)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-book-2"></use></svg><span>Open Sample Book</span><svg class="ic ic-sm drawerChev" aria-hidden="true"><use href="#ticon-chevron-right"></use></svg></button>
+          <button class="drawerRow" onclick="openBook(SAMPLE_PDF_ID)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-file-type-pdf"></use></svg><span>Open Demo PDF</span><svg class="ic ic-sm drawerChev" aria-hidden="true"><use href="#ticon-chevron-right"></use></svg></button>
+          <button class="drawerRow" id="drawerInstallBtn" onclick="$('installBtn').click()" style="display:none"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-download"></use></svg><span>Install App (PWA)</span><svg class="ic ic-sm drawerChev" aria-hidden="true"><use href="#ticon-chevron-right"></use></svg></button>
         </div>
       </section>
 
-    <div class="sheetSection" id="aboutPanel">
-      <div class="aboutIntro">
-        <h3>About this shelf</h3>
-        <p>Inkwell keeps handwriting, PDFs and EPUBs in one library. Everything is stored in this browser on this device, so it is here when you close the tab. Backup gives you a copy for another device.</p>
-      </div>
-      <div class="aboutStats">
-        <div class="listRow"><span>Time writing</span><b id="statWrite">0m</b></div>
-        <div class="listRow"><span>Time reading</span><b id="statRead">0m</b></div>
-        <div class="listRow"><span>Strokes drawn</span><b id="statStrokes">0</b></div>
-        <div class="listRow"><span>Pages read</span><b id="statPagesRead">0</b></div>
-        <div class="listRow"><span>Focus sessions</span><b id="statFocus">0</b></div>
-        <div class="listRow"><span>Words typed</span><b id="statWords">0</b></div>
-      </div>
-    </div>
-
         </div>
     </dialog>
-
-  <footer class="libraryFoot">
-      <p>Inkwell. Local-first notes and reading.</p>
-      <p><a href="https://github.com/coldabs/inkwell" target="_blank" rel="noopener">Source on GitHub</a> <span aria-hidden="true">·</span> Icons by <a href="https://tabler.io/icons" target="_blank" rel="noopener">Tabler</a></p>
-    </footer>
 
     <nav class="tabBar" id="libraryBar" aria-label="Library">
       <button type="button" class="tabBtn active" id="tabShelf" onclick="setLibTab('shelf')" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#ticon-layout-grid"></use></svg><span>Shelf</span></button>
@@ -293,12 +263,12 @@
       <input id="xoppImport" type="file" accept=".xopp,.xoj" class="hidden" onchange="importXopp(event)"/>
     </div>
 
-    <dialog class="sheet drawerRight" id="editorSheet" closedby="any" aria-label="Tools and insert"> <div class="sheetGrip" id="editorSheetGrip" aria-hidden="true"></div> <div class="sheetHead"><h2>Tools &amp; Insert</h2><form method="dialog"><button class="btn" type="submit">Close</button></form></div> <div class="sheetTabs" role="tablist" aria-label="Editor tools">
+    <dialog class="sheet drawerRight" id="editorSheet" closedby="any" aria-label="Tools and insert"> <div class="sheetGrip" id="editorSheetGrip" aria-hidden="true"></div> <div class="sheetHead"><h2>Tools &amp; Insert</h2><form method="dialog"><button class="drawerClose" type="submit" aria-label="Close tools and insert"><svg class="ic" aria-hidden="true"><use href="#ticon-x"></use></svg></button></form></div> <div class="sheetTabs" role="tablist" aria-label="Editor tools">
         <button type="button" role="tab" id="sheetTabBtnDraw" class="sheetTab" aria-selected="true" aria-controls="sheetTabDraw" onclick="switchSheetTab('draw')">Draw</button>
         <button type="button" role="tab" id="sheetTabBtnInsert" class="sheetTab" aria-selected="false" aria-controls="sheetTabInsert" onclick="switchSheetTab('insert')">Insert</button>
         <button type="button" role="tab" id="sheetTabBtnPage" class="sheetTab" aria-selected="false" aria-controls="sheetTabPage" onclick="switchSheetTab('page')">Page</button>
         <button type="button" role="tab" id="sheetTabBtnNotes" class="sheetTab" aria-selected="false" aria-controls="sheetTabNotes" onclick="switchSheetTab('notes')">Notes &amp; Audio</button>
-      </div> <div class="sheetBody"><div class="sheetTabPanel" id="sheetTabDraw" role="tabpanel" aria-labelledby="sheetTabBtnDraw"><section class="sheetSection"> <h3>Tools</h3> <div class="sheetRow"><button class="tool" data-tool="hand" aria-pressed="false" onclick="setTool('hand',this)" title="Hand, scroll the page" aria-label="Hand tool"><svg class="ic" aria-hidden="true"><use href="#ticon-hand-stop"></use></svg></button> <button class="tool" data-tool="calligraphy" aria-pressed="false" onclick="setTool('calligraphy',this)" title="Calligraphy pen, nib angle changes width" aria-label="Calligraphy pen"><svg class="ic" aria-hidden="true"><use href="#ticon-feather"></use></svg></button> <button class="tool" data-tool="select" aria-pressed="false" onclick="setTool('select',this)" title="Select, drag a box around strokes" aria-label="Select strokes"><svg class="ic" aria-hidden="true"><use href="#ticon-pointer"></use></svg></button> <button class="tool" data-tool="text" aria-pressed="false" onclick="setTool('text',this)" title="Text, tap the page to place typed text" aria-label="Text tool"><svg class="ic" aria-hidden="true"><use href="#ticon-typography"></use></svg></button> <button class="tool" data-tool="vspace" aria-pressed="false" onclick="setTool('vspace',this)" title="Vertical space, drag down to make room" aria-label="Vertical space tool"><svg class="ic" aria-hidden="true"><use href="#ticon-arrows-vertical"></use></svg></button></div> </section><section class="sheetSection"> <h3>Size & colour</h3> <div class="sheetRow"><span class="sizeGroup" id="brushSizeGroup"><span class="tool-label">Size</span> <canvas id="sizePreview" width="64" height="30" aria-hidden="true"></canvas> <input type="range" min="1" max="16" value="4" id="brushSize" oninput="updateSizeUI()" aria-label="Brush size"/> <span id="sizeWord" class="sizeWord">Medium</span></span> <span id="swatchBox" style="display:contents"> <button class="swatch active" data-c="#18202B" style="background:#18202B" onclick="setColor('#18202B',this)" aria-label="Ink"></button> <button class="swatch" data-c="#2C4A6E" style="background:#2C4A6E" onclick="setColor('#2C4A6E',this)" aria-label="Blue"></button> <button class="swatch" data-c="#A83A2C" style="background:#A83A2C" onclick="setColor('#A83A2C',this)" aria-label="Vermilion"></button> <button class="swatch" data-c="#3F5C46" style="background:#3F5C46" onclick="setColor('#3F5C46',this)" aria-label="Green"></button> <button class="swatch" data-c="#57425F" style="background:#57425F" onclick="setColor('#57425F',this)" aria-label="Purple"></button> <button class="swatch" data-c="#A9652B" style="background:#A9652B" onclick="setColor('#A9652B',this)" aria-label="Orange"></button> <button class="swatch" data-c="#2B5F5B" style="background:#2B5F5B" onclick="setColor('#2B5F5B',this)" aria-label="Teal"></button> <button class="swatch" data-c="#9A4A60" style="background:#9A4A60" onclick="setColor('#9A4A60',this)" aria-label="Rose"></button> </span> <input type="color" class="colorPick" id="customColor" value="#18202B" title="Custom colour" oninput="setColor(this.value,null)" aria-label="Custom colour"/></div> </section><section class="sheetSection"> <h5 id="toolOptsTitle">Pen options</h5> <div class="toolOptSection" data-tools="pen calligraphy highlighter spline line rect ellipse arrow compass"> <div class="popRow"><span class="tool-label">Style</span><select id="strokeStyleSel" class="shapeSel" onchange="S.strokeStyle=this.value" title="Stroke style"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option><option value="dashdot">Dash-dot</option></select></div> <div class="popRow"><span class="tool-label">Smooth</span><input type="range" min="0" max="90" value="28" id="stabilizeRange" oninput="S.stabilize=+this.value" aria-label="Input stabilisation"/></div> <div class="popChecks"><label class="switchRow"><span>Snap to grid</span><input type="checkbox" id="snapTgl" switch onchange="S.snapGrid=this.checked"/></label><label class="switchRow"><span>Shape recogniser</span><input type="checkbox" id="recognizerTgl" switch/></label><label class="switchRow"><span>Fill shape</span><input type="checkbox" id="fillTgl" switch/></label></div> <div class="popRow"><span class="tool-label">Pen button</span><select id="stylusBtnSel" class="shapeSel" title="Stylus barrel button or eraser end"><option value="eraser">Eraser</option><option value="select">Select</option><option value="none">Nothing</option></select></div> </div> <div class="toolOptSection" data-tools="eraser"> <div class="popRow"><span class="tool-label">Eraser</span><select id="eraserModeSel" class="shapeSel" onchange="S.eraserMode=this.value;updateSizeUI()" title="How the eraser works"><option value="stroke" selected>Whole stroke, touch and it is gone</option><option value="split">Cut, erases only where you rub</option><option value="whiteout">Whiteout, paints over</option></select></div> <p class="kbd">Whole stroke is the default. The size slider sets the touch zone.</p> </div> <div class="toolOptSection" data-tools="text"> <div class="popRow"><span class="tool-label">Text font</span><select id="textFontSel" class="shapeSel" title="Font for text placed with the Text tool"><option value="Newsreader, serif">Serif</option><option value="system-ui, sans-serif">Sans</option><option value="Newsreader, serif">Editorial</option><option value="ui-monospace, monospace">Mono</option></select></div> <p class="kbd">Tap the page to place text. Size follows the Size slider.</p> </div> <div class="toolOptSection" data-tools="hand select lasso vspace"> <p class="kbd">Hand: one finger scrolls. Select and Lasso: drag around strokes, then drag inside the box to move them. Vertical space: drag down to push everything below the line down. With any drawing tool, two fingers always scroll.</p> <div class="popRow"><label class="switchRow"><span>Snap to grid</span><input type="checkbox" id="snapTgl2" switch onchange="S.snapGrid=this.checked;var a=document.getElementById('snapTgl');if(a)a.checked=this.checked"/></label></div> </div> <div class="toolOptSection" data-tools="spline"> <div class="popRow"><span class="kbd">Tap points on the page, then use Finish spline in the top row, or double-tap the last point.</span></div> </div> </section></div><div class="sheetTabPanel" id="sheetTabInsert" role="tabpanel" aria-labelledby="sheetTabBtnInsert" hidden><section class="sheetSection"> <h3>Insert</h3> <div class="insertGrid"><label class="insertTile" for="pageImgInput"><svg class="ic" aria-hidden="true"><use href="#ticon-photo"></use></svg><span>Image</span></label><input id="pageImgInput" type="file" accept="image/*" class="hidden" onchange="insertPageImage(event)"/><button type="button" class="insertTile" onclick="closeAllToolPops();insertTable()"><svg class="ic" aria-hidden="true"><use href="#ticon-table"></use></svg><span>Table</span></button><button type="button" class="insertTile" onclick="closeAllToolPops();addSticky()"><svg class="ic" aria-hidden="true"><use href="#ticon-note"></use></svg><span>Sticky note</span></button><button type="button" class="insertTile" id="setSquareBtn" onclick="toggleSetSquare()"><svg class="ic" aria-hidden="true"><use href="#ticon-ruler"></use></svg><span>Set square</span></button><button type="button" class="insertTile" onclick="closeAllToolPops();openTexModal()"><svg class="ic" aria-hidden="true"><use href="#ticon-math-function"></use></svg><span>LaTeX equation</span></button><button type="button" class="insertTile" id="hwBtn" onclick="handwritingToText()"><svg class="ic" aria-hidden="true"><use href="#ticon-text-recognition"></use></svg><span>Handwriting to text</span></button></div> </section></div><div class="sheetTabPanel" id="sheetTabPage" role="tabpanel" aria-labelledby="sheetTabBtnPage" hidden><section class="sheetSection"> <h3>Page</h3> <div class="popRow"><span class="tool-label">Template</span><select id="templateSel" class="shapeSel" onchange="setTemplate(this.value)"><option value="blank">Blank</option><option value="lined" selected>Lined</option><option value="grid">Grid</option><option value="dotted">Dotted</option><option value="music">Music staff</option><option value="cornell">Cornell notes</option><option value="checklist">Checklist</option></select></div> <div class="popRow"><span class="tool-label">Page colour</span><span class="pageSwatches" id="pageSwatches"><button type="button" class="swatch pageSwatch" style="background:#fffdf6" onclick="pickPageBg('#fffdf6')" aria-label="Paper"></button><button type="button" class="swatch pageSwatch" style="background:#ffffff" onclick="pickPageBg('#ffffff')" aria-label="White"></button><button type="button" class="swatch pageSwatch" style="background:#f6e8c8" onclick="pickPageBg('#f6e8c8')" aria-label="Cream"></button><button type="button" class="swatch pageSwatch" style="background:#e8f0e4" onclick="pickPageBg('#e8f0e4')" aria-label="Pale green"></button><button type="button" class="swatch pageSwatch" style="background:#e3ecf7" onclick="pickPageBg('#e3ecf7')" aria-label="Pale blue"></button><button type="button" class="swatch pageSwatch" style="background:#2b2f36" onclick="pickPageBg('#2b2f36')" aria-label="Dark slate"></button></span><select id="pageBgSel" class="shapeSel srOnly" tabindex="-1" aria-hidden="true" onchange="setPageBg(this.value)"><option value="#fffdf6">Paper</option><option value="#ffffff">White</option><option value="#f6e8c8">Cream</option><option value="#e8f0e4">Pale green</option><option value="#e3ecf7">Pale blue</option><option value="#2b2f36">Dark slate</option></select></div> <div class="popRow"><span class="tool-label">Zoom</span><button class="btn small" onclick="editorZoomBy(0.8)" aria-label="Zoom out"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-out"></use></svg></button><span class="kbd" id="zoomLabel">100%</span><button class="btn small" onclick="editorZoomBy(1.25)" aria-label="Zoom in"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-in"></use></svg></button><button class="btn small" onclick="editorZoomBy(0)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-reset"></use></svg> Reset</button></div> <div class="popRow"><label class="btn small" for="gplImport"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-palette"></use></svg> Palette .gpl</label><input id="gplImport" type="file" accept=".gpl" class="hidden" onchange="importGpl(event)"/><span class="tool-label">Toolbar</span><select id="toolbarLayoutSel" class="shapeSel" onchange="setToolbarLayout(this.value)"><option value="">Comfortable</option><option value="compact">Compact</option><option value="minimal">Minimal</option></select></div> <div class="popRow"><button class="btn small" onclick="closeAllToolPops();openTimer()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-clock"></use></svg> Focus timer</button></div> </section></div><div class="sheetTabPanel" id="sheetTabNotes" role="tabpanel" aria-labelledby="sheetTabBtnNotes" hidden></div> </div> </dialog> <div class="editorWrap">
+      </div> <div class="sheetBody"><div class="sheetTabPanel" id="sheetTabDraw" role="tabpanel" aria-labelledby="sheetTabBtnDraw"><section class="sheetSection"> <h5 id="toolOptsTitle">Pen options</h5> <div class="toolOptSection" data-tools="pen calligraphy highlighter spline line rect ellipse arrow compass"> <div class="popRow"><span class="tool-label">Style</span><select id="strokeStyleSel" class="shapeSel" onchange="S.strokeStyle=this.value" title="Stroke style"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option><option value="dashdot">Dash-dot</option></select></div> <div class="popRow"><span class="tool-label">Smooth</span><input type="range" min="0" max="90" value="28" id="stabilizeRange" oninput="S.stabilize=+this.value" aria-label="Input stabilisation"/></div> <div class="popChecks"><label class="switchRow"><span>Snap to grid</span><input type="checkbox" id="snapTgl" switch onchange="S.snapGrid=this.checked"/></label><label class="switchRow"><span>Shape recogniser</span><input type="checkbox" id="recognizerTgl" switch/></label><label class="switchRow"><span>Fill shape</span><input type="checkbox" id="fillTgl" switch/></label></div> <div class="popRow"><span class="tool-label">Pen button</span><select id="stylusBtnSel" class="shapeSel" title="Stylus barrel button or eraser end"><option value="eraser">Eraser</option><option value="select">Select</option><option value="none">Nothing</option></select></div> </div> <div class="toolOptSection" data-tools="eraser"> <div class="popRow"><span class="tool-label">Eraser</span><select id="eraserModeSel" class="shapeSel" onchange="S.eraserMode=this.value;updateSizeUI()" title="How the eraser works"><option value="stroke" selected>Whole stroke, touch and it is gone</option><option value="split">Cut, erases only where you rub</option><option value="whiteout">Whiteout, paints over</option></select></div> <p class="kbd">Whole stroke is the default. The size slider sets the touch zone.</p> </div> <div class="toolOptSection" data-tools="text"> <div class="popRow"><span class="tool-label">Text font</span><select id="textFontSel" class="shapeSel" title="Font for text placed with the Text tool"><option value="Newsreader, serif">Serif</option><option value="system-ui, sans-serif">Sans</option><option value="Newsreader, serif">Editorial</option><option value="ui-monospace, monospace">Mono</option></select></div> <p class="kbd">Tap the page to place text. Size follows the Size slider.</p> </div> <div class="toolOptSection" data-tools="hand select lasso vspace"> <p class="kbd">Hand: one finger scrolls. Select and Lasso: drag around strokes, then drag inside the box to move them. Vertical space: drag down to push everything below the line down. With any drawing tool, two fingers always scroll.</p> <div class="popRow"><label class="switchRow"><span>Snap to grid</span><input type="checkbox" id="snapTgl2" switch onchange="S.snapGrid=this.checked;var a=document.getElementById('snapTgl');if(a)a.checked=this.checked"/></label></div> </div> <div class="toolOptSection" data-tools="spline"> <div class="popRow"><span class="kbd">Tap points on the page, then use Finish spline in the top row, or double-tap the last point.</span></div> </div> </section><section class="sheetSection"> <h3>Size & colour</h3> <div class="sheetRow"><span class="sizeGroup" id="brushSizeGroup"><span class="tool-label">Size</span> <canvas id="sizePreview" width="64" height="30" aria-hidden="true"></canvas> <input type="range" min="1" max="16" value="4" id="brushSize" oninput="updateSizeUI()" aria-label="Brush size"/> <span id="sizeWord" class="sizeWord">Medium</span></span> <span id="swatchBox" style="display:contents"> <button class="swatch active" data-c="#18202B" style="background:#18202B" onclick="setColor('#18202B',this)" aria-label="Ink"></button> <button class="swatch" data-c="#2C4A6E" style="background:#2C4A6E" onclick="setColor('#2C4A6E',this)" aria-label="Blue"></button> <button class="swatch" data-c="#A83A2C" style="background:#A83A2C" onclick="setColor('#A83A2C',this)" aria-label="Vermilion"></button> <button class="swatch" data-c="#3F5C46" style="background:#3F5C46" onclick="setColor('#3F5C46',this)" aria-label="Green"></button> <button class="swatch" data-c="#57425F" style="background:#57425F" onclick="setColor('#57425F',this)" aria-label="Purple"></button> <button class="swatch" data-c="#A9652B" style="background:#A9652B" onclick="setColor('#A9652B',this)" aria-label="Orange"></button> <button class="swatch" data-c="#2B5F5B" style="background:#2B5F5B" onclick="setColor('#2B5F5B',this)" aria-label="Teal"></button> <button class="swatch" data-c="#9A4A60" style="background:#9A4A60" onclick="setColor('#9A4A60',this)" aria-label="Rose"></button> </span> <input type="color" class="colorPick" id="customColor" value="#18202B" title="Custom colour" oninput="setColor(this.value,null)" aria-label="Custom colour"/></div> </section></div><div class="sheetTabPanel" id="sheetTabInsert" role="tabpanel" aria-labelledby="sheetTabBtnInsert" hidden><section class="sheetSection"> <div class="insertGrid"><label class="insertTile" for="pageImgInput"><svg class="ic" aria-hidden="true"><use href="#ticon-photo"></use></svg><span>Image</span></label><input id="pageImgInput" type="file" accept="image/*" class="hidden" onchange="insertPageImage(event)"/><button type="button" class="insertTile" onclick="closeAllToolPops();insertTable()"><svg class="ic" aria-hidden="true"><use href="#ticon-table"></use></svg><span>Table</span></button><button type="button" class="insertTile" onclick="closeAllToolPops();addSticky()"><svg class="ic" aria-hidden="true"><use href="#ticon-note"></use></svg><span>Sticky note</span></button><button type="button" class="insertTile" id="setSquareBtn" onclick="toggleSetSquare()"><svg class="ic" aria-hidden="true"><use href="#ticon-ruler"></use></svg><span>Set square</span></button><button type="button" class="insertTile" onclick="closeAllToolPops();openTexModal()"><svg class="ic" aria-hidden="true"><use href="#ticon-math-function"></use></svg><span>LaTeX</span></button><button type="button" class="insertTile" id="hwBtn" onclick="handwritingToText()"><svg class="ic" aria-hidden="true"><use href="#ticon-text-recognition"></use></svg><span>Handwriting to text</span></button></div><div class="insertFoot"><button type="button" class="btn insertFootText" onclick="closeAllToolPops();toggleBoard(true)">Open Board</button><button type="button" class="btn" onclick="closeAllToolPops();focusWrittenNotes()">Written Notes [[Links]]</button><button type="button" class="btn primary" onclick="closeAllToolPops();toggleRecord()">Record Audio</button></div> </section></div><div class="sheetTabPanel" id="sheetTabPage" role="tabpanel" aria-labelledby="sheetTabBtnPage" hidden><section class="sheetSection"> <h3>Page</h3> <div class="popRow"><span class="tool-label">Template</span><select id="templateSel" class="shapeSel" onchange="setTemplate(this.value)"><option value="blank">Blank</option><option value="lined" selected>Lined</option><option value="grid">Grid</option><option value="dotted">Dotted</option><option value="music">Music staff</option><option value="cornell">Cornell notes</option><option value="checklist">Checklist</option></select></div> <div class="popRow"><span class="tool-label">Page colour</span><span class="pageSwatches" id="pageSwatches"><span class="pageSwatchWrap"><button type="button" class="swatch pageSwatch" style="background:#fffdf6" onclick="pickPageBg('#fffdf6')" aria-label="Paper"></button><span class="swatchLabel">Paper</span></span><span class="pageSwatchWrap"><button type="button" class="swatch pageSwatch" style="background:#ffffff" onclick="pickPageBg('#ffffff')" aria-label="White"></button><span class="swatchLabel">White</span></span><span class="pageSwatchWrap"><button type="button" class="swatch pageSwatch" style="background:#f6e8c8" onclick="pickPageBg('#f6e8c8')" aria-label="Cream"></button><span class="swatchLabel">Cream</span></span><span class="pageSwatchWrap"><button type="button" class="swatch pageSwatch" style="background:#e8f0e4" onclick="pickPageBg('#e8f0e4')" aria-label="Pale green"></button><span class="swatchLabel">Pale green</span></span><span class="pageSwatchWrap"><button type="button" class="swatch pageSwatch" style="background:#e3ecf7" onclick="pickPageBg('#e3ecf7')" aria-label="Pale blue"></button><span class="swatchLabel">Pale blue</span></span><span class="pageSwatchWrap"><button type="button" class="swatch pageSwatch" style="background:#2b2f36" onclick="pickPageBg('#2b2f36')" aria-label="Dark slate"></button><span class="swatchLabel">Dark slate</span></span></span><select id="pageBgSel" class="shapeSel srOnly" tabindex="-1" aria-hidden="true" onchange="setPageBg(this.value)"><option value="#fffdf6">Paper</option><option value="#ffffff">White</option><option value="#f6e8c8">Cream</option><option value="#e8f0e4">Pale green</option><option value="#e3ecf7">Pale blue</option><option value="#2b2f36">Dark slate</option></select></div> <div class="popRow"><span class="tool-label">Zoom</span><button class="btn small" onclick="editorZoomBy(0.8)" aria-label="Zoom out"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-out"></use></svg></button><span class="kbd" id="zoomLabel">100%</span><button class="btn small" onclick="editorZoomBy(1.25)" aria-label="Zoom in"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-in"></use></svg></button><button class="btn small" onclick="editorZoomBy(0)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-reset"></use></svg> Reset</button></div> <div class="popRow"><label class="btn small" for="gplImport"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-palette"></use></svg> Palette .gpl</label><input id="gplImport" type="file" accept=".gpl" class="hidden" onchange="importGpl(event)"/><span class="tool-label">Toolbar</span><select id="toolbarLayoutSel" class="shapeSel" onchange="setToolbarLayout(this.value)"><option value="">Comfortable</option><option value="compact">Compact</option><option value="minimal">Minimal</option></select></div> <div class="popRow"><button class="btn small" onclick="closeAllToolPops();openTimer()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-clock"></use></svg> Focus timer</button></div> </section></div><div class="sheetTabPanel" id="sheetTabNotes" role="tabpanel" aria-labelledby="sheetTabBtnNotes" hidden></div> </div> </dialog> <div class="editorWrap">
       <aside class="panel side open" id="pagesPanel">
         <div class="railTabs" role="tablist" aria-label="Pages and layers">
           <button type="button" role="tab" id="railTabPages" class="railTab" aria-selected="true" aria-controls="railPages" onclick="switchRailTab('pages')">Pages</button>
@@ -330,6 +300,9 @@
           <button class="tool active" data-tool="pen" aria-pressed="true" onclick="setTool('pen',this)" title="Pen, pressure sensitive" aria-label="Pen"><svg class="ic" aria-hidden="true"><use href="#ticon-pencil"></use></svg></button>
           <button class="tool" data-tool="highlighter" aria-pressed="false" onclick="setTool('highlighter',this)" title="Highlighter, separate layer" aria-label="Highlighter"><svg class="ic" aria-hidden="true"><use href="#ticon-highlighter"></use></svg></button>
           <button class="tool" data-tool="eraser" aria-pressed="false" onclick="setTool('eraser',this)" title="Eraser, touch a stroke to delete it" aria-label="Eraser"><svg class="ic" aria-hidden="true"><use href="#ticon-eraser"></use></svg></button>
+          <button class="tool" data-tool="calligraphy" aria-pressed="false" onclick="setTool('calligraphy',this)" title="Calligraphy pen, nib angle changes width" aria-label="Calligraphy pen"><svg class="ic" aria-hidden="true"><use href="#ticon-feather"></use></svg></button>
+          <button class="tool" data-tool="text" aria-pressed="false" onclick="setTool('text',this)" title="Text, tap the page to place typed text" aria-label="Text tool"><svg class="ic" aria-hidden="true"><use href="#ticon-typography"></use></svg></button>
+          <button class="tool" data-tool="vspace" aria-pressed="false" onclick="setTool('vspace',this)" title="Vertical space, drag down to make room" aria-label="Vertical space tool"><svg class="ic" aria-hidden="true"><use href="#ticon-arrows-vertical"></use></svg></button>
           <button type="button" class="tool pillColorBtn" id="pillColorBtn" aria-label="Ink colour" title="Ink colour" aria-haspopup="true" aria-expanded="false" aria-controls="colorPop" onclick="toggleColorPop()"><span class="pillColorDot" id="pillColorDot" style="background:#18202B" aria-hidden="true"></span></button>
         </div>
         <button type="button" class="tool" id="penOnlyBtn" data-pen-only-btn aria-pressed="false" onclick="togglePenOnly()" title="Pen only: the pen draws, your finger scrolls" aria-label="Pen only mode"><svg class="ic" aria-hidden="true"><use href="#ticon-pencil"/></svg></button>
@@ -346,7 +319,18 @@
         <span class="tbDivider" role="separator" aria-orientation="vertical"></span>
         <button type="button" class="btn small hidden" id="splineDoneBtn" onclick="finishSpline()">Finish spline</button>
       </div>
-      <button type="button" class="btn pillInsert" id="pillInsertBtn" onclick="openInspector('insert')" aria-haspopup="dialog" aria-controls="editorSheet" aria-expanded="false" title="Insert: image, table, sticky note, set square, LaTeX, handwriting to text"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-plus"></use></svg> <span class="tbLabel">Insert</span></button>
+      <button type="button" class="btn small pillTools" id="pillToolsBtn" onclick="openInspector('draw')" aria-haspopup="dialog" aria-controls="editorSheet" title="Open the tools panel">Tools</button>
+      <button type="button" class="btn pillInsert" id="pillInsertBtn" onclick="onPillInsertClick()" aria-haspopup="menu" aria-controls="insertMenu" aria-expanded="false" title="Insert: image, table, sticky note, set square, LaTeX, handwriting to text"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-plus"></use></svg> <span class="tbLabel">Insert</span> <svg class="ic ic-sm pillInsertChev" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg></button>
+      <div id="insertMenu" popover="auto" class="menuPop">
+        <div focusgroup="menu nomemory" aria-labelledby="pillInsertBtn">
+          <button type="button" onclick="closeInsertMenu();$('pageImgInput').click()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-photo"></use></svg> Image</button>
+          <button type="button" onclick="closeInsertMenu();closeAllToolPops();insertTable()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-table"></use></svg> Table</button>
+          <button type="button" onclick="closeInsertMenu();closeAllToolPops();addSticky()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-note"></use></svg> Sticky note</button>
+          <button type="button" onclick="closeInsertMenu();toggleSetSquare()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-ruler"></use></svg> Set square</button>
+          <button type="button" onclick="closeInsertMenu();closeAllToolPops();openTexModal()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-math-function"></use></svg> LaTeX</button>
+          <button type="button" onclick="closeInsertMenu();handwritingToText()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-text-recognition"></use></svg> Handwriting to text</button>
+        </div>
+      </div>
       <div class="shapePop" id="shapePop">
         <button class="tool" data-tool="line" aria-pressed="false" onclick="setTool('line',this)" title="Straight line" aria-label="Line tool"><svg class="ic" aria-hidden="true"><use href="#ticon-line"></use></svg></button>
         <button class="tool" data-tool="rect" aria-pressed="false" onclick="setTool('rect',this)" title="Rectangle" aria-label="Rectangle tool"><svg class="ic" aria-hidden="true"><use href="#ticon-rectangle"></use></svg></button>
@@ -366,6 +350,7 @@
         <button class="swatch" data-c="#9A4A60" style="background:#9A4A60" onclick="setColor('#9A4A60',this);closeColorPop()" aria-label="Rose"></button>
         <input type="color" class="colorPick" id="pillCustomColor" value="#18202B" title="Custom colour" oninput="setColor(this.value,null)" aria-label="Custom colour"/>
       </div>
+      <div class="layerChip" id="layerChip">Layer: Ink</div>
     </div>
         <div>
           <div class="zoomScroll"><div class="canvasShell" id="canvasShell">
@@ -408,6 +393,7 @@
             <div id="stickyLayer"></div>
           </div></div>
           <div id="selBar"><span class="kbd" id="selInfo">Selection</span><button class="btn small" onclick="duplicateSelection()">Duplicate</button><button class="btn small" onclick="copySelection()">Copy</button><button class="btn small" onclick="pasteSelection()">Paste</button><button class="btn small" onclick="rotateSelection(-15)">Rotate left</button><button class="btn small" onclick="rotateSelection(15)">Rotate right</button><button class="btn small" onclick="scaleSelection(0.85)">Smaller</button><button class="btn small" onclick="scaleSelection(1.18)">Bigger</button><button class="btn small" onclick="flipSelection('x')"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-flip-horizontal"></use></svg> Flip</button><button class="btn small" onclick="flipSelection('y')"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-flip-vertical"></use></svg> Flip</button><button class="btn small" onclick="bringSelectionFront()">Bring to front</button><button class="btn small danger" onclick="deleteSelection()">Delete</button><button class="btn small" onclick="clearSelection()" title="Deselect the strokes (they stay on the page)">Deselect</button><span class="kbd">Drag inside the blue box to move the selected strokes. Copy and paste work across pages.</span></div>
+          <div class="notesAudioRow">
           <div class="noteBlock">
             <div class="noteBlockHead"><span class="runningHead">Written notes</span><span class="kbd" id="wordCount">0 words</span></div>
             <textarea id="noteText" class="textArea" placeholder="Type here, or write above and use Handwriting to text. Link notebooks with [[Title]]."></textarea>
@@ -417,6 +403,7 @@
             <button class="btn small" id="recBtn" onclick="toggleRecord()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-microphone"></use></svg> Record</button>
             <button class="btn small hidden" id="playSyncBtn" onclick="playSyncedAudio()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-player-play"></use></svg> Play with ink sync</button>
             <span class="kbd" id="recStatus">Record while you write. On playback, ink reappears in time with the audio.</span>
+          </div>
           </div>
           <div class="statusBar" id="editorStatus" aria-live="polite"><span>Page <b id="statusPage">1 / 1</b></span><span>Layer <b id="statusLayer">Ink</b></span><span><button type="button" class="btn small" onclick="editorZoomBy(0.8)" aria-label="Zoom out">−</button> Zoom <b id="statusZoom">100%</b> <button type="button" class="btn small" onclick="editorZoomBy(1.25)" aria-label="Zoom in">+</button></span><span>Tool <b id="statusTool">Pen</b></span><span class="statusSpacer"></span><span id="statusHint">One finger draws. Two fingers scroll.</span></div>
           <div id="tableHost"></div>
@@ -429,9 +416,9 @@
         <div id="linksList"><p class="kbd">No links yet.</p></div>
         <h4 class="panelSub">This notebook</h4>
         <div class="statRow3">
-          <div class="statCell"><div class="statNum" id="statEditorPages">1</div><div class="statLabel">Pages</div></div>
-          <div class="statCell"><div class="statNum" id="statPageStrokes">0</div><div class="statLabel">Strokes</div></div>
-          <div class="statCell"><div class="statNum" id="statWrite2">0m</div><div class="statLabel">Writing</div></div>
+          <div class="statCell"><div class="statNum" id="statEditorPages">1</div><div class="statLabel" id="statEditorPagesLabel">Pages</div></div>
+          <div class="statCell"><div class="statNum" id="statPageStrokes">0</div><div class="statLabel" id="statPageStrokesLabel">Strokes</div></div>
+          <div class="statCell"><div class="statNum" id="statWrite2">0</div><div class="statLabel" id="statWrite2Label">Words</div></div>
         </div>
       </aside>
     </div>
@@ -636,10 +623,10 @@
       <div class="paletteSearch">
         <svg class="ic searchIcon" aria-hidden="true"><use href="#ticon-search"></use></svg>
         <input id="globalSearch" placeholder="Search notes, notebooks and books" aria-label="Search notebooks and notes" oninput="onSearchInput()" autocomplete="off"/>
-        <kbd class="searchKbd" title="Press Esc to close">esc</kbd>
+        <kbd class="searchKbd" title="Press Esc to close">ESC</kbd>
       </div>
       <div id="paletteResults" class="paletteResults" role="listbox" aria-label="Search results"></div>
-      <p class="paletteHint"><kbd class="searchKbd">/</kbd> or <kbd class="searchKbd">⌘K</kbd> to search · <kbd class="searchKbd">↑</kbd><kbd class="searchKbd">↓</kbd> to move · <kbd class="searchKbd">↵</kbd> to open · <kbd class="searchKbd">esc</kbd> to close</p>
+      <p class="paletteHint"><kbd class="searchKbd">/</kbd> or <kbd class="searchKbd">⌘K</kbd> to search · <kbd class="searchKbd">↑</kbd><kbd class="searchKbd">↓</kbd> to move · <kbd class="searchKbd">↵</kbd> to open · <kbd class="searchKbd">ESC</kbd> to close</p>
     </dialog>
 </main>
 
@@ -692,7 +679,7 @@
   </div>
 </dialog>
 
-<script src="app.js?v=2026-11-20-r26" defer></script>
+<script src="app.js?v=2026-11-20-r27" defer></script>
 <script>
 /* PWA: install prompt and offline app shell. */
 (function(){
