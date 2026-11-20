@@ -29,7 +29,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="styles.css?v=2026-11-19-r13">
+<link rel="stylesheet" href="styles.css?v=2026-11-19-r14">
 </head>
 <body>
 <!-- Icons: Tabler Icons 3.52.0, MIT, https://tabler.io/icons -->
@@ -371,6 +371,7 @@
               <canvas id="bgCanvas" width="1200" height="800"></canvas>
               <canvas id="hiCanvas" width="1200" height="800"></canvas>
               <canvas id="inkCanvas" width="1200" height="800"></canvas>
+              <canvas id="liveCanvas" width="1200" height="800"></canvas>
               <div id="pageImageLayer"></div>
               <div id="pageTextLayer"></div>
               <div id="texLayer"></div>
@@ -474,7 +475,7 @@
     
     <div id="readerGrid">
       <aside class="panel" id="readerSide">
-        <h4>Contents</h4>
+        <h4>Contents <button type="button" class="btn small sideClose" onclick="toggleReaderSide()" aria-label="Close contents">×</button></h4>
         <div id="tocList"><p class="kbd">Open a book to see its contents.</p></div>
         <details class="helpBox" id="bookmarkDetails"><summary><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-bookmark"></use></svg> Bookmarks</summary><div id="bookmarkList"><p class="kbd">No bookmarks yet</p></div></details>
         <details class="helpBox" id="annoDetails"><summary><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-highlighter"></use></svg> Annotations</summary><div id="annoList"><p class="kbd">Select text, then choose Highlight</p></div></details>
@@ -669,7 +670,7 @@
   </div>
 </dialog>
 
-<script src="app.js?v=2026-11-19-r13"></script>
+<script src="app.js?v=2026-11-19-r14"></script>
 <script>
 /* PWA: install prompt and offline app shell. */
 (function(){
