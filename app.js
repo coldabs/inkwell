@@ -133,8 +133,8 @@ function curPageObj(){let nb=curNb();if(!nb)return null;return nb.pages[nb.cur]|
    periodic signature check catches any edit path that forgot to ask. */
 const IDB_NAME='inkwell-db', IDB_STATE_KEY='library-v1';
 let persistReady=false, persistDirty=false, persistSaving=false, persistSaveAgain=false, inSave=false, lastSaveAt=0, saveTimer=null, restoreToken=0, startHash='';
-function idbOpen(){ return new Promise((res,rej)=>{ if(!('indexedDB' in window)){ rej(new Error('IndexedDB unavailable')); return; } let rq=indexedDB.open(IDB_NAME,1); rq.onupgradeneeded=()=>{ if(!rq.result.objectStoreNames.contains('kv')) rq.result.createObjectStore('kv'); }; rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); rq.onblocked=()=>rej(new Error('IndexedDB blocked')); }); }
-let _idbP=null; function idb(){ if(!_idbP) _idbP=idbOpen(); return _idbP; }
+function idbOpen(){ return new Promise((res,rej)=>{ if(!('indexedDB' in window)){ rej(new Error('IndexedDB unavailable')); return; } let rq=indexedDB.open(IDB_NAME,1); rq.onupgradeneeded=()=>{ if(!rq.result.objectStoreNames.contains('kv')) rq.result.createObjectStore('kv'); }; rq.onsuccess=()=>{ const db = rq.result; db.onversionchange = () => { db.close(); _idbP = null; }; res(db); }; rq.onerror=()=>rej(rq.error); rq.onblocked=()=>rej(new Error('IndexedDB blocked')); }); }
+let _idbP=null; function idb(){ if(!_idbP) _idbP = idbOpen().catch(err => { _idbP = null; throw err; }); return _idbP; }
 async function idbGet(key){ let db=await idb(); return new Promise((res,rej)=>{ let rq=db.transaction('kv','readonly').objectStore('kv').get(key); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); }); }
 async function idbPut(key,val){ let db=await idb(); return new Promise((res,rej)=>{ let tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put(val,key); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error); }); }
 async function idbDel(key){ try{ let db=await idb(); await new Promise(res=>{ let tx=db.transaction('kv','readwrite'); tx.objectStore('kv').delete(key); tx.oncomplete=()=>res(); tx.onerror=()=>res(); tx.onabort=()=>res(); }); }catch(e){} }
@@ -145,7 +145,7 @@ function updateSaveStatus(failed){
   if(failed){ el.textContent='Could not save in this browser. Use Backup to keep your notes safe.'; return; }
   el.textContent= lastSaveAt? 'Saved '+new Date(lastSaveAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}) : 'Saved';
 }
-function scheduleSave(){ if(!persistReady || inSave) return; persistDirty=true; clearTimeout(saveTimer); saveTimer=setTimeout(saveNow,700); }
+function scheduleSave(){ if (!persistReady) return; persistDirty = true; if (inSave) return; clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 700); }
 function bgPdfImgData(bg){
   if(!bg) return null;
   if(bg._imgData && bg._imgDataFor===bg.img) return bg._imgData;
@@ -179,7 +179,7 @@ async function saveNow(){
     lastSaveAt=Date.now(); updateSaveStatus(false);
   }catch(e){ persistDirty=true; updateSaveStatus(true); }
   inSave=false; persistSaving=false;
-  if(persistSaveAgain){ persistSaveAgain=false; scheduleSave(); }
+  if(persistSaveAgain || persistDirty){ persistSaveAgain=false; scheduleSave(); }
 }
 function dataUrlToCanvas(url){ return new Promise((res,rej)=>{ let img=new Image(); img.onload=()=>{ let c=document.createElement('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight; c.getContext('2d').drawImage(img,0,0); res(c); }; img.onerror=()=>rej(new Error('image failed')); img.src=url; }); }
 /* The size of a PDF page behind a notebook page, in PDF points: stored
@@ -550,7 +550,7 @@ function renderLibrary(){
      empty shelf while the sample book sits right below it. */
   $('emptyState').classList.toggle('hidden', S.items.length>0);
   $('libHint').textContent=q? items.length+(items.length===1?' match':' matches')+'. Search also looks inside notes, books and annotations.' : (S.recent?'Recently opened first.':'');
-  $('libraryGrid').innerHTML=items.map(n=>{
+  const _libGrid = $('libraryGrid'); if (_libGrid && !_libGrid._deleteDelegated) { _libGrid._deleteDelegated = true; _libGrid.addEventListener('click', e => { const btn = e.target.closest('[data-delete-id]'); if (!btn) return; e.stopPropagation(); askDeleteItem(btn.dataset.deleteId); }); } _libGrid.innerHTML=items.map(n=>{
     let cov=coverFor(n);
     let kindLabel = n.kind==='notebook'? 'Notebook' : n.kind==='pdf'? 'PDF' : 'EPUB';
     let kindIcon = n.kind==='notebook'? 'notebook' : n.kind==='pdf'? 'file-type-pdf' : 'book';
@@ -561,7 +561,7 @@ function renderLibrary(){
     let prog=itemProgress(n);
     let menu='<button type="button" onclick="event.stopPropagation();'+openAct+'">'+icon(n.kind==='notebook'?'notebook':'book-2')+(n.kind==='notebook'?'Open notebook':'Read book')+'</button>'
       + (n.kind==='pdf'? '<button type="button" onclick="event.stopPropagation();annotatePdf(\''+n.id+'\')">'+icon('pencil')+'Annotate</button>':'')
-      + '<button type="button" class="danger" onclick="event.stopPropagation();askDeleteItem(\''+n.id+'\')">'+icon('trash')+'Delete</button>';
+      + '<button type="button" class="danger" data-delete-id="'+esc(n.id)+'">'+icon('trash')+'Delete</button>';
     return '<article class="bookCard"><button type="button" class="book" style="background:'+cov.bg+';color:'+cov.ink+'" onclick="'+openAct+'"><span class="srOnly">Open </span><span class="bookSpine" style="background:'+cov.spine+'"></span><span class="bookFace"><span class="bookKind">'+icon(kindIcon,'ic-sm')+kindLabel+'</span><span class="bookTitle">'+esc(n.title).split('_').join('_&#8203;')+'</span><span class="bookProgress" aria-hidden="true"><span style="width:'+prog+'%"></span></span><span class="srOnly">'+prog+'% read</span><span class="bookMeta"><span>'+count+'</span><span>'+(n.sample?'Sample':'Edited '+esc(n.updated||'just now'))+'</span></span></span></button>'
       +'<button type="button" class="bookMenu" aria-label="Options for '+esc(n.title)+'" aria-haspopup="true" onclick="toggleCardMenu(this)">'+icon('dots','ic-sm')+'</button>'
       +'<div class="bookActions">'+menu+'</div></article>';
@@ -600,7 +600,7 @@ document.addEventListener('click',e=>{ if(!e.target.closest('.bookCard')) docume
 function askDeleteItem(id){
   let it=S.items.find(i=>i.id===id); if(!it) return;
   askConfirm('Delete “'+it.title+'”?','This deletes it from this browser. Export a backup first if you want to keep it.',()=>{
-    if(it.kind==='pdf'){ deletePdfFile(id); /* the PDF's annotation store goes with it, or it would linger in storage with no book */ let lnk=linkedNbFor(id); if(lnk && S.curNbId===lnk.id) S.curNbId=null; S.items=S.items.filter(i=>!(i.kind==='notebook' && i.pdfBookId===id)); }
+    if (it._pdfUrl) { URL.revokeObjectURL(it._pdfUrl); it._pdfUrl = null; } if (Array.isArray(it.pages)) it.pages.forEach(p => { if (p.audio && p.audio.url && p.audio.url.startsWith('blob:')) URL.revokeObjectURL(p.audio.url); }); if(it.kind==='pdf'){ deletePdfFile(id); /* the PDF's annotation store goes with it, or it would linger in storage with no book */ let lnk=linkedNbFor(id); if (lnk && Array.isArray(lnk.pages)) lnk.pages.forEach(p => { if (p.audio && p.audio.url && p.audio.url.startsWith('blob:')) URL.revokeObjectURL(p.audio.url); }); if(lnk && S.curNbId===lnk.id) S.curNbId=null; S.items=S.items.filter(i=>!(i.kind==='notebook' && i.pdfBookId===id)); }
     S.items=S.items.filter(i=>i.id!==id);
     if(S.curNbId===id) S.curNbId=null;
     if(S.curBookId===id) S.curBookId=null;
@@ -798,7 +798,7 @@ function setLibTab(tab){
   /* Invoker fallback: without commandForElement the command attribute
      does nothing, so toggle the popover from script instead. */
   if(!('commandForElement' in HTMLButtonElement.prototype)){
-    triggers.forEach(t=>t.addEventListener('click',e=>{ e.preventDefault(); menu.matches(':popover-open')? menu.hidePopover() : menu.showPopover({source:t}); }));
+    document.addEventListener('click', e => { const btn = e.target.closest('button[commandfor][command]'); if (!btn) return; const target = document.getElementById(btn.getAttribute('commandfor')); if (!target) return; const cmd = btn.getAttribute('command'); if (cmd === 'show-modal' && typeof target.showModal === 'function') { e.preventDefault(); if (!target.open) target.showModal(); } else if (cmd === 'close' && typeof target.close === 'function') { e.preventDefault(); if (target.open) target.close(); } else if (cmd === 'toggle-popover' && typeof target.togglePopover === 'function') { e.preventDefault(); target.togglePopover({ source: btn }); } else if (cmd === 'show-popover' && typeof target.showPopover === 'function') { e.preventDefault(); target.showPopover({ source: btn }); } else if (cmd === 'hide-popover' && typeof target.hidePopover === 'function') { e.preventDefault(); target.hidePopover(); } });
   }
   menu.addEventListener('toggle',e=>{
     let open=e.newState==='open';
