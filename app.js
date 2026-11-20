@@ -1501,6 +1501,18 @@ function penOnlyActive(){ return penOnlyStored!==null? penOnlyStored : penSeen; 
 function syncPenOnlyUI(){ let on=penOnlyActive(); document.querySelectorAll('[data-pen-only-btn]').forEach(b=>{ b.classList.toggle('active',on); b.setAttribute('aria-pressed',on?'true':'false'); }); }
 function togglePenOnly(){ let on=!penOnlyActive(); penOnlyStored=on; try{ localStorage.setItem(PEN_ONLY_KEY,on?'1':'0'); }catch(e){} syncPenOnlyUI(); toast(on? 'Pen only: the pen draws, your finger scrolls' : 'Finger drawing on again — tap Pen only to switch it back'); }
 function notePenSeen(){ if(penSeen) return; penSeen=true; try{ localStorage.setItem(PEN_SEEN_KEY,'1'); }catch(e){} syncPenOnlyUI(); toast('Pen seen — your finger now scrolls instead of drawing. Tap Pen only in the toolbar to change it.'); }
+
+/* Links panel: closed by default at ≤1024px so the page fills the
+   screen, one tap away via the Links button in the editor top bar;
+   always open on wider screens (same mobileMoved hiding the pages
+   panel uses). Stored choice wins on phones/tablets and survives a
+   reload; desktop ignores it and stays open. */
+const LINKS_OPEN_KEY='inkwell-links-open';
+let linksOpenStored=null;
+try{ let v=localStorage.getItem(LINKS_OPEN_KEY); linksOpenStored= v==='1'? true : v==='0'? false : null; }catch(e){}
+function linksPanelOpen(){ if(window.matchMedia('(min-width:1025px)').matches) return true; return linksOpenStored!==null? linksOpenStored : false; }
+function applyLinksPanel(){ let p=$('linksPanel'); if(!p) return; let open=linksPanelOpen(); p.classList.toggle('mobileMoved',!open); let b=$('linksToggleBtn'); if(b) b.setAttribute('aria-pressed',open?'true':'false'); }
+function toggleLinksPanel(){ let open=!linksPanelOpen(); linksOpenStored=open; try{ localStorage.setItem(LINKS_OPEN_KEY,open?'1':'0'); }catch(e){} applyLinksPanel(); if(open){ let p=$('linksPanel'); if(p) p.scrollIntoView({block:'nearest'}); } }
 function penPressureCurve(raw){ if(!(raw>0)) return 0; if(raw<PEN_DEADZONE) return 0; return Math.pow((raw-PEN_DEADZONE)/(1-PEN_DEADZONE),1.25); }
 /* Hover ring: a ring at the pen tip, sized to the stroke the pen would
    make and tinted with the current colour. Moved with transform only
@@ -2128,6 +2140,10 @@ document.addEventListener('keydown',e=>{
    same handlers -- so nothing is duplicated or re-bound. */
 let edSheetMode=null;
 function layoutEditorSheet(){
+  /* Links panel state is applied on every layout pass (load + resize)
+     so crossing the 1024px line can't leave it stale; the stored
+     choice is read fresh each time, so a toggle survives resizes. */
+  applyLinksPanel();
   var mobile=window.matchMedia('(max-width:768px)').matches;
   if(mobile===edSheetMode) return; edSheetMode=mobile;
   /* Guarded: a layout slip here must never abort the rest of app.js
@@ -2533,7 +2549,7 @@ function refreshLinks(){
   let html='';
   if(out.length) html+=out.map(l=>'<div class="listRow"><a href="#" onclick="openLink(\''+esc(l).replace(/'/g,"\\'")+'\');return false">[[ '+esc(l)+' ]]</a><span class="kbd">link</span></div>').join('');
   if(back.length) html+='<h4 style="margin-top:12px">Backlinks</h4>'+back.map(t=>'<div class="listRow"><span>'+esc(t)+'</span><span class="kbd">links here</span></div>').join('');
-  host.innerHTML= html || '<p class="kbd">Type [[Title]] in the note to link another notebook. Links create the notebook if it does not exist yet.</p>';
+  host.innerHTML= html || '<p class="kbd">No links yet.</p>';
 }
 function openLink(title){
   let nb=S.items.find(i=>i.kind==='notebook' && !i.pdfBookId && i.title.toLowerCase()===title.toLowerCase());
