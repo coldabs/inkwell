@@ -1,7 +1,7 @@
 /* Inkwell service worker: offline app shell + runtime-cached CDN libraries.
    User data lives in IndexedDB; this worker never touches it.
    Bump VERSION whenever the shell files change. */
-var VERSION = 'v19-2026-11-19';
+var VERSION = 'v20-2026-11-20';
 var SHELL_CACHE = 'inkwell-shell-' + VERSION;
 var RUNTIME_CACHE = 'inkwell-runtime-' + VERSION;
 var APP_SHELL = [
@@ -50,7 +50,7 @@ self.addEventListener('fetch', function (event) {
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req).then(function (res) {
-        return res;
+        if (res && res.ok) { var copy = res.clone(); event.waitUntil(caches.open(SHELL_CACHE).then(function (cache) { return cache.put('index.html', copy); })); return res; } return caches.match('index.html');
       }).catch(function () {
         return caches.match('index.html');
       })
@@ -65,11 +65,11 @@ self.addEventListener('fetch', function (event) {
         var network = fetch(req).then(function (res) {
           if (res && (res.ok || res.type === 'opaque')) {
             var copy = res.clone();
-            caches.open(RUNTIME_CACHE).then(function (cache) { cache.put(req, copy); });
+            return caches.open(RUNTIME_CACHE).then(function (cache) { return cache.put(req, copy); }).then(function () { return res; });
           }
           return res;
-        }).catch(function () { return cached; });
-        return cached || network;
+        }).catch(function () { return cached || new Response('Offline', { status: 503, statusText: 'Service Unavailable' }); });
+        event.waitUntil(network); return cached || network;
       })
     );
     return;
