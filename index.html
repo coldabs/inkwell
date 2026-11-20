@@ -29,7 +29,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="styles.css?v=2026-11-20-r23">
+<link rel="stylesheet" href="styles.css?v=2026-11-20-r24">
 </head>
 <body>
 <!-- Icons: Tabler Icons 3.52.0, MIT, https://tabler.io/icons -->
@@ -276,6 +276,7 @@
         <label class="srOnly" for="noteTitle">Notebook title</label>
         <input id="noteTitle" value="Untitled notebook" oninput="syncTitle()"/>
       </div>
+      <button type="button" class="btn small" id="linksToggleBtn" onclick="toggleLinksPanel()" aria-pressed="false" aria-controls="linksPanel" title="Show or hide the links panel"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-link"></use></svg> <span class="tbLabel">Links</span></button>
       <button type="button" class="btn small" id="addPageTopBtn" onclick="addPage()" title="Add a page to this notebook" aria-label="Add page"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-plus"></use></svg> <span class="tbLabel">Add page</span></button>
       <button class="btn small edFocus" onclick="openTimer()" title="Start a 25 minute focus session"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-clock"></use></svg> <span class="timerLabel">Focus 25:00</span></button>
       <button type="button" class="tbBoardBtn" id="boardBtn" aria-pressed="false" onclick="toggleBoard()" title="Floating board, an infinite canvas for drafting"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-layout-board"></use></svg> <span class="tbLabel">Board</span></button>
@@ -423,13 +424,15 @@
         <div id="splitPane" class="splitPane hidden"></div>
       </div>
 
-      <aside class="panel side open">
+      <aside class="panel side open" id="linksPanel">
         <h4>Links &amp; backlinks</h4>
-        <div id="linksList"><p class="kbd">Type [[Title]] in the note to link another notebook.</p></div>
+        <div id="linksList"><p class="kbd">No links yet.</p></div>
         <h4 class="panelSub">This notebook</h4>
-        <div class="listRow"><span>Pages</span><b id="statEditorPages">1</b></div>
-        <div class="listRow"><span>Strokes on page</span><b id="statPageStrokes">0</b></div>
-        <div class="listRow"><span>Session writing</span><b id="statWrite2">0m</b></div>
+        <div class="statRow3">
+          <div class="statCell"><div class="statNum" id="statEditorPages">1</div><div class="statLabel">Pages</div></div>
+          <div class="statCell"><div class="statNum" id="statPageStrokes">0</div><div class="statLabel">Strokes</div></div>
+          <div class="statCell"><div class="statNum" id="statWrite2">0m</div><div class="statLabel">Writing</div></div>
+        </div>
       </aside>
     </div>
     <!-- Floating zoom control: separate − / % / + for the notebook, kept
@@ -675,7 +678,7 @@
   </div>
 </dialog>
 
-<script src="app.js?v=2026-11-20-r23" defer></script>
+<script src="app.js?v=2026-11-20-r24" defer></script>
 <script>
 /* PWA: install prompt and offline app shell. */
 (function(){
