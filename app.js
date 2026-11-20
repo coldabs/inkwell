@@ -165,8 +165,8 @@ function serializeLibrary(){
           board:p.board?{color:p.board.color,strokes:p.board.strokes,view:p.board.view,geom:p.board.geom||null}:null,
           audio:(p.audio&&p.audio.blob)?{blob:p.audio.blob,dur:p.audio.dur}:null,
           bgPdf:p.bgPdf?{page:p.bgPdf.page,bookTitle:p.bgPdf.bookTitle,imgData:bgPdfImgData(p.bgPdf),w:(bgPdfSize(p.bgPdf)||[])[0]||null,h:(bgPdfSize(p.bgPdf)||[])[1]||null}:null }))};
-      if(it.kind==='pdf') return {id:it.id,kind:'pdf',title:it.title,color:it.color,updated:it.updated,openedAt:it.openedAt||0,sample:!!it.sample,fileName:it.fileName,numPages:it.numPages,page:it.page,mode:it.mode,bookmarks:it.bookmarks||[],annotations:it.annotations||[],textCache:it.textCache||{},parallelNotes:it.parallelNotes||{},parallelWith:it.parallelWith||null,parallelSync:it.parallelSync||'unit',parallelOffset:it.parallelOffset||0,parallelZoom:it.parallelZoom||1,ocrPages:it.ocrPages||{},markColor:it.markColor||null,markOpacity:(typeof it.markOpacity==='number'? it.markOpacity : 1)};
-      return {id:it.id,kind:'epub',title:it.title,color:it.color,updated:it.updated,openedAt:it.openedAt||0,sample:!!it.sample,ch:it.ch||0,mode:it.mode||'scroll',bookmarks:it.bookmarks||[],annotations:it.annotations||[],parallelNotes:it.parallelNotes||{},parallelWith:it.parallelWith||null,parallelSync:it.parallelSync||'unit',parallelOffset:it.parallelOffset||0,parallelZoom:it.parallelZoom||1,parallelInk:it.parallelInk||{},chapters:it.chapters||[],markColor:it.markColor||null,markOpacity:(typeof it.markOpacity==='number'? it.markOpacity : 1)};
+      if(it.kind==='pdf') return {id:it.id,kind:'pdf',title:it.title,color:it.color,updated:it.updated,openedAt:it.openedAt||0,sample:!!it.sample,fileName:it.fileName,numPages:it.numPages,page:it.page,mode:it.mode,bookmarks:it.bookmarks||[],annotations:it.annotations||[],textCache:it.textCache||{},parallelNotes:it.parallelNotes||{},parallelWith:it.parallelWith||null,parallelSync:it.parallelSync||'unit',parallelOffset:it.parallelOffset||0,parallelZoom:it.parallelZoom||1,ocrPages:it.ocrPages||{},markColor:it.markColor||null,markOpacity:(typeof it.markOpacity==='number'? it.markOpacity : 0.6),markSettings:it.markSettings||null};
+      return {id:it.id,kind:'epub',title:it.title,color:it.color,updated:it.updated,openedAt:it.openedAt||0,sample:!!it.sample,ch:it.ch||0,mode:it.mode||'scroll',bookmarks:it.bookmarks||[],annotations:it.annotations||[],parallelNotes:it.parallelNotes||{},parallelWith:it.parallelWith||null,parallelSync:it.parallelSync||'unit',parallelOffset:it.parallelOffset||0,parallelZoom:it.parallelZoom||1,parallelInk:it.parallelInk||{},chapters:it.chapters||[],markColor:it.markColor||null,markOpacity:(typeof it.markOpacity==='number'? it.markOpacity : 0.6),markSettings:it.markSettings||null};
     })};
 }
 async function saveNow(){
@@ -245,7 +245,7 @@ async function restoreLibrary(token){
       if(nb.cur>=nb.pages.length) nb.cur=nb.pages.length-1; if(nb.cur<0) nb.cur=0;
       items.push(nb);
     } else if(raw.kind==='pdf'){
-      let b={id:raw.id,kind:'pdf',title:raw.title||'PDF',color:raw.color||'#4a5a74',updated:raw.updated||'',openedAt:raw.openedAt||0,sample:!!raw.sample,fileName:raw.fileName||raw.title,numPages:raw.numPages||0,page:raw.page||1,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],textCache:raw.textCache||{},parallelNotes:raw.parallelNotes||{},parallelWith:raw.parallelWith||null,parallelSync:raw.parallelSync||'unit',parallelOffset:+raw.parallelOffset||0,parallelZoom:+raw.parallelZoom||1,ocrPages:raw.ocrPages||{},markColor:raw.markColor||null,markOpacity:(typeof raw.markOpacity==='number'? raw.markOpacity : 1),doc:null,fileData:null};
+      let b={id:raw.id,kind:'pdf',title:raw.title||'PDF',color:raw.color||'#4a5a74',updated:raw.updated||'',openedAt:raw.openedAt||0,sample:!!raw.sample,fileName:raw.fileName||raw.title,numPages:raw.numPages||0,page:raw.page||1,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],textCache:raw.textCache||{},parallelNotes:raw.parallelNotes||{},parallelWith:raw.parallelWith||null,parallelSync:raw.parallelSync||'unit',parallelOffset:+raw.parallelOffset||0,parallelZoom:+raw.parallelZoom||1,ocrPages:raw.ocrPages||{},markColor:raw.markColor||null,markOpacity:(typeof raw.markOpacity==='number'? raw.markOpacity : 0.6),markSettings:(raw.markSettings&&typeof raw.markSettings==='object')? raw.markSettings : null,doc:null,fileData:null};
       try{
         let fd=await idbGet('pdf:'+raw.id);
         if(fd) b.fileData=fd;
@@ -258,7 +258,7 @@ async function restoreLibrary(token){
       }catch(e){}
       items.push(b);
     } else if(raw.kind==='epub'){
-      items.push({id:raw.id,kind:'epub',title:raw.title||'Book',color:raw.color||'#2e6f6a',updated:raw.updated||'',openedAt:raw.openedAt||0,sample:!!raw.sample,ch:raw.ch||0,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],parallelNotes:raw.parallelNotes||{},parallelWith:raw.parallelWith||null,parallelSync:raw.parallelSync||'unit',parallelOffset:+raw.parallelOffset||0,parallelZoom:+raw.parallelZoom||1,parallelInk:(raw.parallelInk&&typeof raw.parallelInk==='object')? raw.parallelInk : {},chapters:raw.chapters||[],markColor:raw.markColor||null,markOpacity:(typeof raw.markOpacity==='number'? raw.markOpacity : 1)});
+      items.push({id:raw.id,kind:'epub',title:raw.title||'Book',color:raw.color||'#2e6f6a',updated:raw.updated||'',openedAt:raw.openedAt||0,sample:!!raw.sample,ch:raw.ch||0,mode:raw.mode||'scroll',bookmarks:raw.bookmarks||[],annotations:raw.annotations||[],parallelNotes:raw.parallelNotes||{},parallelWith:raw.parallelWith||null,parallelSync:raw.parallelSync||'unit',parallelOffset:+raw.parallelOffset||0,parallelZoom:+raw.parallelZoom||1,parallelInk:(raw.parallelInk&&typeof raw.parallelInk==='object')? raw.parallelInk : {},chapters:raw.chapters||[],markColor:raw.markColor||null,markOpacity:(typeof raw.markOpacity==='number'? raw.markOpacity : 0.6),markSettings:(raw.markSettings&&typeof raw.markSettings==='object')? raw.markSettings : null});
     }
    }catch(e){ /* one damaged item must not cost the whole shelf */ }
   }
@@ -3378,7 +3378,7 @@ async function renderPdfTextLayer(page,cssVp,holder,book,pageNum){
   try{
     let tc=await page.getTextContent();
     if(!holder.isConnected) return;
-    let layer=document.createElement('div'); layer.className='textLayer'; holder.appendChild(layer);
+    let layer=document.createElement('div'); layer.className='textLayer'; layer.tabIndex=-1; holder.appendChild(layer);
     let full=''; let pending=[]; /* spans still needing a width measure: one rAF per page, not one per span (~500/page, each forcing layout) */
     tc.items.forEach(item=>{
       if(!item.str) return;
@@ -3667,8 +3667,8 @@ function wrapRangePerNode(range,kind,color,opacity,annoId){
   });
   return first;
 }
-function wrapRangeAsMark(range,kind,color,opacity){
-  let el=wrapRangePerNode(range,kind,color,opacity);
+function wrapRangeAsMark(range,kind,color,opacity,annoId){
+  let el=wrapRangePerNode(range,kind,color,opacity,annoId);
   if(!el) throw new Error('nothing to wrap');
   return el;
 }
@@ -3724,6 +3724,7 @@ function readerShowSelBar(){
   let bar=$('readerSelBar'); if(!bar) return;
   let info=readerSelInfo(); if(!info){ readerHideSelBar(); return; }
   bar.classList.remove('hidden'); renderSelColor();
+  let su=$('readerSelUndo'); if(su){ let cb=curBook(); su.disabled=!(cb&&cb.annotations&&cb.annotations.length); }
   let bw=bar.offsetWidth, bh=bar.offsetHeight, r=info.rect, coarse=window.matchMedia && matchMedia('(pointer:coarse)').matches;
   let x=Math.max(8,Math.min(window.innerWidth-bw-8, r.left+r.width/2-bw/2));
   /* above the selection with a mouse; below it on touch screens, clear of the phone's own copy / paste menu */
@@ -3753,6 +3754,7 @@ function barAct(ev, act, bar){
   else if(act==='underline') annotateSelection('underline');
   else if(act==='strike') annotateSelection('strike');
   else if(act==='color') toggleSelColorPop(bar);
+  else if(act==='undo') undoLastAnnotation();
 }
 /* Mark colour + intensity (Item B). A mark stores the colour and opacity
    it was made with, so it re-renders the same after reload; a book
@@ -3763,8 +3765,26 @@ function barAct(ev, act, bar){
 const MARK_COLORS=[{label:'Default',value:''},{label:'Yellow',value:'#FFE600'},{label:'Orange',value:'#FF9F0A'},{label:'Pink',value:'#FF6482'},{label:'Green',value:'#30D158'},{label:'Blue',value:'#0A84FF'},{label:'Purple',value:'#BF5AF2'}];
 const MARK_COLOR_DEFAULT='conic-gradient(#FFE600,#FF9F0A,#FF6482,#BF5AF2,#0A84FF,#30D158,#FFE600)';
 function hexA(hex,a){ if(!hex) return ''; let h=hex.replace('#',''); if(h.length===3) h=h.split('').map(c=>c+c).join(''); let n=parseInt(h,16); if(isNaN(n)) return hex; return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+(a==null?1:a)+')'; }
-function markColorFor(b,kind){ if(b&&b.markColor) return b.markColor; return kind==='underline'?'#2456c8':kind==='strike'?'#b23a2e':'#FFE600'; }
-function markOpacityFor(b){ return (b&&typeof b.markOpacity==='number')? Math.min(1,Math.max(0.25,b.markOpacity)) : 1; }
+/* Per-tool mark settings (reference video r04/r06/r07): Highlight,
+   Underline and Strikethrough each remember their OWN colour + opacity,
+   so switching tools switches to that tool's last-used colour. Old books
+   only have the one shared markColor/markOpacity — those are the fallback
+   for any tool without its own settings yet, so nothing already saved
+   changes. Fresh tools start at 60% intensity, not 100%: the old 100%
+   default is what made the first highlight in the user's video (f05/f08)
+   come out as a solid block the text could not be read through. */
+const MARK_TOOL_DEFAULTS={highlight:{color:'#FFE600',opacity:0.6},underline:{color:'#2456c8',opacity:0.6},strike:{color:'#b23a2e',opacity:0.6}};
+const MARK_TOOL_NAMES={highlight:'Highlight',underline:'Underline',strike:'Strikeout'};
+function toolSettings(b,kind){ if(!b.markSettings) b.markSettings={}; if(!b.markSettings[kind]) b.markSettings[kind]={}; return b.markSettings[kind]; }
+function markSettingsFor(b,kind){
+  let d=MARK_TOOL_DEFAULTS[kind]||MARK_TOOL_DEFAULTS.highlight;
+  let st=b&&b.markSettings&&b.markSettings[kind];
+  let color=(st&&st.color)? st.color : (b&&b.markColor? b.markColor : d.color);
+  let op=(st&&typeof st.opacity==='number')? st.opacity : (b&&typeof b.markOpacity==='number'? b.markOpacity : d.opacity);
+  return {color:color, opacity:Math.min(1,Math.max(0.25,op))};
+}
+function markColorFor(b,kind){ return markSettingsFor(b,kind).color; }
+function markOpacityFor(b,kind){ return markSettingsFor(b,kind).opacity; }
 function annoSwatch(a){ let c=a&&a.color? a.color : (a&&a.kind==='underline'?'#2456c8':a&&a.kind==='strike'?'#b23a2e':'#FFE600'); return hexA(c, a&&a.opacity!=null? a.opacity : 1); }
 let _selColorFrom='reader';
 function selColorBook(){ return _selColorFrom==='pr'&&PR.panes[PR.active] ? PR.panes[PR.active].book : curBook(); }
@@ -3783,7 +3803,7 @@ function renderSelColor(){
   });
   let rb=$('readerSelBar')&&$('readerSelBar').querySelector('.selColorDot'), pb=$('prSelBar')&&$('prSelBar').querySelector('.selColorDot');
   if(rb){ let cb=curBook(); rb.style.background=cb&&cb.markColor? hexA(cb.markColor,markOpacityFor(cb)) : MARK_COLOR_DEFAULT; }
-  if(pb){ let pbn=PR.panes[PR.active]? PR.panes[PR.active].book : null; pb.style.background=pbn&&pbn.markColor? hexA(pbn.markColor,markOpacityFor(pbn)) : MARK_COLOR_DEFAULT; } let fd=$('readerFabDot'), td=$('readerToolDots'), cb=curBook(); if(fd) fd.style.background=cb&&cb.markColor? hexA(cb.markColor,markOpacityFor(cb)) : MARK_COLOR_DEFAULT; if(td){ if(!td.children.length) td.innerHTML=selColorDotsHTML(); if(cb){ let col=cb.markColor||''; td.querySelectorAll('.selDot').forEach(d=>{ let on=d.dataset.color===col; d.classList.toggle('sel',on); d.setAttribute('aria-pressed',on?'true':'false'); }); } }
+  if(pb){ let pbn=PR.panes[PR.active]? PR.panes[PR.active].book : null; pb.style.background=pbn&&pbn.markColor? hexA(pbn.markColor,markOpacityFor(pbn)) : MARK_COLOR_DEFAULT; } let fd=$('readerFabDot'), cb=curBook(); if(fd){ let s2=cb? markSettingsFor(cb, readerActiveTool||_lastReaderTool||'highlight') : null; fd.style.background=s2? hexA(s2.color,s2.opacity) : MARK_COLOR_DEFAULT; }
 }
 function selColorSet(color){ let b=selColorBook(); if(!b) return; b.markColor=color||null; scheduleSave(); renderSelColor(); }
 function selColorSetOpacity(v){ let b=selColorBook(); if(!b) return; b.markOpacity=Math.min(1,Math.max(0.25,+v||1)); scheduleSave(); renderSelColor(); }
@@ -3808,7 +3828,7 @@ function selDotAct(ev, color){
   if(color===_selDotColor && now-_selDotAt<250) return;
   _selDotAt=now; _selDotColor=color;
   let host=ev.currentTarget.closest('[data-selcolor-for]');
-  if(host&&host.dataset.selcolorFor==='sheet') _selColorFrom='reader'; if(ev.currentTarget.closest('#readerToolDots')) _selColorFrom='reader';
+  if(host&&host.dataset.selcolorFor==='sheet') _selColorFrom='reader';
   selColorSet(color);
 }
 document.addEventListener('click',e=>{ let pop=$('selColorPop'); if(pop&&!pop.classList.contains('hidden')&&e.target&&!e.target.closest('#selColorPop')&&!e.target.closest('.selColorBtn')) hideSelColorPop(); });
@@ -3824,6 +3844,23 @@ document.addEventListener('contextmenu',e=>{
   if(e.target.closest('input,textarea,select,[contenteditable="true"]')) return;
   e.preventDefault();
 });
+/* Touch-to-Search (Chrome Android): a long-press on selectable text pops
+   Google's "Tap to see search results" bar over the reader (user video
+   f12). contextmenu prevention + -webkit-touch-callout do NOT stop it —
+   per developer.chrome.com/blog/tap-to-search Chrome skips the bar for
+   text it sees as interactive: focusable, or with a click handler that
+   preventDefaults / touches the DOM. The text layer is neither, so mark
+   each layer focusable (tabindex -1 above: focusable, never in the tab
+   order) and swallow clicks inside it. Selection itself is untouched;
+   link annotations live in the annotation layer, not the text layer, so
+   they keep working. NOTE: desktop Chrome has no Touch-to-Search, so
+   this can only be confirmed on a real Android phone. */
+document.addEventListener('click',e=>{
+  let t=e.target; if(!t||!t.closest) return;
+  if(t.closest('a,button,input,select,textarea,[contenteditable="true"]')) return;
+  if(!t.closest('#pdfView .textLayer, .prPane .textLayer')) return;
+  e.preventDefault();
+},true);
 document.addEventListener('selectionchange',()=>{ if(PR.on || S.view!=='reader') return; clearTimeout(readerSelT); if(readerActiveTool){ readerHideSelBar(); scheduleAutoReaderMark(); return; } readerSelT=setTimeout(readerShowSelBar,120); });
 /* a scroll moves the passage away from the bar — hide it rather than leave it floating over the wrong text */
 ['pdfView','readerBody'].forEach(id=>{ let el=$(id); if(el) el.addEventListener('scroll',()=>{ let b=$('readerSelBar'); if(b && !b.classList.contains('hidden')) readerHideSelBar(); },{passive:true}); });
@@ -3841,10 +3878,10 @@ function annotateSelection(kind){
     let chEl=node.closest? node.closest('[data-ch]') : null;
     if(b.kind==='pdf') where='PDF page '+(holder? holder.dataset.page : b.page);
     else where='Chapter '+( (chEl? +chEl.dataset.ch : b.ch) +1)+' · '+b.chapters[chEl? +chEl.dataset.ch : b.ch].title;
-    let wrapEl=wrapRangePerNode(range,kind,markColorFor(b,kind),markOpacityFor(b)), annoId;
+    let wrapEl=wrapRangePerNode(range,kind,markColorFor(b,kind),markOpacityFor(b,kind),annoId);
     if(!wrapEl) throw new Error('nothing to wrap');
   }catch(e){ toast('Select a clean stretch inside one paragraph'); return; }
-  b.annotations.push({id:annoId, text:text, where:where, kind:kind, color:markColorFor(b,kind), opacity:markOpacityFor(b)});
+  b.annotations.push({id:annoId, text:text, where:where, kind:kind, color:markColorFor(b,kind), opacity:markOpacityFor(b,kind)});
   sel.removeAllRanges();
   renderReaderSide(); renderLibrary(); scheduleSave(); syncReaderToolUI();;
   /* P7: open the Annotations panel so the new entry is visible. */
@@ -3853,7 +3890,102 @@ function annotateSelection(kind){
 }
 function highlightSelection(){ annotateSelection('highlight'); }
 function underlineSelection(){ annotateSelection('underline'); }
-function undoLastAnnotation(){ let b=curBook(); if(!b||!b.annotations||!b.annotations.length){ toast('Nothing to undo'); return; } let last=b.annotations.pop(); if(last&&last.id){ document.querySelectorAll('[data-hl][data-anno-id="'+last.id+'"]').forEach(el=>{ let p=el.parentNode; while(el.firstChild) p.insertBefore(el.firstChild,el); p.removeChild(el); p.normalize(); }); } renderReaderSide(); renderLibrary(); syncReaderToolUI(); scheduleSave(); toast('Undid last annotation'); } let readerActiveTool='', readerPointerDown=false, readerAutoMarkT=null; function toggleReaderToolPanel(forceOpen){ let p=$('readerToolPanel'); if(!p) return; let show=typeof forceOpen==='boolean'? forceOpen : p.classList.contains('hidden'); p.classList.toggle('hidden',!show); let fab=$('readerToolFab'); if(fab) fab.setAttribute('aria-expanded',show?'true':'false'); syncReaderToolUI(); } function toggleReaderTool(tool){ readerActiveTool=(readerActiveTool===tool)?'':tool; if(!readerActiveTool) clearTimeout(readerAutoMarkT); syncReaderToolUI(); } function setReaderToolOpacity(val){ let b=curBook(); if(!b) return; b.markOpacity=Math.max(0.25, Math.min(1, parseFloat(val)||0.6)); scheduleSave(); renderSelColor(); syncReaderToolUI(); } function syncReaderToolUI(){ let b=curBook(), op=b? markOpacityFor(b) : 0.38; let fab=$('readerToolFab')||$('readerFab'); if(fab){ fab.classList.toggle('armed',!!readerActiveTool); fab.classList.toggle('active',!!readerActiveTool); fab.dataset.tool=readerActiveTool||''; } document.querySelectorAll('[data-rtool], #readerToolPanel [data-tool]').forEach(btn=>{ let t=btn.dataset.rtool||btn.dataset.tool; let on=t===readerActiveTool; btn.classList.toggle('active',on); btn.setAttribute('aria-pressed',on?'true':'false'); }); let sl=$('readerToolSlider'); if(sl) sl.value=op; let vl=$('readerToolSliderVal'); if(vl) vl.textContent=Math.round(op*100)+'%'; let ub=$('readerUndoBtn'); if(ub) ub.disabled=!(b&&b.annotations&&b.annotations.length); let qu=$('readerQuickUndo'); if(qu) qu.classList.toggle('hidden',!(b&&b.annotations&&b.annotations.length)); if($('readerToolDots')&&!$('readerToolDots').children.length) renderSelColor(); } function scheduleAutoReaderMark(){ clearTimeout(readerAutoMarkT); if(!readerActiveTool||readerPointerDown||PR.on||S.view!=='reader') return; readerAutoMarkT=setTimeout(()=>{ if(!readerActiveTool||readerPointerDown||PR.on||S.view!=='reader') return; let sel=readerSelection(); if(sel&&sel.toString().trim()) annotateSelection(readerActiveTool); },500); } document.addEventListener('pointerdown',e=>{ readerPointerDown=true; clearTimeout(readerAutoMarkT); let p=$('readerToolPanel'); if(p&&!p.classList.contains('hidden')&&!e.target.closest('#readerToolPanel')&&!e.target.closest('#readerToolFab')&&!e.target.closest('#readerFab')) toggleReaderToolPanel(false); },true); document.addEventListener('pointerup',()=>{ readerPointerDown=false; if(readerActiveTool&&!PR.on&&S.view==='reader') scheduleAutoReaderMark(); },true); document.addEventListener('pointercancel',()=>{ readerPointerDown=false; },true); 
+function undoLastAnnotation(){ let b=curBook(); if(!b||!b.annotations||!b.annotations.length){ toast('Nothing to undo'); return; } let last=b.annotations.pop(); if(last&&last.id){ document.querySelectorAll('[data-hl][data-anno-id="'+last.id+'"]').forEach(el=>{ let p=el.parentNode; while(el.firstChild) p.insertBefore(el.firstChild,el); p.removeChild(el); p.normalize(); }); } renderReaderSide(); renderLibrary(); syncReaderToolUI(); scheduleSave(); toast('Undid last annotation'); }
+let readerActiveTool='', readerPointerDown=false, readerAutoMarkT=null, _lastReaderTool='highlight', _armedHintShown={};
+function toggleReaderToolPanel(forceOpen){ let p=$('readerToolPanel'); if(!p) return; let show=typeof forceOpen==='boolean'? forceOpen : p.classList.contains('hidden'); p.classList.toggle('hidden',!show); let fab=$('readerToolFab'); if(fab) fab.setAttribute('aria-expanded',show?'true':'false'); syncReaderToolUI(); }
+function toggleReaderTool(tool){
+  readerActiveTool=(readerActiveTool===tool)?'':tool;
+  if(!readerActiveTool) clearTimeout(readerAutoMarkT);
+  else{
+    _lastReaderTool=tool;
+    toggleReaderToolPanel(false); /* armed: get the panel out of the way so the page is clear to drag over */
+    if(!_armedHintShown[tool]){ _armedHintShown[tool]=true; toast('Drag over text to '+(tool==='highlight'?'highlight':tool==='underline'?'underline':'strikethrough')); }
+  }
+  syncReaderToolUI();
+}
+function syncReaderToolUI(){
+  let b=curBook();
+  let fab=$('readerToolFab')||$('readerFab');
+  if(fab){ fab.classList.toggle('armed',!!readerActiveTool); fab.classList.toggle('active',!!readerActiveTool); fab.dataset.tool=readerActiveTool||''; }
+  document.querySelectorAll('[data-rtool], #readerToolPanel [data-tool]').forEach(btn=>{ let t=btn.dataset.rtool||btn.dataset.tool; let on=t===readerActiveTool; btn.classList.toggle('active',on); btn.setAttribute('aria-pressed',on?'true':'false'); });
+  /* each tool row shows its own colour + opacity; the FAB dot shows the armed tool's (or the last-used tool's) */
+  if(b){
+    let cur=markSettingsFor(b, readerActiveTool||_lastReaderTool||'highlight');
+    let fd=$('readerFabDot'); if(fd) fd.style.background=hexA(cur.color,cur.opacity);
+    document.querySelectorAll('#readerToolPanel [data-swatch]').forEach(sw=>{ let s=markSettingsFor(b, sw.dataset.swatch); sw.style.setProperty('--sw', hexA(s.color,s.opacity)); });
+  }
+  let hasMarks=!!(b&&b.annotations&&b.annotations.length);
+  let ub=$('readerUndoBtn'); if(ub) ub.disabled=!hasMarks;
+  let tu=$('readerTopUndo'); if(tu) tu.disabled=!hasMarks;
+  let su=$('readerSelUndo'); if(su) su.disabled=!hasMarks;
+  let qu=$('readerQuickUndo'); if(qu) qu.classList.toggle('hidden',!hasMarks);
+}
+function scheduleAutoReaderMark(){ clearTimeout(readerAutoMarkT); if(!readerActiveTool||readerPointerDown||PR.on||S.view!=='reader') return; readerAutoMarkT=setTimeout(()=>{ if(!readerActiveTool||readerPointerDown||PR.on||S.view!=='reader') return; let sel=readerSelection(); if(sel&&sel.toString().trim()) annotateSelection(readerActiveTool); },500); }
+document.addEventListener('pointerdown',e=>{ readerPointerDown=true; clearTimeout(readerAutoMarkT); let p=$('readerToolPanel'); if(p&&!p.classList.contains('hidden')&&!e.target.closest('#readerToolPanel')&&!e.target.closest('#readerToolFab')&&!e.target.closest('#readerFab')) toggleReaderToolPanel(false); },true);
+document.addEventListener('pointerup',()=>{ readerPointerDown=false; if(readerActiveTool&&!PR.on&&S.view==='reader') scheduleAutoReaderMark(); },true);
+document.addEventListener('pointercancel',()=>{ readerPointerDown=false; },true);
+/* --- "<Tool> color" bottom sheet (reference video r06: colour grid + Opacity slider) --- */
+const TOOL_COLORS=['#0A84FF','#30D158','#FFE600','#FF9F0A','#FF3B30','#BF5AF2','#64D2FF','#7EE787','#FFF3A3','#FFD9B3','#FF6482','#E84393','#FFFFFF','#E8E4DA','#AEAEB2','#6E6E73','#3A3A3C','#000000'];
+let _colorSheetTool='highlight', _toolColorGridBuilt=false;
+function toolColorLum(hex){ let h=hex.replace('#',''); if(h.length===3) h=h.split('').map(c=>c+c).join(''); let n=parseInt(h,16); let r=((n>>16)&255)/255, g=((n>>8)&255)/255, b=(n&255)/255; let f=c=> c<=0.03928? c/12.92 : Math.pow((c+0.055)/1.055,2.4); return 0.2126*f(r)+0.7152*f(g)+0.0722*f(b); }
+function openToolColorSheet(tool){
+  _colorSheetTool=tool; renderToolColorSheet();
+  let d=$('toolColorSheet'); if(d&&!d.open) d.showModal();
+}
+function renderToolColorSheet(){
+  let b=curBook(); if(!b) return;
+  let tool=_colorSheetTool, s=markSettingsFor(b,tool);
+  let t=$('toolColorSheetTitle'); if(t) t.textContent=MARK_TOOL_NAMES[tool]+' color';
+  let g=$('toolColorGrid');
+  if(g&&!_toolColorGridBuilt){ _toolColorGridBuilt=true; g.innerHTML=TOOL_COLORS.map(c=>'<button type="button" class="toolColorCell" data-color="'+c+'" style="--cell:'+c+'" aria-label="'+c+'" onclick="setToolColor(\''+c+'\')"><span class="toolColorCheck" aria-hidden="true">\u2713</span></button>').join(''); }
+  if(g) g.querySelectorAll('.toolColorCell').forEach(cell=>{ let on=cell.dataset.color===s.color; cell.classList.toggle('sel',on); cell.querySelector('.toolColorCheck').style.color=toolColorLum(cell.dataset.color)>0.5? '#18181B' : '#FFFFFF'; });
+  let sl=$('toolOpacitySlider'); if(sl) sl.value=s.opacity;
+  let f=$('toolOpacityFill'); if(f){ f.style.width=Math.round(s.opacity*100)+'%'; f.style.background=s.color; }
+  let v=$('toolOpacityVal'); if(v) v.textContent=Math.round(s.opacity*100)+'%';
+}
+function setToolColor(color){
+  let b=curBook(); if(!b) return;
+  toolSettings(b,_colorSheetTool).color=color||null;
+  scheduleSave(); renderToolColorSheet(); syncReaderToolUI();
+}
+function setToolColorOpacity(val){
+  let b=curBook(); if(!b) return;
+  toolSettings(b,_colorSheetTool).opacity=Math.min(1,Math.max(0.25,parseFloat(val)||0.6));
+  scheduleSave(); renderToolColorSheet(); syncReaderToolUI();
+}
+/* Modern-web-guidance fallbacks: focusgroup is Chrome 150+ only — where it
+   is missing, give each [role="toolbar"][focusgroup] a roving tabindex
+   (first item tabbable, arrows move, Home/End jump). closedby is missing
+   in Safari — where it is missing, a press+release outside a
+   closedby="any" dialog closes it, so a selection drag ending on the
+   backdrop does not dismiss. */
+(function(){
+  if(!('focusGroup' in HTMLElement.prototype)){
+    document.querySelectorAll('[role="toolbar"][focusgroup]').forEach(bar=>{
+      let items=[...bar.querySelectorAll('button')].filter(b=>!b.disabled);
+      if(!items.length) return;
+      items.forEach((b,i)=> b.tabIndex=i? -1 : 0);
+      bar.addEventListener('focusin',e=>{ if(items.includes(e.target)) items.forEach(b=> b.tabIndex=b===e.target? 0 : -1); });
+      bar.addEventListener('keydown',e=>{
+        let i=items.indexOf(document.activeElement); if(i<0) return;
+        let rtl=getComputedStyle(bar).direction==='rtl';
+        let step={ArrowRight:rtl?-1:1, ArrowLeft:rtl?1:-1, Home:'home', End:'end'}[e.key];
+        if(step===undefined) return;
+        e.preventDefault();
+        let n=step==='home'? 0 : step==='end'? items.length-1 : (i+step+items.length)%items.length;
+        items[n].focus();
+      });
+    });
+  }
+  if(!('closedBy' in HTMLDialogElement.prototype)){
+    let outside=(e,d)=>{ let r=d.getBoundingClientRect(); return e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom; };
+    document.querySelectorAll('dialog[closedby="any"]').forEach(d=>{
+      let pressedOutside=false;
+      d.addEventListener('pointerdown',e=>{ pressedOutside=outside(e,d); });
+      d.addEventListener('pointerup',e=>{ if(pressedOutside&&outside(e,d)) d.close(); });
+    });
+  }
+})();
 function strikeSelection(){ annotateSelection('strike'); }
 function exportAnnotations(){
   let b=curBook(); if(!b||!b.annotations.length){ toast('No annotations to export'); return; }
@@ -4585,9 +4717,10 @@ function prAnnotateSelection(kind){
   let P=PR.panes[side]; if(!P) return; let b=P.book, where;
   if(b.kind==='pdf'){ let pg=el.closest('.prPage'); if(!pg){ toast('Select text on one page at a time'); return; } where='PDF page '+pg.dataset.page; }
   else { let sec=el.closest('section[data-unit]'); if(!sec){ toast('Select text inside one chapter at a time'); return; } let k=+sec.dataset.unit; where='Chapter '+(k+1)+', '+((b.chapters[k]||{}).title||''); }
-  try{ wrapRangeAsMark(range,kind,markColorFor(b,kind),markOpacityFor(b)); }catch(e){ toast('Select a clean stretch inside one paragraph'); return; }
+  let annoId='a_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6);
+  try{ wrapRangeAsMark(range,kind,markColorFor(b,kind),markOpacityFor(b,kind),annoId); }catch(e){ toast('Select a clean stretch inside one paragraph'); return; }
   if(!b.annotations) b.annotations=[];
-  b.annotations.push({text:text, where:where, kind:kind, color:markColorFor(b,kind), opacity:markOpacityFor(b)});
+  b.annotations.push({id:annoId, text:text, where:where, kind:kind, color:markColorFor(b,kind), opacity:markOpacityFor(b,kind)});
   sel.removeAllRanges(); prHideSelBar();
   PRA.marksChanged=true;
   prSetActive(side); prUpdateMarksBtn();
