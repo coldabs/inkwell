@@ -309,12 +309,12 @@ function ensurePdfDoc(b){
            book lives (pdf.js fetched the whole file at load — blob URLs
            have no range support — so nothing re-fetches it later). */
         if(!b._pdfUrl) b._pdfUrl=URL.createObjectURL(b.fileData);
-        doc=await pdfjsLib.getDocument({url:b._pdfUrl}).promise;
+        doc=await pdfjsLib.getDocument({url:b._pdfUrl,isEvalSupported:false}).promise;
       } else {
         /* Older saved records and the built-in sample keep their bytes as
            an ArrayBuffer; pdf.js may detach the buffer it is given, so
            hand it a copy and keep the stored one intact. */
-        doc=await pdfjsLib.getDocument({data:b.fileData.slice(0)}).promise;
+        doc=await pdfjsLib.getDocument({data:b.fileData.slice(0),isEvalSupported:false}).promise;
       }
       b.doc=doc; b.numPages=doc.numPages;
       return true;
@@ -3131,7 +3131,7 @@ async function importPdf(f){
        ~850 MB transient on a phone. pdf.js fetches the blob URL once
        into memory it owns; the stored File is a reference, not a copy,
        and ensurePdfDoc() re-opens it the same way after a reload. */
-    let doc=await pdfjsLib.getDocument({url:URL.createObjectURL(f)}).promise;
+    let doc=await pdfjsLib.getDocument({url:URL.createObjectURL(f),isEvalSupported:false}).promise;
     let book={id:uid(),kind:'pdf',title:f.name.replace(/\.[^.]+$/,''),color:'#4a5a74',updated:'Imported just now',doc:doc,numPages:doc.numPages,page:1,mode:'scroll',bookmarks:[],annotations:[],textCache:{},parallelNotes:{},fileName:f.name,fileData:f};
     S.items.unshift(book); renderLibrary();
     /* The file bytes ARE the book: wait until they are actually written
