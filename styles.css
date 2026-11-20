@@ -324,6 +324,11 @@ body.inEditor #mainLayout{max-width:1440px}
 #hiCanvas,#inkCanvas,#liveCanvas{position:absolute;inset:0;height:100%}
 #liveCanvas{pointer-events:none}
 #inkCanvas{touch-action:none;cursor:crosshair}
+#penHoverRing{position:fixed;left:0;top:0;z-index:9999;pointer-events:none;border:2px solid var(--accent);border-radius:50%;opacity:0;transition:opacity 120ms ease-out;will-change:transform}
+/* Pen-only toggle in the Parallel Read ink bar: same 44px tap area as the
+   editor pill tools (38px visual + ::after), on coarse pointers. */
+#prInkBar [data-pen-only-btn]{position:relative}
+@media (pointer:coarse){ #prInkBar [data-pen-only-btn]::after{content:"";position:absolute;inset:-3px} }
 .noteBlock{margin-top:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden}
 .noteBlockHead{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--border)}
 .noteBlockHead .runningHead{margin:0}
