@@ -146,17 +146,10 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 .masthead{position:sticky;top:12px;z-index:50;display:grid;grid-template-columns:minmax(150px,1fr) minmax(280px,560px) minmax(150px,1fr);align-items:center;gap:16px;padding:10px 14px;background:var(--surface);background:color-mix(in srgb,var(--surface) 86%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:0;border-bottom:1px solid var(--border);border-radius:0;box-shadow:none}
 .wordmark{display:flex;align-items:baseline;gap:12px;justify-self:start;color:var(--text);text-decoration:none;min-width:0}
 .wordmarkName{font-family:var(--font-display);font-size:26px;font-weight:600;letter-spacing:-.03em;line-height:1}
-.wordmarkTag{font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
 .mastheadTools{display:flex;align-items:center;justify-self:end;gap:8px;flex:0 0 auto}
 .installBtn{min-height:34px;padding:0 10px;font-size:11px;border-color:var(--border-strong)}
 .installBtn .ic{width:14px;height:14px}
 .saveFlag{font-size:11px;line-height:1.4;color:var(--muted);max-width:210px;text-align:right;white-space:nowrap}
-.libraryHead{display:block;padding:40px 0 28px}
-.navSearch{width:100%;max-width:560px;justify-self:center}
-.navSearch .search{min-height:44px;background:var(--paper)}
-.navSearch .search input{height:42px}
-.libraryTitle h1{font-family:var(--font-ui);font-size:clamp(2.4rem,6vw,3.4rem);font-weight:700;line-height:1.02;letter-spacing:-.03em;margin:0 0 14px}
-.lede{font-family:var(--font-ui);font-size:16px;line-height:1.55;color:var(--muted);max-width:52ch;margin:0}
 .searchWrap{position:relative;min-width:0}
 .search{display:flex;align-items:center;gap:10px;min-height:50px;padding:0 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-pill);transition:border-color .15s ease,box-shadow .15s ease}
 .search:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
@@ -170,6 +163,10 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 .chip{min-height:44px;padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--surface);color:var(--muted);font-size:13px;font-weight:600;line-height:1}
 .chip:hover{color:var(--text);border-color:var(--border-strong)}
 .chip.active{color:var(--surface);background:var(--text);border-color:var(--text)}
+/* Mockup 11 (Pass 1 audit): on desktop the active filter is a white
+   pill with a border and dark text, not a dark fill; phones keep the
+   dark fill (mockup 15). */
+@media (min-width:1025px){.chip.active{background:var(--surface);color:var(--text);border-color:var(--border-strong)}}
 .chip.dashed{border:1px dashed var(--border-strong);padding:8px 12px;color:var(--text)}
 .libHint{font-size:11px;line-height:1.5;color:var(--muted);text-align:right;padding-bottom:12px;margin:0}
 
@@ -183,16 +180,34 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 
 /* ---------- shelf ---------- */
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 20px}
-.bookCard{position:relative;min-width:0}
-.book{position:relative;display:flex;width:100%;min-height:238px;padding:0;border:0;border-radius:3px 7px 7px 3px;overflow:hidden;text-align:left;box-shadow:inset 0 0 0 1px rgba(255,255,255,.09),var(--shadow-cover);transition:transform .16s ease,box-shadow .16s ease}
-.book:hover{transform:translateY(-2px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 20px 34px -18px rgba(24,32,43,.65)}
+/* Mockups 11/15 (Pass 1 audit): the card is a white frame — 1px border,
+   ~14px radius — with the coloured cover inside it and the progress bar
+   + meta BELOW the cover, not on it. Desktop shows the title on the
+   cover; at ≤1024px the title moves below the cover in serif, with the
+   type label above the bar (mockup 15). Card guide: <article> root,
+   regions in source order — media (the cover button), then the
+   below-cover content; the ··· menu stays a sibling control, not
+   nested inside the open button. */
+.bookCard{position:relative;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:transform .16s ease,box-shadow .16s ease}
+.bookCard:hover{transform:translateY(-2px);box-shadow:0 20px 34px -18px rgba(24,32,43,.35)}
+.book{position:relative;display:flex;width:100%;min-height:0;aspect-ratio:4/3;padding:0;border:0;border-radius:0;overflow:hidden;text-align:left;box-shadow:inset 0 0 0 1px rgba(255,255,255,.09)}
+.book:hover{transform:translateY(0);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
 .book:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .bookSpine{width:11px;flex:0 0 auto;box-shadow:inset -1px 0 0 rgba(255,255,255,.18)}
-.bookFace{flex:1;min-width:0;display:flex;flex-direction:column;padding:18px 42px 16px 16px}
-.bookKind{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px}
+.bookFace{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;padding:18px 42px 16px 16px}
 .bookTitle{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0;font-family:var(--font-ui);font-size:22px;font-weight:700;line-height:1.15;letter-spacing:-.02em;overflow-wrap:anywhere}
-.bookMeta{margin-top:auto;padding-top:18px;font-size:11px;line-height:1.55;letter-spacing:.01em}
+.bookTitleBelow{display:none}
+.bookKindBelow{display:none}
+.bookBelow{display:flex;flex-direction:column;gap:6px;padding:12px 14px 14px}
+.bookMeta{margin:0;padding:0;font-size:11px;line-height:1.55;letter-spacing:.01em;color:var(--muted)}
 .bookMeta span{display:block}
+@media (max-width:1024px){
+  .bookTitleCover{display:none}
+  .bookTitleBelow{display:-webkit-box;font-family:var(--font-display);font-size:18px;font-weight:600;line-height:1.25;letter-spacing:0}
+  .bookKindBelow{display:block;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .bookMeta{display:none}
+  .bookFace{padding:14px 34px 12px 12px}
+}
 .bookMenu{position:absolute;top:10px;right:10px;width:30px;height:30px;min-height:30px;padding:0;border:1px solid rgba(255,255,255,.28);border-radius:var(--radius-xs);background:rgba(0,0,0,.14);color:inherit;display:grid;place-items:center;z-index:2}
 .bookMenu:hover{background:rgba(0,0,0,.3)}
 .bookMenu::after{content:"";position:absolute;inset:-8px}
@@ -206,21 +221,9 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 .bookActions button.danger .ic{color:var(--danger)}
 
 /* ---------- library utilities, about, footer ---------- */
-.utilsColumn h4{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
-.utilsRow{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
-.utilsRow .btn{width:100%;justify-content:flex-start;border-color:transparent;background:transparent;padding:0 8px}
-.utilsRow .btn:hover{background:var(--paper2);border-color:var(--border)}
-.aboutPanel{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:32px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:24px;margin:0 0 28px}
-.aboutIntro h4{font-family:var(--font-ui);font-size:18px;font-weight:700;letter-spacing:-.01em;margin:0 0 10px}
-.aboutIntro p{font-family:var(--font-ui);font-size:14px;line-height:1.65;color:var(--text-soft);margin:0 0 10px}
-.aboutStats{min-width:0}
 .listRow{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px}
 .listRow:last-child{border-bottom:0}
 .listRow b{font-weight:600;white-space:nowrap}
-.libraryFoot{display:flex;justify-content:space-between;gap:16px 32px;flex-wrap:wrap;padding-top:24px;margin-top:32px;border-top:1px solid var(--border);font-size:11px;line-height:1.6;color:var(--muted)}
-.libraryFoot p{margin:0}
-.libraryFoot a{color:var(--text);text-decoration:none;border-bottom:1px solid var(--border-strong)}
-.libraryFoot a:hover{color:var(--accent);border-color:var(--accent)}
 
 
 /* ---------- editor frame ---------- */
@@ -774,9 +777,6 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px);over
   .installBtn{width:44px;min-width:44px;min-height:44px;padding:0;justify-content:center}
   .installBtn .installLabel{display:none}
   .iconBtn{width:44px;height:44px;min-width:44px;min-height:44px}
-  .libraryHead{padding:32px 0 24px}
-  .aboutPanel{grid-template-columns:1fr;gap:20px;padding:18px}
-  .libraryFoot{padding-top:20px;margin-top:24px}
   .editorTop{position:sticky;top:0;z-index:30;padding:6px 8px;gap:4px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
   .editorTop::-webkit-scrollbar{display:none}
   .editorTop .edFocus{display:none}
@@ -832,25 +832,22 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px);over
 
 @media (max-width:768px){
   .layout{padding:14px 12px 100px}
-  .masthead{grid-template-columns:1fr auto;gap:8px;padding:8px 10px;top:8px}
+  /* Mockup 15 (Pass 1 audit): on phones the search is an icon-only
+     magnifier in the header row, not a full-width second row. */
+  .masthead{grid-template-columns:1fr auto auto;gap:8px;padding:8px 10px;top:8px}
   .wordmark{grid-column:1;grid-row:1;flex-direction:column;gap:3px}
   .wordmarkName{font-size:23px}
-  .wordmarkTag{font-size:9px}
-  .mastheadTools{grid-column:2;grid-row:1}
-  .navSearch{grid-column:1/-1;grid-row:2;max-width:none;justify-self:stretch}
-  .libraryTitle h1{font-size:clamp(2.2rem,11vw,3rem);margin-bottom:12px}
-  .lede{font-size:18px;max-width:40ch}
-  .search input{font-size:16px}
+  .mastheadTools{grid-column:3;grid-row:1}
+  .navSearch{grid-column:2;grid-row:1;max-width:none;justify-self:end}
+  .masthead .navSearch .searchTrigger{width:44px;min-height:44px;padding:0;justify-content:center;border-radius:999px}
+  .searchTriggerText{display:none}
   .shelfBar{flex-direction:column;align-items:stretch;gap:0}
   .chipRow{gap:16px}
   .chip{font-size:12px}
   .libHint{text-align:left;padding:0 0 12px}
   .grid{gap:16px 12px}
-  .book{min-height:196px}
   .bookFace{padding:14px 34px 12px 12px}
-  .bookTitle{font-size:21px}
-  .bookKind{font-size:9px;letter-spacing:.08em;margin-bottom:10px}
-  .bookMeta{font-size:10px;padding-top:12px}
+  .bookTitleBelow{font-size:18px}
   .bookMenu{top:8px;right:8px;width:28px;height:28px;min-height:28px}
   .searchKbd{display:none}
   .search{min-height:48px}
@@ -968,6 +965,10 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px);over
 /* + New menu in the filter bar (hidden on mobile: the FAB opens it). */
 .newWrap{position:relative;margin-left:auto;flex:0 0 auto}
 .newBtn{white-space:nowrap}
+/* Mockup 11 (Pass 1 audit): the + New button is terracotta, not dark.
+   Scoped to .btn.primary — the plain .newBtn rule loses to it. */
+.btn.primary.newBtn{background:var(--accent);border-color:var(--accent);color:var(--accent-text)}
+.btn.primary.newBtn:hover{background:var(--accent);border-color:var(--accent);color:var(--accent-text);filter:brightness(1.07)}
 
 /* Command palette: native <dialog>, centred modal (dialog guide Rule 1).
    No role/aria-modal — the native modal provides them. */
@@ -984,11 +985,18 @@ dialog.palette::backdrop{background:rgba(20,16,12,.45);overflow:hidden}
 .paletteSearch input{flex:1;min-width:0;height:48px;border:0;background:transparent;color:var(--text);font-size:16px;outline:none}
 .paletteSearch input::placeholder{color:var(--muted)}
 .paletteResults{flex:1;min-height:0;overflow-y:auto;padding:6px 0 10px}
-.palGroup{padding:12px 16px 6px;font:600 11px/1.3 var(--font-ui);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.palItem{display:flex;flex-direction:column;gap:2px;padding:10px 16px;cursor:pointer;min-height:44px}
+/* Mockup 1 (Pass 1 audit): group headers are normal case, not small
+   caps; rows are a row — label + sub on the left, format/progress
+   pills and a ⌘1..⌘9 shortcut chip on the right. */
+.palGroup{padding:12px 16px 6px;font:600 13px/1.3 var(--font-ui);letter-spacing:0;text-transform:none;color:var(--text)}
+.palItem{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;min-height:44px}
 .palItem:hover,.palItem.sel{background:var(--paper2)}
+.palItemMain{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .palItem b{display:block;font-size:14px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
-.palItem span{display:block;font-size:12px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}
+.palItemMain span{display:block;font-size:12px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}
+.palChips{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.palPill{font-size:11px;font-weight:600;line-height:1;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:4px 8px;white-space:nowrap}
+.palKbd{min-width:24px;min-height:24px;display:grid;place-items:center;border:1px solid var(--border);border-radius:var(--radius-xs);font-size:11px;line-height:1;color:var(--muted);padding:0 5px}
 .palEmpty{padding:18px 16px;font-size:13px;color:var(--muted)}
 .paletteHint{margin:0;padding:10px 16px;border-top:1px solid var(--border);font-size:11px;line-height:1.6;color:var(--muted)}
 .paletteHint .searchKbd{display:inline-grid}
@@ -1036,9 +1044,31 @@ dialog.sheet.drawerRight{
 .storageBar{height:6px;border-radius:999px;background:var(--paper2);border:1px solid var(--border);overflow:hidden}
 .storageFill{display:block;height:100%;background:var(--accent);border-radius:999px}
 
-/* Thin reading-progress bar on each shelf card. The track follows the
-   cover ink colour; the fill is the terracotta accent. */
-.bookProgress{display:block;height:3px;border-radius:999px;background:color-mix(in srgb,currentColor 22%,transparent);margin:12px 0 0;overflow:hidden}
+/* Shelf Options drawer restyle (Pass 1 audit, mockup 5): serif title +
+   terracotta X close; stat cards are icon + label above, big value
+   below; the storage bar lives in its own card; row groups are rounded
+   cards with chevrons. */
+#librarySheet .sheetHead h2{font-family:var(--font-display);font-size:19px;font-weight:600}
+.drawerClose{display:grid;place-items:center;width:36px;height:36px;min-height:36px;padding:0;border:1px solid transparent;border-radius:999px;background:transparent;color:var(--accent);cursor:pointer}
+.drawerClose:hover{background:var(--paper2)}
+.drawerClose .ic{width:18px;height:18px}
+.statCard{display:flex;flex-direction:column;gap:2px}
+.statCard .statIcon{color:var(--accent)}
+.statIcon .ic{width:18px;height:18px}
+.storageCard{background:var(--paper2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-top:12px}
+.storageCard .storageBar{background:var(--surface)}
+.storageCard .sheetNote{margin:8px 0 0}
+.drawerRows{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden}
+.drawerRow{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:10px 12px;border:0;border-bottom:1px solid var(--border);background:transparent;color:var(--text);font:500 13px/1.3 var(--font-ui);text-align:left;cursor:pointer}
+.drawerRow:last-child{border-bottom:0}
+.drawerRow:hover{background:var(--paper2)}
+.drawerRow>span{flex:1;min-width:0}
+.drawerRow .ic{width:16px;height:16px;color:var(--muted);flex:0 0 auto}
+
+/* Thin reading-progress bar on each shelf card, below the cover. The
+   track is neutral on the white card; the fill is the terracotta
+   accent. */
+.bookProgress{display:block;height:3px;border-radius:999px;background:var(--paper2);border:1px solid var(--border);margin:0;overflow:hidden}
 .bookProgress span{display:block;height:100%;background:var(--accent);border-radius:999px}
 
 /* Mobile tab bar + terracotta FAB: phone only. The dock they replace
@@ -1091,6 +1121,9 @@ dialog.sheet.drawerRight{
 .editorTop .tbBoardBtn{flex:0 0 auto}
 #splitTopBtn{flex:0 0 auto;white-space:nowrap}
 #addPageTopBtn{flex:0 0 auto;white-space:nowrap}
+/* Pass 2 audit (mockup 12): the top bar's + Add page duplicates the
+   rail's button on desktop — hide it there, keep it ≤1024px. */
+@media (min-width:1025px){#addPageTopBtn{display:none}}
 @media (max-width:1024px){
   .editorTop .tbLabel{display:none}
   .editorTop .tbBoardBtn,.editorTop #splitTopBtn,.editorTop #exportBtn,.editorTop #addPageTopBtn{min-width:44px;padding:0 10px;justify-content:center}
@@ -1109,6 +1142,14 @@ dialog.sheet.drawerRight{
 .toolbar .tool[aria-pressed="true"]:hover{background:var(--text)}
 .pillInsert{flex:0 0 auto;white-space:nowrap;border-radius:999px;background:var(--accent);border-color:transparent;color:var(--accent-text)}
 .pillInsert:hover{background:var(--accent)}
+/* Pass 2 audit (mockup 8): a Tools button on the pill (desktop only)
+   opens the inspector; the Insert button gains a dropdown chevron. */
+.pillTools{flex:0 0 auto;white-space:nowrap}
+@media (max-width:768px){.pillTools{display:none}}
+/* Floating layer chip (Pass 2 audit, mockup 7): top-right of the
+   canvas, below the pill so it never overlaps it; pointer-events none
+   so it never blocks drawing. */
+.layerChip{position:absolute;top:68px;right:12px;z-index:6;display:inline-flex;align-items:center;min-height:32px;padding:4px 12px;background:var(--surface);background:color-mix(in srgb,var(--surface) 92%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:999px;box-shadow:var(--shadow-modal);font-size:12px;font-weight:600;color:var(--text);pointer-events:none}
 .shapePop{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);display:none;gap:2px;padding:6px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-modal);z-index:70}
 .shapePop.open{display:flex}
 .shapePop .tool{width:38px;height:38px;min-height:38px;padding:0;border:1px solid transparent;border-radius:var(--radius-xs);background:transparent;color:var(--text);display:grid;place-items:center;flex:0 0 auto}
@@ -1168,6 +1209,7 @@ body.inEditor .pageNavFab{display:flex}
   .toolbar{top:8px;max-width:calc(100% - 4px)}
   .toolbar .tbDivider{display:none}
   .pillInsert .tbLabel{display:none}
+  .pillInsert .pillInsertChev{display:none}
   .pillInsert{min-width:44px;padding:0 12px;justify-content:center}
   /* Hand fix: the pill gains the Hand tool, so its tools shrink from
      44px to 36px visual at <=1024px — the 44px tap area is kept via
@@ -1198,13 +1240,25 @@ body.inEditor .pageNavFab{display:flex}
 
 /* --- inspector: side drawer on desktop, 4-tab bottom sheet on mobile --- */
 #editorSheet .sheetGrip{display:none}
+/* Pass 2 audit (mockups 7/8): no title row on the mobile sheet; on the
+   desktop drawer the title is gone too (mockup 8 starts at Pen
+   Options) and the close is the terracotta X, right-aligned. */
+#editorSheet .sheetHead h2{display:none}
+#editorSheet .sheetHead{justify-content:flex-end}
+@media (max-width:768px){#editorSheet .sheetHead{display:none}}
+/* Mockup 8 shows the canvas undimmed beside the panel: the drawer
+   backdrop is transparent on desktop (the dialog stays modal — the
+   canvas is visible but not clickable while the panel is open). */
+@media (min-width:769px){#editorSheet::backdrop{background:transparent;backdrop-filter:none}}
 .sheetTabs{display:none}
 @media (max-width:768px){
   dialog.sheet#editorSheet.drawerRight{width:min(560px,100vw);height:auto;max-height:92dvh;margin:auto auto 0;border:1px solid var(--border);border-left:1px solid var(--border);border-radius:18px 18px 0 0}
   #editorSheet .sheetGrip{display:block;width:40px;height:5px;border-radius:999px;background:var(--border-strong);margin:10px auto 0;cursor:grab;touch-action:none;flex:none}
   .sheetTabs{display:flex;flex:none;gap:4px;padding:0 12px;border-bottom:1px solid var(--border)}
   .sheetTab{flex:1;min-width:0;min-height:48px;padding:8px 2px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .sheetTab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
+  /* Pass 2 audit (mockup 7): the active tab is a terracotta filled
+     pill, not an underline. */
+  .sheetTab[aria-selected="true"]{color:var(--accent-text);background:var(--accent);border-bottom-color:transparent;border-radius:999px}
   .sheetTabPanel[hidden]{display:none}
 }
 @media (min-width:769px){
@@ -1224,16 +1278,24 @@ body.inEditor .pageNavFab{display:flex}
 
 /* --- Insert 3x2 tile grid --- */
 .insertGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.insertTile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:64px;padding:10px 6px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:12px;font-weight:600;line-height:1.25;text-align:center;cursor:pointer}
+/* Pass 2 audit (mockup 7): tiles are taller (~110px) with big dark
+   icons, and the panel ends in an action row: Open Board (text),
+   Written Notes [[Links]] (outlined pill), Record Audio (terracotta). */
+.insertTile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:110px;padding:16px 6px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:12px;font-weight:600;line-height:1.25;text-align:center;cursor:pointer}
 .insertTile:hover{background:var(--paper2)}
-.insertTile .ic{width:20px;height:20px;color:var(--muted)}
+.insertTile .ic{width:28px;height:28px;color:var(--text)}
 .insertTile span{overflow-wrap:anywhere}
-@media (pointer:coarse){.insertTile{min-height:56px}}
+.insertFoot{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.insertFoot .btn{flex:1;min-width:0;white-space:nowrap;border-radius:999px}
+.insertFoot .btn.insertFootText{border-color:transparent;background:transparent}
 
 /* --- Page colour swatches --- */
 .pageSwatches{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .pageSwatch{width:32px;height:32px;min-height:32px}
 .pageSwatch.active{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--text)}
+/* Pass 2 audit (mockup 8): a visible label under each page swatch. */
+.pageSwatchWrap{display:inline-flex;flex-direction:column;align-items:center;gap:4px}
+.swatchLabel{font-size:10px;line-height:1.2;color:var(--muted)}
 
 /* --- mobile: a side panel hidden by the mobileMoved class stays out of
    the layout entirely — the left rail (its content moved to the sheet
@@ -1247,6 +1309,15 @@ body.inEditor .pageNavFab{display:flex}
 .statCell{flex:1;min-width:0;text-align:center}
 .statNum{font-size:22px;font-weight:700;line-height:1.15}
 .statLabel{font-size:12px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Pass 2 audit (mockup 17): on desktop the Written Notes block and the
+   Audio block sit side by side, the audio restyled as a card; stacked
+   on mobile, as before. */
+@media (min-width:1025px){
+  .notesAudioRow{display:flex;gap:16px;align-items:stretch}
+  .notesAudioRow .noteBlock{flex:1 1 auto;min-width:0}
+  .notesAudioRow .studioRow{flex:0 0 300px;margin-top:16px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);flex-direction:column;align-items:flex-start}
+  .notesAudioRow .studioRow .kbd{flex:none;min-width:0}
+}
 /* The Links toggle lives in the editor top bar but only matters where
    the panel can be closed (≤1024px); on wider screens the panel is
    always open, so the button stays hidden. (Scoped to min-width:1025px:
