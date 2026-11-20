@@ -29,7 +29,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="styles.css?v=2026-11-20-r25">
+<link rel="stylesheet" href="styles.css?v=2026-11-20-r26">
 </head>
 <body>
 <!-- Icons: Tabler Icons 3.52.0, MIT, https://tabler.io/icons -->
@@ -325,7 +325,7 @@
     <div class="toolbar" id="mainToolbar" role="toolbar" aria-label="Writing tools" focusgroup="toolbar wrap" aria-controls="inkCanvas">
       <div class="tbRow tbRowTools" aria-label="Tools">
         <button class="tool" data-tool="select" aria-pressed="false" onclick="setTool('select',this)" title="Select, drag a box around strokes to move them" aria-label="Select strokes"><svg class="ic" aria-hidden="true"><use href="#ticon-pointer"></use></svg></button>
-        <button class="tool" data-tool="hand" aria-pressed="false" onclick="setTool('hand',this)" title="Hand, scroll the page" aria-label="Hand tool"><svg class="ic" aria-hidden="true"><use href="#ticon-hand-stop"></use></svg></button>
+        <button class="tool" data-tool="hand" aria-pressed="false" onclick="setTool('hand',this)" title="Hand, scroll the page" aria-label="Hand tool"><svg class="ic" aria-hidden="true"><use href="#ticon-hand-stop"></use></svg> <span class="tbLabel">Hand</span></button>
         <div role="group" aria-label="Draw">
           <button class="tool active" data-tool="pen" aria-pressed="true" onclick="setTool('pen',this)" title="Pen, pressure sensitive" aria-label="Pen"><svg class="ic" aria-hidden="true"><use href="#ticon-pencil"></use></svg></button>
           <button class="tool" data-tool="highlighter" aria-pressed="false" onclick="setTool('highlighter',this)" title="Highlighter, separate layer" aria-label="Highlighter"><svg class="ic" aria-hidden="true"><use href="#ticon-highlighter"></use></svg></button>
@@ -443,6 +443,20 @@
       <button type="button" class="zoomFabBtn" onclick="editorZoomBy(0.8)" aria-label="Zoom out" title="Zoom out"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-out"></use></svg></button>
       <button type="button" class="zoomFabPct" id="zoomFabPct" onclick="editorZoomBy(0)" aria-label="Reset zoom to 100 percent" title="Reset zoom to 100%">100%</button>
       <button type="button" class="zoomFabBtn" onclick="editorZoomBy(1.25)" aria-label="Zoom in" title="Zoom in"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-in"></use></svg></button>
+    </div>
+    <!-- Floating page navigation: ‹ n / N › for the notebook, phone/tablet
+         only (desktop has the Pages panel). Same floating-pill language
+         as the zoomFab, bottom-right per the Gemini editor mockup
+         (image 12, "Page 2 / 8" pill at the stage's bottom-right); the
+         zoom pill sits bottom-left so the two never overlap. Tapping
+         the centre label jumps to the thumbnails: on phones they live
+         in the inspector's Page tab, on tablets (769-1024px) they stay
+         in #pagesPanel below the stage, so the label reveals that panel
+         instead of opening an inspector tab that has no thumbnails. -->
+    <div class="pageNavFab" id="pageNavFab" role="group" aria-label="Page navigation">
+      <button type="button" class="pageNavBtn" id="pageNavPrev" onclick="editorPageStep(-1)" aria-label="Previous page" title="Previous page"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-chevron-left"></use></svg></button>
+      <button type="button" class="pageNavLabel" id="pageNavLabel" onclick="openPageNavList()" aria-label="Open page list" title="Open page list">1 / 1</button>
+      <button type="button" class="pageNavBtn" id="pageNavNext" onclick="editorPageStep(1)" aria-label="Next page" title="Next page"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-chevron-right"></use></svg></button>
     </div>
   </section>
 
@@ -678,7 +692,7 @@
   </div>
 </dialog>
 
-<script src="app.js?v=2026-11-20-r25" defer></script>
+<script src="app.js?v=2026-11-20-r26" defer></script>
 <script>
 /* PWA: install prompt and offline app shell. */
 (function(){
