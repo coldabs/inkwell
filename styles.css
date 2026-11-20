@@ -786,7 +786,7 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px);over
   #backToReadingBtn .backLong{display:none}
   .titleField{flex:1 1 120px;min-width:0}
   #noteTitle{font-size:18px;text-overflow:ellipsis}
-  .toolbar{position:static;top:auto;padding:4px 6px;margin-top:8px}
+  .toolbar{position:static;top:auto;padding:4px 6px;margin-top:8px;scroll-margin-top:64px}
   .tbRowTools{flex-wrap:nowrap;overflow-x:auto;gap:2px}
   .tbRowTools .tbDivider{display:none}
   .statusBar{display:none}
@@ -1130,16 +1130,34 @@ dialog.sheet.drawerRight{
 #mainToolbar .colorPop.open{display:flex}
 #mainToolbar .colorPop .swatch{width:24px;height:24px;min-height:24px}
 /* Floating zoom control (separate − / % / +): fixed to the viewport's
-   bottom-right while editing, so it never fights the pill or the top bar
+   bottom-left while editing, so it never fights the pill or the top bar
    for place and never scrolls away with the page. Same floating-pill
    language as the toolbar (surface, blur, border, shadow). Hidden
-   outside the editor (body.inEditor is set by showView). */
-.zoomFab{position:fixed;right:12px;bottom:12px;z-index:40;display:none;align-items:center;gap:2px;padding:4px 6px;background:var(--surface);background:color-mix(in srgb,var(--surface) 92%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:999px;box-shadow:var(--shadow-modal)}
+   outside the editor (body.inEditor is set by showView). The page
+   pill takes the bottom-right corner (Gemini mockup, image 12). */
+.zoomFab{position:fixed;left:12px;bottom:12px;z-index:40;display:none;align-items:center;gap:2px;padding:4px 6px;background:var(--surface);background:color-mix(in srgb,var(--surface) 92%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:999px;box-shadow:var(--shadow-modal)}
 body.inEditor .zoomFab{display:flex}
 .zoomFabBtn{width:36px;height:36px;min-height:36px;display:grid;place-items:center;padding:0;border:1px solid transparent;border-radius:999px;background:transparent;color:var(--text)}
 .zoomFabBtn:hover{background:var(--paper2)}
 .zoomFabPct{min-width:44px;min-height:36px;padding:0 6px;border:0;border-radius:999px;background:transparent;color:var(--text);font-size:12px;font-weight:600}
 .zoomFabPct:hover{background:var(--paper2)}
+/* Floating page navigation (‹ n / N ›): same floating-pill language as
+   .zoomFab, bottom-RIGHT per the Gemini editor mockup (image 12: the
+   "Page 2 / 8" pill floats at the stage's bottom-right). The zoom pill
+   moves to bottom-left so the two pills never overlap. Hidden outside
+   the editor (body.inEditor) and on desktop, where the Pages panel is
+   the navigation. 44px targets (form-factor-adaptation, WCAG 2.5.5);
+   the bottom edge is padded by the safe-area inset so the pill clears
+   the home indicator / gesture bar. */
+.pageNavFab{position:fixed;right:12px;bottom:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:40;display:none;align-items:center;gap:2px;padding:4px 6px;background:var(--surface);background:color-mix(in srgb,var(--surface) 92%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:999px;box-shadow:var(--shadow-modal)}
+body.inEditor .pageNavFab{display:flex}
+@media (min-width:1025px){body.inEditor .pageNavFab{display:none}}
+.pageNavBtn{width:44px;height:44px;min-height:44px;display:grid;place-items:center;padding:0;border:1px solid transparent;border-radius:999px;background:transparent;color:var(--text)}
+.pageNavBtn:hover{background:var(--paper2)}
+.pageNavBtn:disabled{opacity:.35;cursor:default}
+.pageNavBtn:disabled:hover{background:transparent}
+.pageNavLabel{min-width:64px;min-height:44px;padding:0 8px;border:0;border-radius:999px;background:transparent;color:var(--text);font-size:13px;font-weight:600;white-space:nowrap}
+.pageNavLabel:hover{background:var(--paper2)}
 .toolbar.compact{padding:2px 4px}
 .toolbar.minimal .tbDivider{display:none}
 .toolbar.minimal .pillInsert .tbLabel{display:none}
@@ -1160,6 +1178,18 @@ body.inEditor .zoomFab{display:flex}
   #mainToolbar .tbRowTools .tool:not(.pillColorBtn){position:relative;width:36px;height:36px;min-height:36px}
   #mainToolbar .tbRowTools .tool:not(.pillColorBtn)::after{content:"";position:absolute;inset:-4px}
 }
+/* Hand discoverability: the pill's Hand button carries a visible label
+   (the same .tbLabel pattern the Insert button uses) so one-finger
+   scroll is findable on phones/tablets, where the status-bar hint is
+   hidden. The button widens to fit the label; the pill row scrolls
+   horizontally, so the row stays unbroken at 390px. Active state comes
+   from .tool[aria-pressed="true"] exactly as before (form-factor-
+   adaptation 44px targets via the ::after tap area; accessibility:
+   visible text label, not tooltip-only). Placed after the 1024px block
+   on purpose: equal specificity, so this width:auto must win over the
+   36px width set there. */
+#mainToolbar .tbRowTools .tool[data-tool="hand"]{width:auto;padding:0 10px;display:inline-flex;align-items:center;gap:6px}
+#mainToolbar .tbRowTools .tool[data-tool="hand"] .tbLabel{font-size:12px;font-weight:600;white-space:nowrap}
 
 /* --- tabbed left rail: Pages | Layers --- */
 .railTabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:12px}
