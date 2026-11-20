@@ -853,6 +853,16 @@ function openNotebook(id){
   nb.openedAt=Date.now(); /* Recent tab sorts on this; persisted by serializeLibrary */
   saveEditorToModel();
   S.curNbId=id;
+  /* PDF-linked notebooks land on the page being read (b.page, kept in sync
+     by backToReading), matched by bgPdf.page, clamped — the same landing
+     r15 added to annotatePdf. A reload / duplicate / restored editor tab
+     replays the #/note/... hash and calls openNotebook directly, bypassing
+     annotatePdf entirely, so a notebook saved on a blank trailing page
+     used to reopen on that blank page and look as if no PDF had loaded.
+     Plain notebooks (no PDF) keep resuming their persisted cur.
+     Trade-off: navigating inside the editor then reloading bounces back
+     to b.page; one tap in Pages returns. */
+  if(nb.pdfBookId){ let b=S.items.find(i=>i.id===nb.pdfBookId); if(b){ let pg=Math.max(1,Math.min(b.numPages||nb.pages.length,b.page||1)); let idx=nb.pages.findIndex(p=>p.bgPdf && p.bgPdf.page===pg); nb.cur= idx>=0 ? idx : Math.max(0,Math.min(nb.pages.length-1,pg-1)); } }
   $('noteTitle').value=nb.title;
   $('templateSel').value=nb.template;
   loadPageIntoEditor();
@@ -868,8 +878,11 @@ function openNotebook(id){
      so turning a page finds them ready. Warming the whole notebook used
      to render every page of a long PDF up front — the same memory blow-up
      as the old annotatePdf — so only the three pages after the current
-     one are warmed, and the loop stops if the user opens another book. */
-  (async()=>{ for(let k=1;k<=3 && nb.cur+k<nb.pages.length;k++){ if(S.curNbId!==id) return; await decodeBgPdfImg(nb.pages[nb.cur+k]); } })();
+     one are warmed, and the loop stops if the user opens another book.
+     The three pages BEFORE the current one are warmed too, so their
+     thumbnails in the Pages panel show the PDF preview instead of staying
+     blank — pages behind the current one were never decoded otherwise. */
+  (async()=>{ for(let k=1;k<=3;k++){ if(S.curNbId!==id) return; if(nb.cur+k<nb.pages.length) await decodeBgPdfImg(nb.pages[nb.cur+k]); if(S.curNbId!==id) return; if(nb.cur-k>=0) await decodeBgPdfImg(nb.pages[nb.cur-k]); } })();
 }
 function syncTitle(){ let nb=curNb(); if(nb){ nb.title=$('noteTitle').value; nb.updated='Just now'; } refreshLinks(); scheduleSave(); }
 function saveEditorToModel(){
