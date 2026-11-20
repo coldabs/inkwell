@@ -29,7 +29,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="styles.css?v=2026-11-20-r22">
+<link rel="stylesheet" href="styles.css?v=2026-11-20-r23">
 </head>
 <body>
 <!-- Icons: Tabler Icons 3.52.0, MIT, https://tabler.io/icons -->
@@ -313,7 +313,7 @@
           <div class="panelBtnRow"><button class="btn small" onclick="selectLayerStrokes('ink')">Select ink</button><button class="btn small" onclick="selectLayerStrokes('hi')">Select highlight</button></div>
         </div>
         <details class="helpBox"><summary>Using the tools</summary>
-        <p>Stylus and mouse draw with pressure. One finger draws with the selected tool; two fingers scroll. Hand scrolls with one finger.</p>
+        <p>Stylus and mouse draw with pressure. One finger draws with the selected tool; two fingers scroll. Hand scrolls with one finger. With Pen only on, the pen draws and your finger scrolls instead.</p>
         <p><b>Shapes</b> drag with Line, Rectangle, Ellipse or Arrow. <b>Select</b> drag a box, then drag inside to move. <b>Text</b> tap the page to place typed text. <b>Insert</b> adds images, tables, stickies and equations.</p>
         <p><b>Spline</b> joins tapped points. <b>Compass</b> draws a true circle. <b>Lasso</b> selects with a free loop. <b>Vertical space</b> pushes content down. Selections can be rotated, resized, flipped, copied and pasted across pages.</p>
         <p><b>Eraser</b> removes whole strokes by default; switch to Cut or Whiteout in Pen options. <b>Style</b> gives strokes dashed, dotted or dash-dot lines. Load a <b>.gpl</b> palette to replace the swatches. Export a notebook as <b>.xopp</b> to open it in other handwriting apps.</p>
@@ -331,6 +331,7 @@
           <button class="tool" data-tool="eraser" aria-pressed="false" onclick="setTool('eraser',this)" title="Eraser, touch a stroke to delete it" aria-label="Eraser"><svg class="ic" aria-hidden="true"><use href="#ticon-eraser"></use></svg></button>
           <button type="button" class="tool pillColorBtn" id="pillColorBtn" aria-label="Ink colour" title="Ink colour" aria-haspopup="true" aria-expanded="false" aria-controls="colorPop" onclick="toggleColorPop()"><span class="pillColorDot" id="pillColorDot" style="background:#18202B" aria-hidden="true"></span></button>
         </div>
+        <button type="button" class="tool" id="penOnlyBtn" data-pen-only-btn aria-pressed="false" onclick="togglePenOnly()" title="Pen only: the pen draws, your finger scrolls" aria-label="Pen only mode"><svg class="ic" aria-hidden="true"><use href="#ticon-pencil"/></svg></button>
         <span class="tbDivider" role="separator" aria-orientation="vertical"></span>
         <div role="group" aria-label="Select">
           <button class="tool" data-tool="lasso" aria-pressed="false" onclick="setTool('lasso',this)" title="Lasso select, draw a free loop around strokes" aria-label="Lasso select"><svg class="ic" aria-hidden="true"><use href="#ticon-lasso"></use></svg></button>
@@ -576,6 +577,8 @@
           <button type="button" class="tool" data-tool="rect" onclick="prSetInkTool('rect')" title="Rectangle" aria-label="Rectangle"><svg class="ic" aria-hidden="true"><use href="#ticon-rectangle"></use></svg></button>
           <button type="button" class="tool" data-tool="ellipse" onclick="prSetInkTool('ellipse')" title="Ellipse or circle" aria-label="Ellipse"><svg class="ic" aria-hidden="true"><use href="#ticon-circle"></use></svg></button>
           <button type="button" class="tool" data-tool="arrow" onclick="prSetInkTool('arrow')" title="Arrow" aria-label="Arrow"><svg class="ic" aria-hidden="true"><use href="#ticon-arrow-up-right"></use></svg></button>
+          <span class="tbDivider" aria-hidden="true"></span>
+          <button type="button" class="tool" data-pen-only-btn aria-pressed="false" onclick="togglePenOnly()" title="Pen only: the pen draws, your finger scrolls" aria-label="Pen only mode"><svg class="ic" aria-hidden="true"><use href="#ticon-pencil"/></svg></button>
         </div>
         <span class="sizeGroup prInkSizeGroup"><span class="tool-label">Size</span>
           <canvas id="prInkSizePreview" width="64" height="30" style="width:52px;height:24px" aria-hidden="true"></canvas>
@@ -672,7 +675,7 @@
   </div>
 </dialog>
 
-<script src="app.js?v=2026-11-20-r22" defer></script>
+<script src="app.js?v=2026-11-20-r23" defer></script>
 <script>
 /* PWA: install prompt and offline app shell. */
 (function(){
