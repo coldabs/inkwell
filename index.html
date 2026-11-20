@@ -29,7 +29,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="styles.css?v=2026-11-20-r17">
+<link rel="stylesheet" href="styles.css?v=2026-11-20-r18">
 </head>
 <body>
 <!-- Icons: Tabler Icons 3.52.0, MIT, https://tabler.io/icons -->
@@ -472,7 +472,7 @@
       <div class="selDots"></div>
       <label class="selSliderWrap">Intensity <input type="range" class="selSlider" min="0.25" max="1" step="0.05" value="1" aria-label="Highlight intensity"><span class="selSliderVal">100%</span></label>
     </div>
-    
+        <div id="readerToolDock" class="readerToolDock" aria-label="Annotation tools"><div id="readerToolPanel" class="readerToolPanel hidden" role="group" aria-label="Annotation options"><div class="readerToolRow" role="toolbar" aria-label="Annotation mode"><button type="button" class="readerToolBtn" data-tool="highlight" onclick="toggleReaderTool('highlight')" aria-pressed="false">Highlight</button><button type="button" class="readerToolBtn" data-tool="underline" onclick="toggleReaderTool('underline')" aria-pressed="false">Underline</button><button type="button" class="readerToolBtn" data-tool="strike" onclick="toggleReaderTool('strike')" aria-pressed="false">Strikethrough</button><button type="button" class="readerToolBtn readerUndoBtn" id="readerUndoBtn" onclick="undoLastAnnotation()">Undo</button></div><div class="readerToolColors"><div class="selDots" id="readerToolDots"></div><label class="selSliderWrap">Intensity <input type="range" class="selSlider" id="readerToolSlider" min="0.25" max="1" step="0.05" value="0.6" oninput="setReaderToolOpacity(this.value)"><span class="selSliderVal" id="readerToolSliderVal">60%</span></label></div></div><div class="readerFabRow"><button type="button" class="readerFabMini hidden" id="readerQuickUndo" onclick="undoLastAnnotation()" title="Undo last mark" aria-label="Undo last mark">&#8617;</button><button type="button" class="readerFab" id="readerToolFab" onclick="toggleReaderToolPanel()" aria-expanded="false" aria-controls="readerToolPanel" title="Annotation tools" aria-label="Annotation tools"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg><span class="readerFabDot" id="readerFabDot"></span></button></div></div>
     <div id="readerGrid">
       <aside class="panel" id="readerSide">
         <h4>Contents <button type="button" class="btn small sideClose" onclick="toggleReaderSide()" aria-label="Close contents">×</button></h4>
@@ -670,7 +670,7 @@
   </div>
 </dialog>
 
-<script src="app.js?v=2026-11-20-r17" defer></script>
+<script src="app.js?v=2026-11-20-r18" defer></script>
 <script>
 /* PWA: install prompt and offline app shell. */
 (function(){

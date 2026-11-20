@@ -3187,7 +3187,7 @@ function renderEpubBook(){
    single-node wrapTextOnce misses it and the mark vanishes on re-render.
    Whitespace is normalised on both sides, then the match is wrapped with
    the same extract-contents fallback the live mark uses. */
-function wrapTextAcross(container,needle,kind,color,opacity){
+function wrapTextAcross(container,needle,kind,color,opacity,annoId){
   if(!container||!needle) return false;
   let want=String(needle).replace(/\s+/g,' ').trim(); if(!want) return false;
   let walker=document.createTreeWalker(container,NodeFilter.SHOW_TEXT,{acceptNode:n=>{
@@ -3221,14 +3221,14 @@ function wrapTextAcross(container,needle,kind,color,opacity){
     let rs=r.start, re=r.start+r.text.length;
     let s=Math.max(s0,rs), e=Math.min(e0,re);
     if(e<=s) continue;
-    let el=wrapMarkEl(kind,color,opacity), rr=document.createRange();
+    let el=wrapMarkEl(kind,color,opacity,annoId), rr=document.createRange();
     rr.setStart(r.node,s-rs); rr.setEnd(r.node,e-rs);
     try{ rr.surroundContents(el); }catch(e2){ let frag=rr.extractContents(); el.appendChild(frag); rr.insertNode(el); }
     made=true;
   }
   return made;
 }
-function wrapTextOnce(container,needle,kind,color,opacity){
+function wrapTextOnce(container,needle,kind,color,opacity,annoId){
   if(!container||!needle) return false;
   let walker=document.createTreeWalker(container,NodeFilter.SHOW_TEXT,{acceptNode:n=>{
     if(!n.nodeValue||n.nodeValue.indexOf(needle)<0) return NodeFilter.FILTER_REJECT;
@@ -3238,7 +3238,7 @@ function wrapTextOnce(container,needle,kind,color,opacity){
   let node=walker.nextNode(); if(!node) return false;
   let idx=node.nodeValue.indexOf(needle);
   let range=document.createRange(); range.setStart(node,idx); range.setEnd(node,idx+needle.length);
-  let wrapEl=wrapMarkEl(kind,color,opacity);
+  let wrapEl=wrapMarkEl(kind,color,opacity,annoId);
   try{ range.surroundContents(wrapEl); return true; }catch(e){ return false; }
 }
 function reapplyAnnotations(){
@@ -3246,7 +3246,7 @@ function reapplyAnnotations(){
   (b.annotations||[]).forEach(a=>{
     let m=/Chapter\s+(\d+)/.exec(a.where||''); let ci=m? (+m[1]-1) : b.ch;
     let container= b.mode==='page'? (ci===b.ch? $('readerBody') : null) : document.querySelector('[data-ch="'+ci+'"]');
-    if(container) (wrapTextAcross(container,a.text,a.kind||'highlight',a.color,a.opacity)||wrapTextOnce(container,a.text,a.kind||'highlight',a.color,a.opacity));
+    if(container) (wrapTextAcross(container,a.text,a.kind||'highlight',a.color,a.opacity,a.id)||wrapTextOnce(container,a.text,a.kind||'highlight',a.color,a.opacity,a.id));
   });
 }
 /* P3: OCR card, closable, and never left behind on a new page */
@@ -3394,7 +3394,7 @@ async function renderPdfTextLayer(page,cssVp,holder,book,pageNum){
     });
     if(!full.trim()&&book.ocrPages&&book.ocrPages[pageNum]&&book.ocrPages[pageNum].words&&book.ocrPages[pageNum].words.length){let o=book.ocrPages[pageNum];o.words.forEach(w=>{if(!w.t)return;let s=document.createElement('span');s.textContent=w.t;s.style.left=(w.x*cssVp.width)+'px';s.style.top=(w.y*cssVp.height)+'px';s.style.fontSize=Math.max(4,w.h*cssVp.height)+'px';s.dataset.pg=pageNum;s.dataset.ocr='1';layer.appendChild(s);pending.push({span:s, w:w.w*cssVp.width});});full=o.text||o.words.map(w=>w.t).join(' ');} if(pending.length) requestAnimationFrame(()=>{ pending.forEach(q=>{ let ow=q.span.offsetWidth; if(ow>2 && q.w>2) q.span.style.transform='scaleX('+(q.w/ow)+')'; }); }); if(book.textCache) book.textCache[pageNum]=full.trim();
     /* put this page's saved highlights / underlines back, they used to vanish after a reload */
-    (book.annotations||[]).forEach(a=>{ if(a.where==='PDF page '+pageNum) (wrapTextAcross(layer,a.text,a.kind||'highlight',a.color,a.opacity)||wrapTextOnce(layer,a.text,a.kind||'highlight',a.color,a.opacity)); });
+    (book.annotations||[]).forEach(a=>{ if(a.where==='PDF page '+pageNum) (wrapTextAcross(layer,a.text,a.kind||'highlight',a.color,a.opacity,a.id)||wrapTextOnce(layer,a.text,a.kind||'highlight',a.color,a.opacity,a.id)); });
   }catch(e){ /* text layer is best-effort; page image still reads */ }
 }
 /* Draw the linked annotation notebook's ink on a PDF page in reading mode.
@@ -3525,7 +3525,7 @@ window.addEventListener('resize',()=>{
   }catch(e){}
 })();
 /* --- reader sidebar: TOC, bookmarks, annotations, thumbnails --- */
-/* Reading progress: the native <progress> under the reader top bar. EPUB counts chapters, PDF counts pages. */ function updateReadProgress(){ let el=$('readProgress'); if(!el) return; let b=curBook(); if(!b){ el.value=0; return; } if(b.kind==='pdf'){ el.value= b.numPages? Math.round((b.page||1)/b.numPages*100):0; } else if(b.kind==='epub'){ let n=(b.chapters||[]).length; el.value= n? Math.round(((b.ch||0)+1)/n*100):0; } else el.value=0; } let thumbIO=null; async function renderReaderSide(){ updateReadProgress(); renderSelColor();
+/* Reading progress: the native <progress> under the reader top bar. EPUB counts chapters, PDF counts pages. */ function updateReadProgress(){ let el=$('readProgress'); if(!el) return; let b=curBook(); if(!b){ el.value=0; return; } if(b.kind==='pdf'){ el.value= b.numPages? Math.round((b.page||1)/b.numPages*100):0; } else if(b.kind==='epub'){ let n=(b.chapters||[]).length; el.value= n? Math.round(((b.ch||0)+1)/n*100):0; } else el.value=0; } let thumbIO=null; async function renderReaderSide(){ updateReadProgress(); renderSelColor(); syncReaderToolUI();
   scheduleSave();
   let b=curBook(); let toc=$('tocList'), bm=$('bookmarkList'), an=$('annoList'), th=$('thumbList');
   if(!b){ toc.innerHTML='<p class="kbd">Open a book to see its contents.</p>'; return; }
@@ -3628,12 +3628,12 @@ function changePage(d){
 /* --- highlights & annotations --- */
 /* wrap a selected range in a highlight / underline / strikethrough, shared by the reader and Parallel Read */
 /* One wrapper element for a mark of the given kind. */
-function wrapMarkEl(kind, color, opacity){
+function wrapMarkEl(kind, color, opacity, annoId){
   let el;
   if(kind==='underline'){ el=document.createElement('span'); el.style.cssText='text-decoration:underline;text-decoration-color:'+hexA(color||'#2456c8', opacity==null?1:opacity)+';text-decoration-thickness:2px'; }
   else if(kind==='strike'){ el=document.createElement('span'); el.style.cssText='text-decoration:line-through;text-decoration-color:'+hexA(color||'#b23a2e', opacity==null?1:opacity)+';text-decoration-thickness:2px'; }
   else { el=document.createElement('mark'); if(color) el.style.backgroundColor=hexA(color, opacity==null?1:opacity); }
-  el.setAttribute('data-hl','1');
+  el.setAttribute('data-hl','1'); if (annoId) el.dataset.annoId = annoId;
   return el;
 }
 /* Wrap a range in marks, one per text node it touches. A range across
@@ -3645,10 +3645,10 @@ function wrapMarkEl(kind, color, opacity){
    (probe diag5b12 — removing the mark restores selection at once).
    Wrapping each node's own portion keeps every span intact and each mark
    sitting exactly over its own text. Returns the first mark made, or null. */
-function wrapRangePerNode(range,kind,color,opacity){
+function wrapRangePerNode(range,kind,color,opacity,annoId){
   let sc=range.startContainer, so=range.startOffset, ec=range.endContainer, eo=range.endOffset;
   if(sc===ec && sc.nodeType===3){
-    let el=wrapMarkEl(kind,color,opacity), r=document.createRange(); r.setStart(sc,so); r.setEnd(ec,eo);
+    let el=wrapMarkEl(kind,color,opacity, annoId), r=document.createRange(); r.setStart(sc,so); r.setEnd(ec,eo);
     try{ r.surroundContents(el); }catch(e){ let frag=r.extractContents(); el.appendChild(frag); r.insertNode(el); }
     return el;
   }
@@ -3661,7 +3661,7 @@ function wrapRangePerNode(range,kind,color,opacity){
   }
   let first=null;
   parts.forEach(p=>{
-    let el=wrapMarkEl(kind,color,opacity), r=document.createRange(); r.setStart(p.node,p.s); r.setEnd(p.node,p.e);
+    let el=wrapMarkEl(kind,color,opacity, annoId), r=document.createRange(); r.setStart(p.node,p.s); r.setEnd(p.node,p.e);
     try{ r.surroundContents(el); }catch(e){ let frag=r.extractContents(); el.appendChild(frag); r.insertNode(el); }
     if(!first) first=el;
   });
@@ -3783,7 +3783,7 @@ function renderSelColor(){
   });
   let rb=$('readerSelBar')&&$('readerSelBar').querySelector('.selColorDot'), pb=$('prSelBar')&&$('prSelBar').querySelector('.selColorDot');
   if(rb){ let cb=curBook(); rb.style.background=cb&&cb.markColor? hexA(cb.markColor,markOpacityFor(cb)) : MARK_COLOR_DEFAULT; }
-  if(pb){ let pbn=PR.panes[PR.active]? PR.panes[PR.active].book : null; pb.style.background=pbn&&pbn.markColor? hexA(pbn.markColor,markOpacityFor(pbn)) : MARK_COLOR_DEFAULT; }
+  if(pb){ let pbn=PR.panes[PR.active]? PR.panes[PR.active].book : null; pb.style.background=pbn&&pbn.markColor? hexA(pbn.markColor,markOpacityFor(pbn)) : MARK_COLOR_DEFAULT; } let fd=$('readerFabDot'), td=$('readerToolDots'), cb=curBook(); if(fd) fd.style.background=cb&&cb.markColor? hexA(cb.markColor,markOpacityFor(cb)) : MARK_COLOR_DEFAULT; if(td){ if(!td.children.length) td.innerHTML=selColorDotsHTML(); if(cb){ let col=cb.markColor||''; td.querySelectorAll('.selDot').forEach(d=>{ let on=d.dataset.color===col; d.classList.toggle('sel',on); d.setAttribute('aria-pressed',on?'true':'false'); }); } }
 }
 function selColorSet(color){ let b=selColorBook(); if(!b) return; b.markColor=color||null; scheduleSave(); renderSelColor(); }
 function selColorSetOpacity(v){ let b=selColorBook(); if(!b) return; b.markOpacity=Math.min(1,Math.max(0.25,+v||1)); scheduleSave(); renderSelColor(); }
@@ -3808,7 +3808,7 @@ function selDotAct(ev, color){
   if(color===_selDotColor && now-_selDotAt<250) return;
   _selDotAt=now; _selDotColor=color;
   let host=ev.currentTarget.closest('[data-selcolor-for]');
-  if(host&&host.dataset.selcolorFor==='sheet') _selColorFrom='reader';
+  if(host&&host.dataset.selcolorFor==='sheet') _selColorFrom='reader'; if(ev.currentTarget.closest('#readerToolDots')) _selColorFrom='reader';
   selColorSet(color);
 }
 document.addEventListener('click',e=>{ let pop=$('selColorPop'); if(pop&&!pop.classList.contains('hidden')&&e.target&&!e.target.closest('#selColorPop')&&!e.target.closest('.selColorBtn')) hideSelColorPop(); });
@@ -3824,7 +3824,7 @@ document.addEventListener('contextmenu',e=>{
   if(e.target.closest('input,textarea,select,[contenteditable="true"]')) return;
   e.preventDefault();
 });
-document.addEventListener('selectionchange',()=>{ if(PR.on || S.view!=='reader') return; clearTimeout(readerSelT); readerSelT=setTimeout(readerShowSelBar,120); });
+document.addEventListener('selectionchange',()=>{ if(PR.on || S.view!=='reader') return; clearTimeout(readerSelT); if(readerActiveTool){ readerHideSelBar(); scheduleAutoReaderMark(); return; } readerSelT=setTimeout(readerShowSelBar,120); });
 /* a scroll moves the passage away from the bar — hide it rather than leave it floating over the wrong text */
 ['pdfView','readerBody'].forEach(id=>{ let el=$(id); if(el) el.addEventListener('scroll',()=>{ let b=$('readerSelBar'); if(b && !b.classList.contains('hidden')) readerHideSelBar(); },{passive:true}); });
 window.addEventListener('scroll',()=>{ let b=$('readerSelBar'); if(b && !b.classList.contains('hidden')) readerHideSelBar(); },{passive:true});
@@ -3833,7 +3833,7 @@ function annotateSelection(kind){
   if(PR.on){ prAnnotateSelection(kind); return; } /* Parallel Read: the mark goes to whichever book the text was selected in */
   let sel=readerSelection(); let text=sel.toString().trim();
   if(!text){ toast('Select some text in the book first'); return; }
-  let where='';
+  let where=''; const annoId = 'a_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
   try{
     let range=sel.getRangeAt(0);
     let node=range.commonAncestorContainer.nodeType===1? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
@@ -3841,18 +3841,18 @@ function annotateSelection(kind){
     let chEl=node.closest? node.closest('[data-ch]') : null;
     if(b.kind==='pdf') where='PDF page '+(holder? holder.dataset.page : b.page);
     else where='Chapter '+( (chEl? +chEl.dataset.ch : b.ch) +1)+' · '+b.chapters[chEl? +chEl.dataset.ch : b.ch].title;
-    let wrapEl=wrapRangePerNode(range,kind,markColorFor(b,kind),markOpacityFor(b));
+    let wrapEl=wrapRangePerNode(range,kind,markColorFor(b,kind),markOpacityFor(b)), annoId;
     if(!wrapEl) throw new Error('nothing to wrap');
   }catch(e){ toast('Select a clean stretch inside one paragraph'); return; }
-  b.annotations.push({text:text, where:where, kind:kind, color:markColorFor(b,kind), opacity:markOpacityFor(b)});
+  b.annotations.push({id:annoId, text:text, where:where, kind:kind, color:markColorFor(b,kind), opacity:markOpacityFor(b)});
   sel.removeAllRanges();
-  renderReaderSide(); renderLibrary(); scheduleSave();
+  renderReaderSide(); renderLibrary(); scheduleSave(); syncReaderToolUI();;
   /* P7: open the Annotations panel so the new entry is visible. */
   let ad=$('annoDetails'); if(ad) ad.open=true;
   toast((kind==='highlight'?'Highlighted': kind==='underline'?'Underlined':'Struck through')+' & saved to annotations');
 }
 function highlightSelection(){ annotateSelection('highlight'); }
-function underlineSelection(){ annotateSelection('underline'); }
+function underlineSelection(){ annotateSelection('underline'); function undoLastAnnotation(){ let b=curBook(); if(!b||!b.annotations||!b.annotations.length){ toast('Nothing to undo'); return; } let last=b.annotations.pop(); if(last&&last.id){ document.querySelectorAll('[data-hl][data-anno-id="'+last.id+'"]').forEach(el=>{ let p=el.parentNode; while(el.firstChild) p.insertBefore(el.firstChild,el); p.removeChild(el); p.normalize(); }); } renderReaderSide(); renderLibrary(); syncReaderToolUI(); scheduleSave(); toast('Undid last annotation'); } let readerActiveTool='', readerPointerDown=false, readerAutoMarkT=null; function toggleReaderToolPanel(forceOpen){ let p=$('readerToolPanel'); if(!p) return; let show=typeof forceOpen==='boolean'? forceOpen : p.classList.contains('hidden'); p.classList.toggle('hidden',!show); syncReaderToolUI(); } function toggleReaderTool(tool){ readerActiveTool=(readerActiveTool===tool)?'':tool; if(!readerActiveTool) clearTimeout(readerAutoMarkT); syncReaderToolUI(); } function setReaderToolOpacity(val){ let b=curBook(); if(!b) return; b.markOpacity=Math.max(0.1,Math.min(0.85,parseFloat(val)||0.38)); scheduleSave(); renderSelColor(); syncReaderToolUI(); } function syncReaderToolUI(){ let b=curBook(), op=b? markOpacityFor(b) : 0.38; let fab=$('readerToolFab')||$('readerFab'); if(fab){ fab.classList.toggle('armed',!!readerActiveTool); fab.classList.toggle('active',!!readerActiveTool); fab.dataset.tool=readerActiveTool||''; } document.querySelectorAll('[data-rtool], #readerToolPanel [data-tool]').forEach(btn=>{ let t=btn.dataset.rtool||btn.dataset.tool; let on=t===readerActiveTool; btn.classList.toggle('active',on); btn.setAttribute('aria-pressed',on?'true':'false'); }); let sl=$('readerToolOpacity'); if(sl) sl.value=op; let vl=$('readerToolOpacityVal'); if(vl) vl.textContent=Math.round(op*100)+'%'; let ub=$('readerToolUndo'); if(ub) ub.disabled=!(b&&b.annotations&&b.annotations.length); } function scheduleAutoReaderMark(){ clearTimeout(readerAutoMarkT); if(!readerActiveTool||readerPointerDown||PR.on||S.view!=='reader') return; readerAutoMarkT=setTimeout(()=>{ if(!readerActiveTool||readerPointerDown||PR.on||S.view!=='reader') return; let sel=readerSelection(); if(sel&&sel.toString().trim()) annotateSelection(readerActiveTool); },140); } document.addEventListener('pointerdown',e=>{ readerPointerDown=true; clearTimeout(readerAutoMarkT); let p=$('readerToolPanel'); if(p&&!p.classList.contains('hidden')&&!e.target.closest('#readerToolPanel')&&!e.target.closest('#readerToolFab')&&!e.target.closest('#readerFab')) toggleReaderToolPanel(false); },true); document.addEventListener('pointerup',()=>{ readerPointerDown=false; if(readerActiveTool&&!PR.on&&S.view==='reader') scheduleAutoReaderMark(); },true); document.addEventListener('pointercancel',()=>{ readerPointerDown=false; },true); }
 function strikeSelection(){ annotateSelection('strike'); }
 function exportAnnotations(){
   let b=curBook(); if(!b||!b.annotations.length){ toast('No annotations to export'); return; }
