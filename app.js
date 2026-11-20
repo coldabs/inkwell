@@ -95,9 +95,9 @@ function pageH(p){ if(p&&p.bgPdf&&p.bgPdf.img&&p.bgPdf.img.width&&p.bgPdf.img.he
    (1 = the old 1200px store, never worse). */
 let canvasScale=1, zoomRescaleT=null;
 function canvasScaleTarget(){ let shell=$('canvasShell'); if(!shell||!curPageObj()) return 1; let w=shell.getBoundingClientRect().width; if(!w) return 1; let dpr=Math.min(window.devicePixelRatio||1,2); let k=(w*dpr)/CW; k=Math.min(k,2200/CW,Math.sqrt(8e6/(CW*PH))); return Math.max(1,k); }
-function applyCanvasTransform(){ [bgX,hiX,inkX].forEach(c=>{ c.setTransform(canvasScale,0,0,canvasScale,0,0); }); }
-function rescaleCanvases(){ if(!curPageObj()||S.view!=='editor') return; let k=canvasScaleTarget(); if(Math.abs(k-canvasScale)<0.02) return; canvasScale=k; redrawAll(); }
-function syncPageHeight(){ let h=pageH(curPageObj()); let W=Math.round(CW*canvasScale), H=Math.round(h*canvasScale); if(h!==PH||bgC.width!==W||bgC.height!==H){ PH=h; [bgC,hiC,inkC].forEach(c=>{c.width=W;c.height=H;}); [bgX,hiX,inkX].forEach(c=>{c.lineCap='round';c.lineJoin='round'}); } applyCanvasTransform(); }
+function applyCanvasTransform(){ [bgX,hiX,inkX,liveX].forEach(c=>{ c.setTransform(canvasScale,0,0,canvasScale,0,0); }); }
+function rescaleCanvases(){ if(!curPageObj()||S.view!=='editor') return; let k=canvasScaleTarget(); if(Math.abs(k-canvasScale)<0.02){ syncSplitPaneHeight(); return; } canvasScale=k; redrawAll(); syncSplitPaneHeight(); }
+function syncPageHeight(){ let h=pageH(curPageObj()); let W=Math.round(CW*canvasScale), H=Math.round(h*canvasScale); if(h!==PH||bgC.width!==W||bgC.height!==H){ PH=h; [bgC,hiC,inkC,liveC].forEach(c=>{c.width=W;c.height=H;}); [bgX,hiX,inkX,liveX].forEach(c=>{c.lineCap='round';c.lineJoin='round'}); } applyCanvasTransform(); }
 const SAMPLE_ID='sample-book';
 function blankPage(){return {ink:[],hi:[],text:'',stickies:[],table:null,board:null,audio:null,bgPdf:null,texts:[],images:[],texs:[],bgColor:'#fffdf6'}}
 function blankBoard(){return {color:0,strokes:[],view:{x:0,y:0,k:1},geom:null}}
@@ -217,7 +217,7 @@ function decodeBgPdfImg(p){
       bumpV(p); /* refresh its thumbnail and save the picture */
     })();
   }
-  p.bgPdf._decodeP=work.catch(()=>{}).then(()=>{ p.bgPdf._decodeP=null; let nb=curNb(); if(nb && nb.pages[nb.cur]===p && S.view==='editor'){ redrawAll(); renderPages(); } });
+  p.bgPdf._decodeP=work.catch(()=>{}).then(()=>{ p.bgPdf._decodeP=null; let nb=curNb(); if(nb && nb.pages[nb.cur]===p && S.view==='editor'){ redrawAll(); renderPages(); } syncSplitPaneHeight(); splitRefitCurrentPage(); });
   return p.bgPdf._decodeP;
 }
 async function restoreLibrary(token){
@@ -287,7 +287,20 @@ function ensurePdfDoc(b){
       if(!b.fileData) return false;
       if(!window.pdfjsLib) return false;
       pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      let doc=await pdfjsLib.getDocument({data:b.fileData.slice(0)}).promise;
+      let doc;
+      if(b.fileData instanceof Blob){
+        /* Imported files are stored as the File itself: open by blob URL
+           so no copy of the bytes is made. The URL is kept while the
+           book lives (pdf.js fetched the whole file at load — blob URLs
+           have no range support — so nothing re-fetches it later). */
+        if(!b._pdfUrl) b._pdfUrl=URL.createObjectURL(b.fileData);
+        doc=await pdfjsLib.getDocument({url:b._pdfUrl}).promise;
+      } else {
+        /* Older saved records and the built-in sample keep their bytes as
+           an ArrayBuffer; pdf.js may detach the buffer it is given, so
+           hand it a copy and keep the stored one intact. */
+        doc=await pdfjsLib.getDocument({data:b.fileData.slice(0)}).promise;
+      }
       b.doc=doc; b.numPages=doc.numPages;
       return true;
     }catch(e){ return false; }
@@ -296,9 +309,16 @@ function ensurePdfDoc(b){
   return b._docP;
 }
 function librarySignature(){
+  /* Cheap numeric digest, checked every 4s as a safety net for changes
+     that bypass scheduleSave(). The old version built strings out of
+     every sticky's text, every table row and every board geometry on
+     every page — on a 3,000-page notebook that was a long string build
+     every 4 seconds. Counts and versions detect the same changes; the
+     4s net only ever triggers a debounced save, so a rare collision
+     costs nothing (the direct scheduleSave paths still fire). */
   try{
     return S.items.map(it=> it.kind==='notebook'
-      ? 'n:'+it.title+':'+it.cur+':'+it.pages.reduce((a,p)=>a+(p.ink||[]).length+(p.hi||[]).length+((p.text||'').length)+((p.stickies||[]).reduce((x,s)=>x+(s.text||'').length+((s.x|0)+(s.y|0)),0))+((p.table&&p.table.rows)?p.table.rows.reduce((x,r)=>x+r.join('').length,0):0)+((p.board&&p.board.strokes)?p.board.strokes.length:0)+(p.texts||[]).length+(p.texs||[]).length+(p.images||[]).length+(p.audio?1:0),0)+':'+it.pages.reduce((a,p)=>a+((p.board&&p.board.geom)?((p.board.geom.x|0)+','+(p.board.geom.y|0)+','+(p.board.geom.w|0)+','+(p.board.geom.h|0)+';'):''),'')
+      ? 'n:'+it.title+':'+it.cur+':'+it.pages.length+':'+it.pages.reduce((a,p)=>a+(p._v||0)+(p.ink?p.ink.length:0)+(p.hi?p.hi.length:0)+((p.text||'').length)+((p.stickies||[]).length)+(p.texts?p.texts.length:0)+(p.texs?p.texs.length:0)+(p.images?p.images.length:0)+(p.audio?1:0)+(p.board&&p.board.strokes?p.board.strokes.length:0)+(p.board&&p.board.geom?((p.board.geom.x|0)+(p.board.geom.y|0)+(p.board.geom.w|0)+(p.board.geom.h|0)):0),0)
       : it.kind+':'+(it.title||'')+':'+(it.annotations||[]).length+':'+(it.bookmarks||[]).length+':'+(it.page||it.ch||0)+':'+Object.keys(it.parallelNotes||{}).length
     ).join('|')+'#'+S.stats.strokes+'#'+S.stats.focusDone;
   }catch(e){ return ''; }
@@ -861,9 +881,9 @@ function saveEditorToModel(){
 function setTemplate(v){ let nb=curNb(); if(nb) nb.template=v; drawBackground(); scheduleSave(); }
 
 /* ============ editor: canvas engine ============ */
-const bgC=$('bgCanvas'), hiC=$('hiCanvas'), inkC=$('inkCanvas');
-const bgX=bgC.getContext('2d'), hiX=hiC.getContext('2d'), inkX=inkC.getContext('2d');
-[bgX,hiX,inkX].forEach(c=>{c.lineCap='round';c.lineJoin='round'});
+const bgC=$('bgCanvas'), hiC=$('hiCanvas'), inkC=$('inkCanvas'), liveC=$('liveCanvas');
+const bgX=bgC.getContext('2d'), hiX=hiC.getContext('2d'), inkX=inkC.getContext('2d'), liveX=liveC.getContext('2d');
+[bgX,hiX,inkX,liveX].forEach(c=>{c.lineCap='round';c.lineJoin='round'});
 
 /* Page backgrounds, the template set: blank, lined, grid, dotted, plus
    music staff, Cornell notes and checklist layouts. One painter is shared
@@ -1429,7 +1449,7 @@ function setPageBg(v){ let p=curPageObj(); if(!p) return; p.bgColor=v; bumpV(p);
 
 /* pointer drawing */
 let drawing=false, curStroke=null, lastPt=null, lastT=0, eraseChanged=false;
-function canvasPos(e){ let r=inkC.getBoundingClientRect(); return { x:(e.clientX-r.left)*(CW/r.width), y:(e.clientY-r.top)*(PH/r.height) }; }
+function canvasPos(e,r){ r=r||inkC.getBoundingClientRect(); return { x:(e.clientX-r.left)*(CW/r.width), y:(e.clientY-r.top)*(PH/r.height) }; }
 function pointerPressure(e,pt){
   if(e.pointerType==='pen' && e.pressure && e.pressure>0) return e.pressure;
   if(lastPt){ let d=Math.hypot(pt.x-lastPt.x,pt.y-lastPt.y); return Math.max(0.2,Math.min(1, 1.05 - d/46)); }
@@ -1472,6 +1492,7 @@ function inkPtrMid(){ let ps=Array.from(inkPtrs.values()); return ps.length>=2? 
 function abortGestureForPan(){
   let wasMove=!!moveDrag;
   if(curStroke){ if(strokeUndoPushed && S.undoStack.length) S.undoStack.pop(); curStroke=null; }
+  liveX.clearRect(0,0,CW,PH);
   drawing=false; lastPt=null; strokeUndoPushed=false; handPan=null;
   selDrag=false; moveDrag=null; lassoPts=null; vspaceDrag=null; S.selRect=null;
   drawSelectionOverlay();
@@ -1484,10 +1505,26 @@ function redoStroke(){ let p=curPageObj(); if(!p) return; let s=S.redoStack.pop(
 function renderLive(){
   if(!curStroke) return;
   let p=curPageObj(); if(!p) return;
-  let layer=curStroke._layer, ctx= layer==='ink'? inkX:hiX;
-  ctx.clearRect(0,0,CW,PH);
-  p[layer].forEach(st=>drawStroke(ctx,st,p));
-  drawStroke(ctx,curStroke,p);
+  /* The stroke in progress draws on its own overlay canvas, not on the
+     ink layer. The old renderLive cleared the layer and re-drew EVERY
+     committed stroke on the page for each pointer event — O(all ink on
+     the page) per move, ~7ms on a page with 200 strokes, so the stylus
+     lagged behind the pen and got worse the more was on the page. Now a
+     move costs only the live stroke itself (one path, a few dozen
+     points), whatever else the page holds. On lift, endStroke clears
+     the overlay and redraws the layer once with the exact final stroke
+     (tapered pressure outline), so what you see while drawing is a
+     plain round-cap preview of the same line. */
+  liveX.clearRect(0,0,CW,PH);
+  if(curStroke.tool==='shape' || curStroke._compassCenter){ drawStroke(liveX,curStroke,p); return; }
+  let pts=curStroke.points; if(!pts.length) return;
+  liveX.save();
+  liveX.lineCap='round'; liveX.lineJoin='round';
+  if(curStroke.tool==='highlighter'){ liveX.globalCompositeOperation=isDarkPage(p)?'screen':'multiply'; liveX.globalAlpha=0.42; liveX.strokeStyle=pageInkColor(curStroke.color,p); liveX.lineWidth=curStroke.size*4.5; }
+  else { liveX.strokeStyle=pageInkColor(curStroke.color,p); liveX.lineWidth=Math.max(1.5,curStroke.size*1.4); if(curStroke.style&&curStroke.style!=='solid') liveX.setLineDash(dashFor(curStroke)); }
+  if(pts.length===1){ liveX.fillStyle=liveX.strokeStyle; liveX.beginPath(); liveX.arc(pts[0].x,pts[0].y,Math.max(1.1,curStroke.size*0.6),0,7); liveX.fill(); }
+  else { liveX.beginPath(); liveX.moveTo(pts[0].x,pts[0].y); for(let i=1;i<pts.length;i++) liveX.lineTo(pts[i].x,pts[i].y); liveX.stroke(); }
+  liveX.restore();
 }
 /* Stylus button mapping: the pen's eraser end or barrel button temporarily
    swaps in the mapped tool for the length of that stroke, then the chosen
@@ -1606,8 +1643,9 @@ inkC.addEventListener('pointermove',e=>{
   }
   if(!drawing) return;
   let evts=e.getCoalescedEvents? e.getCoalescedEvents():[e];
+  let rect=inkC.getBoundingClientRect(); /* once per dispatch, not once per coalesced point */
   evts.forEach(ev=>{
-    let pt=canvasPos(ev); pt.p=pointerPressure(ev,pt);
+    let pt=canvasPos(ev,rect); pt.p=pointerPressure(ev,pt);
     if(curStroke && curStroke.tool==='shape' && curStroke._compassCenter){ let c=curStroke._compassCenter; let r=Math.hypot(pt.x-c.x,pt.y-c.y); curStroke.points=[{x:c.x-r,y:c.y-r},{x:c.x+r,y:c.y+r}]; renderLive(); lastPt=pt; return; }
     if(curStroke && curStroke.tool==='shape'){ curStroke.points[1]={x:snapVal(pt.x),y:snapVal(pt.y)}; renderLive(); lastPt=pt; return; }
     if(lastPt){ let keep=1-(S.stabilize||0)/100; pt.x=lastPt.x+(pt.x-lastPt.x)*keep; pt.y=lastPt.y+(pt.y-lastPt.y)*keep; } // input stabilization (streamline): Smooth slider sets how much jitter is filtered
@@ -1618,6 +1656,7 @@ inkC.addEventListener('pointermove',e=>{
 });
 function bumpV(p){ if(p) p._v=(p._v||0)+1; scheduleSave(); }
 function endStroke(){
+  liveX.clearRect(0,0,CW,PH); /* the stroke in progress lives on the overlay; the layer below holds the finished one */
   if(S.tool==='select'){ if(moveDrag){ moveDrag=null; let p=curPageObj(); bumpV(p); renderPages(); drawSelectionOverlay(); } if(selDrag){ selDrag=false; finishSelection(); } return; }
   if(S.tool==='lasso'){ if(lassoPts && lassoPts.length>2) finishLasso(); else { lassoPts=null; drawSelectionOverlay(); } return; }
   if(S.tool==='vspace'){ if(vspaceDrag) finishVspace(); return; }
@@ -1880,8 +1919,8 @@ function strokeTouchedByEraser(st,a,b){
 }
 function drawEraserCursor(pt){
   if(S.tool!=='eraser' || S.eraserMode!=='stroke' || !pt) return;
-  inkX.save(); inkX.strokeStyle='rgba(178,38,30,.8)'; inkX.lineWidth=2;
-  inkX.beginPath(); inkX.arc(pt.x,pt.y,eraserRadius(),0,7); inkX.stroke(); inkX.restore();
+  liveX.save(); liveX.strokeStyle='rgba(178,38,30,.8)'; liveX.lineWidth=2;
+  liveX.beginPath(); liveX.arc(pt.x,pt.y,eraserRadius(),0,7); liveX.stroke(); liveX.restore();
 }
 /* Brush size in plain words, with a live preview drawn at the stroke's real
    width (in page-canvas units) in the current ink colour, so how thick the
@@ -1925,8 +1964,11 @@ function eraseAt(pt){
       p[layer]=p[layer].filter(st=>!strokeTouchedByEraser(st,a,b));
       if(p[layer].length!==before) hit=true;
     });
-    if(hit){ eraseChanged=true; bumpV(p); }
-    redrawLayer('ink'); redrawLayer('hi'); drawEraserCursor(b);
+    if(hit){ eraseChanged=true; bumpV(p); redrawLayer('ink'); redrawLayer('hi'); }
+    /* No hit, no redraw: the old code re-drew both layers on every move
+       even when the eraser touched nothing (~6ms a move on a full page).
+       The ring lives on the overlay now, so it needs no layer redraw. */
+    liveX.clearRect(0,0,CW,PH); drawEraserCursor(b);
     return;
   }
   let half=8+(+$('brushSize').value); /* halfEraserSize: half the side of the eraser square */
@@ -2087,6 +2129,7 @@ function loadPageIntoEditor(){
     else if((sb.id)!==(pane.dataset.bookId||'')) renderSplitBook(pane,sb);
     else if(sb.kind==='pdf'){ let host=pane.querySelector('#splitPdfHost'); if(host&&!host.querySelector('canvas')&&!host.dataset.splitLoading) splitRenderPdfPage(pane,sb); }
   } }
+  syncSplitPaneHeight();
 }
 function switchPage(i){
   let nb=curNb(); if(!nb) return;
@@ -2128,6 +2171,20 @@ function drawPageThumb(i){
 }
 function renderPages(){
   let nb=curNb(); if(!nb) return;
+  /* The row list only shows each page's number, its PDF page and a board
+     marker, so it only needs rebuilding when that changes (pages added,
+     removed, duplicated or reordered). A plain page switch used to
+     rebuild all 3,000 rows (12,000 icon calls) on every switch — ~800ms
+     on a long annotation notebook. When the rows are unchanged, just
+     move the active marker and draw the thumbs near the current page. */
+  let rowSig=nb.pages.map(p=>((p.bgPdf&&p.bgPdf.page)||0)+':'+((p.board&&p.board.strokes&&p.board.strokes.length)?1:0)).join(',');
+  if(nb._pagesRowSig===rowSig && $('pageList').children.length===nb.pages.length){
+    document.querySelectorAll('#pageList .pageThumb').forEach((el,i)=>el.classList.toggle('active',i===nb.cur));
+    $('statEditorPages').textContent=nb.pages.length; updateStatusBar();
+    for(let i=Math.max(0,nb.cur-12); i<=Math.min(nb.pages.length-1,nb.cur+12); i++) drawPageThumb(i);
+    scheduleSave(); return;
+  }
+  nb._pagesRowSig=rowSig;
   $('pageList').innerHTML=nb.pages.map((p,i)=>{
     return '<div class="pageThumb '+(i===nb.cur?'active':'')+'" onclick="switchPage('+i+')"><canvas width="150" height="100" data-thumb="'+i+'"></canvas>'
     +'<div class="ptRow"><span class="kbd">Page '+(i+1)+(p.board&&p.board.strokes.length?' · board':'')+(p.bgPdf?' · PDF p.'+p.bgPdf.page:'')+'</span><span class="ptBtns">'
@@ -2239,7 +2296,11 @@ boardC.addEventListener('pointermove',e=>{
   }
   if(!bDrawing) return;
   if(boardTool==='pan' && bLast){ let r=boardC.getBoundingClientRect(); bd.view.x+=(e.clientX-bLast.x)*(boardC.width/r.width); bd.view.y+=(e.clientY-bLast.y)*(boardC.height/r.height); bLast={x:e.clientX,y:e.clientY}; redrawBoard(); return; }
-  let w=boardWorld(e); if(bStroke){ bStroke.points.push({x:w.x,y:w.y}); bd.strokes=bd.strokes.filter(s=>s!==bStroke); bd.strokes.push(bStroke); redrawBoard(); }
+  let w=boardWorld(e); if(bStroke){ let a=bLast; bStroke.points.push({x:w.x,y:w.y}); bd.strokes=bd.strokes.filter(s=>s!==bStroke); bd.strokes.push(bStroke);
+    /* Draw just the new segment, not the whole board: redrawBoard() re-drew
+       every board stroke per move, the same lag as the editor had. */
+    let v=bd.view; bX.setTransform(v.k,0,0,v.k,v.x,v.y); bX.strokeStyle=bStroke.color; bX.lineWidth=bStroke.size; bX.lineCap='round'; bX.lineJoin='round'; bX.beginPath(); bX.moveTo(a.x,a.y); bX.lineTo(w.x,w.y); bX.stroke(); bX.setTransform(1,0,0,1,0,0);
+    bLast=w; }
 });
 function boardEnd(e){ delete boardPointers[e.pointerId]; if(Object.keys(boardPointers).length<2) pinchStart=null; if(bDrawing && bStroke){ renderPages(); } bDrawing=false; bStroke=null; bLast=null; }
 boardC.addEventListener('pointerup',boardEnd); boardC.addEventListener('pointercancel',boardEnd);
@@ -2406,6 +2467,9 @@ function toggleSplit(){
     let b=splitBookFor(curNb());
     if(b) renderSplitBook(pane,b);
     else renderSplitPicker(pane);
+    syncSplitPaneHeight();
+  } else {
+    pane.style.height='';
   }
 }
 /* Split View book picker: the pane shows the notebook's picked book
@@ -2418,15 +2482,45 @@ function splitBookFor(nb){
   let c=curBook();
   return (c && (c.kind==='epub'||c.kind==='pdf')) ? c : null;
 }
+/* Split View alignment: the pane is a column — the book fills the body
+   and the book/page controls sit in a footer UNDER it, so the page
+   starts at the pane's top edge, level with the notebook page, instead
+   of being pushed down by a header above it. (A header cannot live in
+   the 76px band above the pane: the pill floats centred over the stage
+   and covers that band at phone width.) The pane's height is synced to
+   the notebook page (the shell) in JS, so both windows share a top edge
+   and a height at every width. */
 function renderSplitBook(pane,b){
   pane.dataset.bookId=b.id;
-  let head='<div class="splitHead"><span class="badge">'+esc(b.title)+'</span><button type="button" class="btn small" onclick="splitShowPicker()">Change book</button></div>';
-  if(b.kind==='epub'){ let c=(b.chapters||[])[b.ch]||{title:'',html:''}; pane.innerHTML=head+'<h3>'+esc(c.title)+'</h3>'+c.html; }
+  syncSplitPaneHeight(); /* body height must be right before the page is fitted to it */
+  let head='<div class="splitHead"><span class="badge">'+esc(b.title)+'</span><button type="button" class="btn small" onclick="splitShowPicker()">Change</button><span class="splitZoomGroup"><button type="button" class="btn small" onclick="splitPdfZoomBy(0.8)" aria-label="Zoom out">−</button><button type="button" class="btn small" id="splitZoomLabel" onclick="splitPdfZoomBy(0)" aria-label="Reset zoom" title="Tap to reset zoom">100%</button><button type="button" class="btn small" onclick="splitPdfZoomBy(1.25)" aria-label="Zoom in">+</button></span></div>';
+  if(b.kind==='epub'){ let c=(b.chapters||[])[b.ch]||{title:'',html:''}; pane.innerHTML='<div class="splitPaneBody"><h3>'+esc(c.title)+'</h3>'+c.html+'</div><div class="splitPaneFoot">'+head+'</div>'; }
   else if(b.kind==='pdf'){
-    pane.innerHTML=head+'<div class="splitPdfNav"><button type="button" class="btn small" onclick="splitPdfPage(-1)" aria-label="Previous page">‹ Prev</button><span class="kbd" id="splitPdfLabel">Page …</span><button type="button" class="btn small" onclick="splitPdfPage(1)" aria-label="Next page">Next ›</button></div><div class="splitPdfHost" id="splitPdfHost"><p class="kbd">Loading page…</p></div>';
+    pane.innerHTML='<div class="splitPaneBody"><div class="splitPdfHost" id="splitPdfHost"><p class="kbd">Loading page…</p></div></div><div class="splitPaneFoot">'+head+'<div class="splitPdfNav"><button type="button" class="btn small" onclick="splitPdfPage(-1)" aria-label="Previous page">‹</button><span class="kbd" id="splitPdfLabel">…</span><button type="button" class="btn small" onclick="splitPdfPage(1)" aria-label="Next page">›</button></div></div>';
     splitRenderPdfPage(pane,b);
   }
-  else pane.innerHTML=head+'<h3>Nothing to read yet</h3><p>Open or import a book and it will appear here beside your notebook.</p>';
+  else pane.innerHTML='<div class="splitPaneBody"><h3>Nothing to read yet</h3><p>Open or import a book and it will appear here beside your notebook.</p></div>';
+  syncSplitPaneHeight();
+}
+/* The pane is exactly as tall as the notebook page (the shell), so the
+   two windows share a top edge and a height. The shell's height follows
+   the page aspect and the zoom, so it is measured and copied whenever
+   the page, zoom or viewport changes. */
+function syncSplitPaneHeight(){
+  if(!S.split) return;
+  let shell=$('canvasShell'), pane=$('splitPane');
+  if(!shell||!pane) return;
+  /* The pane matches the notebook shell's full height, in every
+     orientation — the two windows stay parallel and the PDF page fills
+     its half. Capping the pane at the scroller's visible height (an
+     earlier version of this) made the pane 300px against a 560px shell
+     in phone landscape: the windows were visibly unequal and the PDF
+     page shrank to ~130px wide, wasting the wide stage. In short
+     landscape the footer now sits at the bottom of the stage and is
+     reached by the same scroll that reveals the notebook page's bottom;
+     the pane's body scrolls internally, so the page itself stays put. */
+  let h=shell.offsetHeight;
+  pane.style.height=h+'px';
 }
 /* Split View PDF pages: the pane used to show only cached text, so a PDF
    never opened in the reader showed "Open the PDF in the reader once…"
@@ -2443,12 +2537,94 @@ function splitPdfPage(d){
   scheduleSave();
   let pane=$('splitPane'); if(pane) splitRenderPdfPage(pane,b);
 }
+/* Split-pane zoom: the same approach as the reader (readerZoomBy) — the
+   page holder widens by a percentage and the page is re-rendered crisply
+   at the new width after a short settle delay, never an upscaled bitmap.
+   The zoom lives on the book (b.splitZoom, like the reader's readerZoom)
+   so page turns keep it; it resets when another book is picked. */
+let splitZoomT=null; let splitPaneResizeT=null;
+function splitPdfZoomBy(f){
+  let nb=curNb(); if(!nb) return;
+  let b=splitBookFor(nb); if(!b||b.kind!=='pdf') return;
+  b.splitZoom= f===0? 1 : Math.max(0.5, Math.min(2.5, (b.splitZoom||1)*f));
+  let pane=$('splitPane'); if(!pane) return;
+  let host=pane.querySelector('#splitPdfHost'); if(host) host.style.width=(b.splitZoom*100)+'%';
+  let zl=pane.querySelector('#splitZoomLabel'); if(zl) zl.textContent=Math.round(b.splitZoom*100)+'%';
+  clearTimeout(splitZoomT);
+  splitZoomT=setTimeout(()=>{ splitPdfRedraw(pane,b); },120);
+}
+/* Space use: the pane page fits its body — width AND height, whichever
+   binds — so the stage does not sit half-empty. The holder's width is
+   capped at the width that fits the body's height at the page's aspect
+   ratio; the cap scales with the pane zoom, so zooming in still grows
+   the page (and the body scrolls). The page is centred when narrower
+   than the body. */
+function splitFitPanePage(pane,b,holder){
+  let body=pane.querySelector('.splitPaneBody'); if(!body||!holder) return 0;
+  let sz=(b._pageSizes&&b._pageSizes[b.page-1])||[612,792];
+  /* The body's padding is 12px a side horizontally but only 12px at the
+     bottom vertically (top is 0) — subtracting 24px vertically
+     double-counted it and shrank the page by ~12px of height at phone
+     widths, where the body is shortest. */
+  let availW=body.clientWidth-24, availH=body.clientHeight-12;
+  let fitW=Math.min(availW, availH*sz[0]/sz[1]);
+  let cap=Math.max(40, Math.floor(fitW*(b.splitZoom||1)));
+  holder.style.maxWidth=cap+'px'; holder.style.margin='0 auto';
+  return cap;
+}
+function splitRefitCurrentPage(){
+  if(!S.split) return;
+  let pane=$('splitPane'); if(!pane) return;
+  let nb=curNb(); if(!nb) return;
+  let b=splitBookFor(nb); if(!b||b.kind!=='pdf') return;
+  let host=pane.querySelector('#splitPdfHost'); if(!host) return;
+  let holder=host.querySelector('.pdfHolder'); if(!holder||!holder._drawn) return;
+  let before=parseInt(holder.style.maxWidth||'0',10)||0;
+  let cap=splitFitPanePage(pane,b,holder);
+  if(Math.abs(cap-before)>2) splitPdfRedraw(pane,b);
+}
+function splitPdfRedraw(pane,b){
+  let host=pane.querySelector('#splitPdfHost'); if(!host) return;
+  let holder=host.querySelector('.pdfHolder'); if(!holder) return;
+  splitFitPanePage(pane,b,holder);
+  let gen=splitPdfGen;
+  let live=()=>gen===splitPdfGen&&pane.isConnected&&pane.dataset.bookId===b.id&&holder.isConnected;
+  pdfReleasePage(holder);
+  let jump=(n)=>{ if(typeof n==='number'){ b.page=Math.max(1,Math.min(b.numPages,n)); scheduleSave(); splitRenderPdfPage(pane,b); } };
+  pdfDrawPage(b,+holder.dataset.n,holder,live,jump);
+}
+/* Pinch-to-zoom in the pane, mirroring the reader's pinch (readerTouch*):
+   a live scale preview while pinching, the real crisp zoom on lift. */
+let splitPinch=null;
+function splitPdfTouchStart(e){
+  if(!e.touches||e.touches.length!==2) return;
+  let host=e.currentTarget.querySelector('#splitPdfHost'); if(!host || !host.querySelector('.pdfHolder')) return;
+  let a=e.touches[0],c=e.touches[1],r=host.getBoundingClientRect();
+  let b=splitBookFor(curNb());
+  splitPinch={host:host,d0:Math.max(20,Math.hypot(a.clientX-c.clientX,a.clientY-c.clientY)),z0:(b&&b.splitZoom)||1,s:1};
+  e.preventDefault();
+  host.style.transformOrigin=((a.clientX+c.clientX)/2-r.left)+'px '+((a.clientY+c.clientY)/2-r.top)+'px';
+}
+function splitPdfTouchMove(e){
+  if(!splitPinch||!e.touches||e.touches.length!==2) return;
+  e.preventDefault();
+  let a=e.touches[0],c=e.touches[1];
+  let z=Math.max(0.5,Math.min(2.5,splitPinch.z0*Math.hypot(a.clientX-c.clientX,a.clientY-c.clientY)/splitPinch.d0));
+  splitPinch.s=z/splitPinch.z0; splitPinch.host.style.transform='scale('+splitPinch.s+')';
+}
+function splitPdfTouchEnd(e){
+  if(!splitPinch||(e.touches&&e.touches.length>=2)) return;
+  let p=splitPinch; splitPinch=null;
+  p.host.style.transform=''; p.host.style.transformOrigin='';
+  if(Math.abs(p.s-1)>0.02) splitPdfZoomBy(p.s);
+}
+(function(){ let pane=$('splitPane'); if(!pane) return; pane.addEventListener('touchstart',splitPdfTouchStart,{passive:false}); pane.addEventListener('touchmove',splitPdfTouchMove,{passive:false}); pane.addEventListener('touchend',splitPdfTouchEnd,{passive:false}); pane.addEventListener('touchcancel',splitPdfTouchEnd,{passive:false}); })();
 async function splitRenderPdfPage(pane,b){
   let gen=++splitPdfGen;
   let host=pane.querySelector('#splitPdfHost'); if(!host) return;
   let label=pane.querySelector('#splitPdfLabel');
   b.page=Math.max(1,Math.min(b.numPages||1,b.page||1));
-  if(label) label.textContent='Page '+b.page+' of '+(b.numPages||'?');
+  if(label) label.textContent=b.page+'/'+(b.numPages||'?'); /* compact footer label */
   /* free the previous page's bitmap (and cancel a draw still in flight) */
   let old=host.querySelector('.pdfHolder'); if(old) pdfReleasePage(old);
   host.innerHTML='<p class="kbd">Loading page…</p>';
@@ -2458,13 +2634,16 @@ async function splitRenderPdfPage(pane,b){
   delete host.dataset.splitLoading;
   if(!ok){ host.innerHTML='<p>This PDF\u2019s file could not be restored from this browser. Import the file again to read it.</p>'; return; }
   b.page=Math.max(1,Math.min(b.numPages,b.page||1));
-  if(label) label.textContent='Page '+b.page+' of '+b.numPages;
+  if(label) label.textContent=b.page+'/'+b.numPages;
+  host.style.width=((b.splitZoom||1)*100)+'%'; /* page turns keep the pane zoom */
+  let zl=pane.querySelector('#splitZoomLabel'); if(zl) zl.textContent=Math.round((b.splitZoom||1)*100)+'%';
   host.innerHTML='';
   let holder=document.createElement('div');
   holder.className='pdfHolder'; holder.dataset.n=b.page;
   let sz=(b._pageSizes&&b._pageSizes[b.page-1])||[612,792];
   holder.style.aspectRatio=sz[0]+' / '+sz[1];
   host.appendChild(holder);
+  splitFitPanePage(pane,b,holder);
   let jump=(n)=>{ if(typeof n==='number'){ b.page=Math.max(1,Math.min(b.numPages,n)); scheduleSave(); splitRenderPdfPage(pane,b); } };
   let live=()=>gen===splitPdfGen&&pane.isConnected&&pane.dataset.bookId===b.id&&holder.isConnected;
   splitDrawWhenVisible(holder,b,pane,gen,live,jump,14);
@@ -2482,8 +2661,8 @@ function splitDrawWhenVisible(holder,b,pane,gen,live,jump,left){
 function renderSplitPicker(pane){
   pane.dataset.bookId='';
   let books=S.items.filter(i=>i.kind==='pdf'||i.kind==='epub');
-  if(!books.length){ pane.innerHTML='<h3>Nothing to read yet</h3><p>Open or import a book and it will appear here beside your notebook.</p>'; return; }
-  pane.innerHTML='<h3>Read beside this notebook</h3><p class="kbd">Pick a book to open beside the notebook.</p>';
+  if(!books.length){ pane.innerHTML='<div class="splitPaneBody"><h3>Nothing to read yet</h3><p>Open or import a book and it will appear here beside your notebook.</p></div>'; return; }
+  pane.innerHTML='<div class="splitPaneBody"><h3>Read beside this notebook</h3><p class="kbd">Pick a book to open beside the notebook.</p></div>';
   let list=document.createElement('div');
   books.forEach(b=>{
     let row=document.createElement('button');
@@ -2492,7 +2671,7 @@ function renderSplitPicker(pane){
     row.innerHTML='<span class="pickDot" style="background:'+esc(b.color||'#4a5a74')+'"></span><span class="pickMain"><b>'+esc(b.title)+'</b><span class="kbd">'+esc(meta)+'</span></span><span class="pickGo" aria-hidden="true">›</span>';
     list.appendChild(row);
   });
-  pane.appendChild(list);
+  pane.querySelector('.splitPaneBody').appendChild(list);
 }
 function splitPickBook(id){
   let nb=curNb(); if(nb){ nb.splitBookId=id; scheduleSave(); }
@@ -2672,11 +2851,17 @@ function exportNotebookTXT(){
   download(nb.title.replace(/[^\w\- ]+/g,'')+'.txt', new Blob([body],{type:'text/plain'}));
   toast('Notebook exported as .txt');
 }
-function exportNotebookPDF(){
+async function exportNotebookPDF(){
   let nb=curNb(); if(!nb) return; saveEditorToModel();
   if(!window.jspdf){ toast('PDF export library could not load. Check the connection.'); return; }
   let doc=new window.jspdf.jsPDF({unit:'px', format:[CW,pageH(nb.pages[0])], orientation: pageH(nb.pages[0])>CW?'portrait':'landscape'});
-  nb.pages.forEach((p,i)=>{ let ph=pageH(p); if(i>0) doc.addPage([CW,ph], ph>CW?'portrait':'landscape'); let c=composePage(p, nb.template); doc.addImage(c.toDataURL('image/jpeg',0.92),'JPEG',0,0,CW,c.height); });
+  for(let i=0;i<nb.pages.length;i++){ let p=nb.pages[i];
+    /* Decode this page's PDF background first (lazy since the restore
+       change): exporting an unviewed page used to print the blank
+       template instead of its PDF page. */
+    if(p.bgPdf) await decodeBgPdfImg(p);
+    let ph=pageH(p); if(i>0) doc.addPage([CW,ph], ph>CW?'portrait':'landscape'); let c=composePage(p, nb.template); doc.addImage(c.toDataURL('image/jpeg',0.92),'JPEG',0,0,CW,c.height);
+  }
   doc.save(nb.title.replace(/[^\w\- ]+/g,'')+'.pdf'); toast('Notebook exported as PDF');
 }
 /* SVG export, strokes become real vector elements, so the page opens in
@@ -2789,18 +2974,11 @@ function exportBackup(){
   toast('Backup downloaded. Notebooks are included in full, with bookmarks and annotations.');
 }
 async function relinkPdfBackgrounds(){
-  for(let nb of S.items){ if(nb.kind!=='notebook') continue;
-    for(let p of nb.pages){ if(!p.bgPdf || p.bgPdf.img) continue;
-      let book=S.items.find(i=>i.kind==='pdf' && i.title===p.bgPdf.bookTitle);
-      if(!book) continue;
-      if(!book.doc && !(await ensurePdfDoc(book))) continue;
-      try{ let page=await book.doc.getPage(p.bgPdf.page); let v0=page.getViewport({scale:1}); let vp=page.getViewport({scale:CW/v0.width});
-        let cv=document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
-        await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
-        p.bgPdf.img=cv;
-      }catch(e){}
-    }
-  }
+  /* Backgrounds are NOT rendered here any more. Rendering every missing
+     page up front (one full-size canvas per page, retained) was the same
+     blow-up as the old annotatePdf; decodeBgPdfImg() renders a page's
+     background when it is actually viewed, and exportNotebookPDF()
+     decodes on demand before composing. Nothing needs doing eagerly. */
   if(S.view==='editor' && curNb()){ loadPageIntoEditor(); }
 }
 function importBackup(e){
@@ -2840,10 +3018,15 @@ async function importPdf(f){
   toast('Loading PDF…');
   try{
     pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    let buf=await f.arrayBuffer();
-    let storedBuf=buf.slice(0); /* kept so the file itself is saved in this browser and the book reopens after a reload */
-    let doc=await pdfjsLib.getDocument({data:buf.slice(0)}).promise;
-    let book={id:uid(),kind:'pdf',title:f.name.replace(/\.[^.]+$/,''),color:'#4a5a74',updated:'Imported just now',doc:doc,numPages:doc.numPages,page:1,mode:'scroll',bookmarks:[],annotations:[],textCache:{},parallelNotes:{},fileName:f.name,fileData:storedBuf};
+    /* The file itself is the book: hand pdf.js a blob URL and store the
+       File object, instead of copying the bytes three times (arrayBuffer
+       + a slice for storage + a slice for pdf.js). A 151 MB file used to
+       drive the heap past 350 MB at import; a 400 MB file would be
+       ~850 MB transient on a phone. pdf.js fetches the blob URL once
+       into memory it owns; the stored File is a reference, not a copy,
+       and ensurePdfDoc() re-opens it the same way after a reload. */
+    let doc=await pdfjsLib.getDocument({url:URL.createObjectURL(f)}).promise;
+    let book={id:uid(),kind:'pdf',title:f.name.replace(/\.[^.]+$/,''),color:'#4a5a74',updated:'Imported just now',doc:doc,numPages:doc.numPages,page:1,mode:'scroll',bookmarks:[],annotations:[],textCache:{},parallelNotes:{},fileName:f.name,fileData:f};
     S.items.unshift(book); renderLibrary();
     /* The file bytes ARE the book: wait until they are actually written
        before opening, and say so if the write fails, a silent failure
@@ -3055,7 +3238,9 @@ function reapplyAnnotations(){
 }
 /* P3: OCR card, closable, and never left behind on a new page */
 function closeReaderCards(){ let o=$('ocrBox'); if(o) o.classList.add('hidden'); }
-function jumpToChapter(i){ let b=curBook(); if(!b||b.kind!=='epub') return; closeReaderCards(); b.ch=Math.max(0,Math.min(b.chapters.length-1,i));
+function jumpToChapter(i){ let b=curBook(); if(!b||b.kind!=='epub') return; closeReaderCards();
+  if(window.matchMedia('(max-width:1024px)').matches) $('readerSide').classList.remove('open'); /* drawer over the pages: close it on navigation */
+  b.ch=Math.max(0,Math.min(b.chapters.length-1,i));
   if(b.mode==='page') renderEpubBook(); else { let el=document.querySelector('[data-ch="'+b.ch+'"]'); if(el) el.scrollIntoView({behavior:smoothOrInstant()}); updateResume(); }
   renderReaderSide(); }
 
@@ -3181,7 +3366,7 @@ async function renderPdfTextLayer(page,cssVp,holder,book,pageNum){
     let tc=await page.getTextContent();
     if(!holder.isConnected) return;
     let layer=document.createElement('div'); layer.className='textLayer'; holder.appendChild(layer);
-    let full='';
+    let full=''; let pending=[]; /* spans still needing a width measure: one rAF per page, not one per span (~500/page, each forcing layout) */
     tc.items.forEach(item=>{
       if(!item.str) return;
       let tx=pdfjsLib.Util.transform(cssVp.transform,item.transform);
@@ -3192,9 +3377,9 @@ async function renderPdfTextLayer(page,cssVp,holder,book,pageNum){
       span.dataset.pg=pageNum;
       layer.appendChild(span);
       full+=item.str+' ';
-      requestAnimationFrame(()=>{ let w=item.width*cssVp.scale; let ow=span.offsetWidth; if(ow>2 && w>2) span.style.transform='scaleX('+(w/ow)+')'; });
+      pending.push({span:span, w:item.width*cssVp.scale});
     });
-    if(!full.trim()&&book.ocrPages&&book.ocrPages[pageNum]&&book.ocrPages[pageNum].words&&book.ocrPages[pageNum].words.length){let o=book.ocrPages[pageNum];o.words.forEach(w=>{if(!w.t)return;let s=document.createElement('span');s.textContent=w.t;s.style.left=(w.x*cssVp.width)+'px';s.style.top=(w.y*cssVp.height)+'px';s.style.fontSize=Math.max(4,w.h*cssVp.height)+'px';s.dataset.pg=pageNum;s.dataset.ocr='1';layer.appendChild(s);requestAnimationFrame(()=>{let tw=w.w*cssVp.width,ow=s.offsetWidth;if(ow>2&&tw>2)s.style.transform='scaleX('+(tw/ow)+')';});});full=o.text||o.words.map(w=>w.t).join(' ');} if(book.textCache) book.textCache[pageNum]=full.trim();
+    if(!full.trim()&&book.ocrPages&&book.ocrPages[pageNum]&&book.ocrPages[pageNum].words&&book.ocrPages[pageNum].words.length){let o=book.ocrPages[pageNum];o.words.forEach(w=>{if(!w.t)return;let s=document.createElement('span');s.textContent=w.t;s.style.left=(w.x*cssVp.width)+'px';s.style.top=(w.y*cssVp.height)+'px';s.style.fontSize=Math.max(4,w.h*cssVp.height)+'px';s.dataset.pg=pageNum;s.dataset.ocr='1';layer.appendChild(s);pending.push({span:s, w:w.w*cssVp.width});});full=o.text||o.words.map(w=>w.t).join(' ');} if(pending.length) requestAnimationFrame(()=>{ pending.forEach(q=>{ let ow=q.span.offsetWidth; if(ow>2 && q.w>2) q.span.style.transform='scaleX('+(q.w/ow)+')'; }); }); if(book.textCache) book.textCache[pageNum]=full.trim();
     /* put this page's saved highlights / underlines back, they used to vanish after a reload */
     (book.annotations||[]).forEach(a=>{ if(a.where==='PDF page '+pageNum) (wrapTextAcross(layer,a.text,a.kind||'highlight',a.color,a.opacity)||wrapTextOnce(layer,a.text,a.kind||'highlight',a.color,a.opacity)); });
   }catch(e){ /* text layer is best-effort; page image still reads */ }
@@ -3298,12 +3483,16 @@ function pdfJumpGuard(){
 }
 function jumpToPdfPage(n,instant){
   let b=curBook(); if(!b||b.kind!=='pdf') return; closeReaderCards();
+  /* On phone/tablet the Contents panel is a drawer over the pages: close
+     it once the jump lands, so the page is actually visible. */
+  if(window.matchMedia('(max-width:1024px)').matches) $('readerSide').classList.remove('open');
   b.page=Math.max(1,Math.min(b.numPages,n));
   if(b.mode==='page'){ renderPdfBook(); window.scrollTo({top:0}); }
   else { let el=document.querySelector('.pdfPage[data-page="'+b.page+'"]'); if(el){ pdfJumpGuard(); el.scrollIntoView({behavior: instant? 'auto':smoothOrInstant()}); } updateResume(); }
 }
 let pdfResizeT=null;
 window.addEventListener('resize',()=>{
+  if(S.split){ clearTimeout(splitPaneResizeT); splitPaneResizeT=setTimeout(()=>{ syncSplitPaneHeight(); splitRefitCurrentPage(); },100); }
   if(S.view==='editor' && document.activeElement && document.activeElement.className!=='canvasText') renderCanvasTexts();
   let b=curBook(); if(!b||b.kind!=='pdf'||S.view!=='reader'||!pdfDrawIO) return;
   /* a phone's address bar showing / hiding changes only the height: pages keep their size, nothing to redraw */
@@ -3323,7 +3512,7 @@ window.addEventListener('resize',()=>{
   }catch(e){}
 })();
 /* --- reader sidebar: TOC, bookmarks, annotations, thumbnails --- */
-/* Reading progress: the native <progress> under the reader top bar. EPUB counts chapters, PDF counts pages. */ function updateReadProgress(){ let el=$('readProgress'); if(!el) return; let b=curBook(); if(!b){ el.value=0; return; } if(b.kind==='pdf'){ el.value= b.numPages? Math.round((b.page||1)/b.numPages*100):0; } else if(b.kind==='epub'){ let n=(b.chapters||[]).length; el.value= n? Math.round(((b.ch||0)+1)/n*100):0; } else el.value=0; } async function renderReaderSide(){ updateReadProgress(); renderSelColor();
+/* Reading progress: the native <progress> under the reader top bar. EPUB counts chapters, PDF counts pages. */ function updateReadProgress(){ let el=$('readProgress'); if(!el) return; let b=curBook(); if(!b){ el.value=0; return; } if(b.kind==='pdf'){ el.value= b.numPages? Math.round((b.page||1)/b.numPages*100):0; } else if(b.kind==='epub'){ let n=(b.chapters||[]).length; el.value= n? Math.round(((b.ch||0)+1)/n*100):0; } else el.value=0; } let thumbIO=null; async function renderReaderSide(){ updateReadProgress(); renderSelColor();
   scheduleSave();
   let b=curBook(); let toc=$('tocList'), bm=$('bookmarkList'), an=$('annoList'), th=$('thumbList');
   if(!b){ toc.innerHTML='<p class="kbd">Open a book to see its contents.</p>'; return; }
@@ -3344,16 +3533,56 @@ window.addEventListener('resize',()=>{
       else toc.innerHTML='<p class="kbd">This PDF has no outline.</p>';
     }catch(e){ toc.innerHTML='<p class="kbd">Outline unavailable.</p>'; }
     th.innerHTML='';
-    for(let n=1;n<=b.numPages;n++){
-      if(curBook()!==b) return;
-      let item=document.createElement('div'); item.className='thumbItem'+(n===b.page?' active':''); item.innerHTML='<span class="kbd">Page '+n+'</span>';
-      item.onclick=()=>jumpToPdfPage(n); th.appendChild(item);
-      try{ let pg=await b.doc.getPage(n); let v0=pg.getViewport({scale:1}); let vp=pg.getViewport({scale:130/v0.width});
-        let cv=document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
+    /* Thumbnails are LAZY now. Rendering every page up front (one 130px
+       render per page, sequential, ~15ms each) kept the reader busy for
+       ~30s on a 2,000-page PDF and retained ~176 MB of bitmaps — and on
+       image-heavy PDFs it starved the first page's own draw, so a
+       151 MB scanned book took 12s to show page 1. Rows are built
+       cheaply; each page's picture renders only when its row scrolls
+       near, and is freed again when it scrolls far away. */
+    if(thumbIO){ thumbIO.disconnect(); thumbIO=null; }
+    /* A fast scroll through the list fires the observer for hundreds of
+       rows at once. Without a cap, hundreds of renders queue on the pdf.js
+       worker and each inserts its bitmap even after its row scrolled far
+       away — one probe scroll retained 522 bitmaps and starved a jump to
+       page 1500 past its 20s timeout. So: at most 6 renders in flight,
+       the rest wait in a set, and a finished render is only inserted while
+       its row is still near the viewport; a stale one is dropped and its
+       row re-renders when it next scrolls near. */
+    let thumbInFlight=0; const thumbPending=new Set();
+    const thumbNear=(item)=>{ let r=item.getBoundingClientRect(); return r.bottom>=-600 && r.top<=innerHeight+600; };
+    function pumpThumb(){ if(thumbInFlight>=6) return; for(let it of thumbPending){ thumbPending.delete(it);
+      if(th.dataset.bookId!==b.id || curBook()!==b || it._thumbDone) continue;
+      if(!thumbNear(it)) continue; renderThumb(it,+it.dataset.n); if(thumbInFlight>=6) break; } }
+    let renderThumb=async(item,n)=>{
+      if(th.dataset.bookId!==b.id || curBook()!==b || item._thumbDone) return;
+      if(thumbInFlight>=6){ thumbPending.add(item); return; }
+      item._thumbDone=true; thumbInFlight++;
+      try{ let pg=await b.doc.getPage(n); if(th.dataset.bookId!==b.id || curBook()!==b) return;
+        let v0=pg.getViewport({scale:1}); let vp=pg.getViewport({scale:130/v0.width});
+        let cv=document.createElement('canvas'); cv.width=Math.ceil(vp.width); cv.height=Math.ceil(vp.height);
         await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+        if(!item.isConnected || th.dataset.bookId!==b.id) { item._thumbDone=false; return; }
+        if(!thumbNear(item)){ item._thumbDone=false; return; } /* row scrolled away while rendering */
         item.insertBefore(cv,item.firstChild);
-      }catch(e){}
-      if(n%4===0) await new Promise(r=>setTimeout(r,10));
+      }catch(e){ item._thumbDone=false; }
+      finally{ thumbInFlight--; pumpThumb(); }
+    };
+    thumbIO=new IntersectionObserver(es=>{ es.forEach(en=>{ let item=en.target, n=+item.dataset.n;
+      if(en.isIntersecting){ if(!item.querySelector('canvas')) renderThumb(item,n); }
+      else { thumbPending.delete(item); let cv=item.querySelector('canvas'); if(cv){ cv.width=cv.height=0; cv.remove(); item._thumbDone=false; } }
+    }); },{rootMargin:'600px 0px'});
+    for(let n=1;n<=b.numPages;n++){
+      let item=document.createElement('div'); item.className='thumbItem'+(n===b.page?' active':''); item.dataset.n=n; item.innerHTML='<span class="kbd">Page '+n+'</span>';
+      /* Reserve the thumb's height up front: the canvas is display:block
+         at the column width, so a row grows ~110-140px when its picture
+         lands. Rows above the scroll target growing shoved the target
+         itself out of view (and out of the observer's margin) before its
+         own render finished, so far rows never got a picture. The reserve
+         is the page's aspect at a 100px column plus the label/padding. */
+      let sz=(b._pageSizes&&b._pageSizes[n-1])||[612,792];
+      item.style.minHeight=Math.ceil(100*sz[1]/sz[0])+28+'px';
+      item.onclick=()=>jumpToPdfPage(n); th.appendChild(item); thumbIO.observe(item);
     }
     return;
   }
