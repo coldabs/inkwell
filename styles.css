@@ -304,7 +304,12 @@ body.inEditor #mainLayout{max-width:1440px}
 .miniBtn::after{content:"";position:absolute;inset:-10px}
 .miniBtn .ic{width:14px;height:14px}
 .stageWrap{display:grid;gap:16px}
-.stageWrap.split{grid-template-columns:1fr 1fr}
+/* minmax(0,1fr), not 1fr: a bare 1fr track's minimum is its content, and
+   the notebook column's status bar (~600px of nowrap spans) forced the
+   first track to ~602px at desktop, squeezing the split pane to ~110px.
+   With a 0 minimum both halves share the stage equally at every width;
+   the status bar scrolls internally, everything else wraps or is 100%. */
+.stageWrap.split{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 .zoomScroll{overflow:auto;border-radius:var(--radius-xs)}
 /* Clear of the floating pill toolbar: the pill sits 12px down from the
    stage top and is ~54px tall, so without this the page title hides
@@ -333,6 +338,11 @@ body.inEditor #mainLayout{max-width:1440px}
 .splitPane h3{font-family:var(--font-display);font-size:24px;font-weight:600;letter-spacing:-.02em;margin:0 0 8px}
 .splitPane p{font-family:var(--font-display);font-size:15px;line-height:1.7}
 .splitHead{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+/* Split View PDF page: Prev / Page N of M / Next above the drawn page.
+   The page itself reuses the reader's .pdfHolder, so it gets the same
+   canvas sizing, text layer and density cap as the main reader. */
+.splitPdfNav{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.splitPdfNav .kbd{flex:1;text-align:center}
 #tableHost .panel{margin-top:14px;padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm)}
 table.inkTable{width:100%;border-collapse:collapse}
 table.inkTable td,table.inkTable th{border:1px solid var(--border);padding:8px;text-align:left;min-width:70px;font-size:13px}
