@@ -354,10 +354,88 @@ body.inEditor #mainLayout{max-width:1440px}
 .splitPaneBody{flex:1 1 auto;min-height:0;overflow:auto;padding:0 12px 12px}
 .splitPaneFoot{flex:none;border-top:1px solid var(--border);background:var(--surface);padding:6px 8px;display:flex;flex-direction:column;gap:6px}
 .splitPaneFoot .splitHead{margin-bottom:0;flex-wrap:nowrap}
-.splitPaneFoot .splitPdfNav{margin-bottom:0;flex-wrap:nowrap}
+.splitPaneFoot .splitPdfNav,.splitPaneFoot .splitEpubNav{margin-bottom:0;flex-wrap:nowrap}
+.splitEpubNav{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.splitEpubNav .kbd{flex:1;text-align:center}
 .splitPaneFoot .btn{min-width:28px;padding:0 4px}
 .splitPaneFoot .splitZoomGroup .btn{min-width:28px}
 .splitHead .badge{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+
+/* ---------- P3: Split View icon rail (mockup 13) ----------
+   Desktop only (>=1025px): when Split View is on, both sidebars collapse
+   into a 48px icon rail at the far left and the stage takes the rest, so
+   notebook + reader share a clean 50/50 split. Explicit tracks per the
+   css-layout guide (grid-template-areas, one 48px track + one flexible
+   minmax(0,1fr) track so the stage can shrink below its content width).
+   Each rail button opens its panel as an overlay drawer while split stays
+   on. At <=1024px there is no rail: the stacked rails simply hide while
+   split is on. */
+.splitRail{display:none}
+.railBackdrop{display:none}
+@media (min-width:1025px){
+  body.splitOn .editorWrap{grid-template-columns:48px minmax(0,1fr);grid-template-areas:"rail stage"}
+  body.splitOn #splitRail{display:flex;grid-area:rail;flex-direction:column;align-items:center;gap:8px;padding-top:4px}
+  body.splitOn #stageWrap{grid-area:stage}
+  body.splitOn #pagesPanel,body.splitOn #linksPanel{display:none}
+  body.splitOn #pagesPanel.railDrawer,body.splitOn #linksPanel.railDrawer{display:block;position:fixed;left:48px;top:0;bottom:0;z-index:70;width:300px;max-width:calc(100vw - 48px);overflow:auto;background:var(--surface);border-right:1px solid var(--border);padding:14px;overscroll-behavior:contain}
+  .railBtn{display:grid;place-items:center;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;border:1px solid transparent;border-radius:var(--radius-xs);background:transparent;color:var(--muted);cursor:pointer}
+  .railBtn:hover{background:var(--paper2);color:var(--text)}
+  .railBtn[aria-pressed="true"]{background:var(--surface);border-color:var(--border);color:var(--accent)}
+  .railBtn .ic{width:20px;height:20px}
+  .railBackdrop{display:block;position:fixed;inset:0;z-index:65;background:rgba(0,0,0,.18)}
+  .railBackdrop.hidden{display:none}
+}
+@media (max-width:1024px){
+  body.splitOn #pagesPanel,body.splitOn #linksPanel{display:none}
+}
+
+/* ---------- P3: Focus Mode (mockup 3) ----------
+   A dark, chrome-free view over the same editor: only <- Exit Focus, the
+   top-right Focus pill (time, session, Pause/Resume + progress ring), the
+   centered canvas + Written Notes, and the audio pill while recording.
+   No DOM moves and no second canvas — body.focusMode hides the chrome and
+   re-grids the stage (canvas left, notes right >=1025px; stacked below on
+   smaller widths), per content-first-noise-reduction: keep the frame small,
+   move it out of the way, show secondary content only when asked. The page
+   itself keeps the user's paper and ink so notes stay readable; only the
+   frame around it goes dark, as in the mockup. */
+.focusBar{display:none}
+.focusAudioPill{display:none}
+body.focusMode{background:#0d0d0f}
+body.focusMode .editorTop,body.focusMode #pagesPanel,body.focusMode #linksPanel,body.focusMode #splitRail,body.focusMode #mainToolbar,body.focusMode #statusBar,body.focusMode #pageNavFab,body.focusMode #zoomFab,body.focusMode #layerChip,body.focusMode #selBar,body.focusMode #setSquare,body.focusMode #floatingBoard,body.focusMode #boardMini,body.focusMode #tableHost{display:none!important}
+body.focusMode .editorWrap{grid-template-columns:minmax(0,1fr);max-width:1180px;margin-inline:auto}
+body.focusMode .stageWrap{grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start}
+body.focusMode #zoomScroll{grid-column:1;grid-row:1;min-width:0}
+body.focusMode .notesAudioRow{grid-column:2;grid-row:1;flex-direction:column;gap:12px}
+body.focusMode .notesAudioRow .noteBlock{margin-top:0}
+body.focusMode .notesAudioRow .studioRow{flex:none;width:100%;margin-top:0}
+body.focusMode .canvasShell{margin-top:0;background:#17171a}
+body.focusMode .notesAudioRow .noteBlock,body.focusMode .notesAudioRow .studioRow{background:#17171a;border-color:#2a2a30;color:#ecebe6}
+body.focusMode .notesAudioRow .noteBlock .runningHead,body.focusMode .notesAudioRow .studioRow .runningHead,body.focusMode .notesAudioRow .kbd,body.focusMode #noteText{color:#ecebe6}
+body.focusMode #noteText{background:transparent}
+body.focusMode .focusBar{display:flex;position:fixed;top:0;left:0;right:0;z-index:80;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;pointer-events:none}
+body.focusMode .focusBar>*{pointer-events:auto}
+.focusExit{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border:1px solid transparent;border-radius:var(--radius-xs);background:transparent;color:#9a9aa2;font-size:14px;font-weight:600;cursor:pointer}
+.focusExit:hover{color:#ecebe6}
+.focusPill{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:0 12px 0 16px;border:1px solid #2a2a30;border-radius:999px;background:#17171a;color:#ecebe6;font-size:13px;font-weight:600;cursor:pointer;box-shadow:var(--shadow-modal)}
+.focusRing{flex:0 0 auto;transform:rotate(-90deg)}
+.focusRingBg{fill:none;stroke:#2a2a30;stroke-width:2.5}
+.focusRingFg{fill:none;stroke:#e06d44;stroke-width:2.5;stroke-linecap:round}
+body.focusMode .focusAudioPill{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:80;display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:0 16px;border:1px solid #2a2a30;border-radius:999px;background:#17171a;color:#ecebe6;font-size:13px;font-weight:600;box-shadow:var(--shadow-modal)}
+.focusRecDot{width:10px;height:10px;border-radius:50%;background:#e06d44;flex:0 0 auto}
+.focusWave{display:inline-flex;align-items:flex-end;gap:2px;height:16px}
+.focusWave i{width:2px;background:#e06d44;border-radius:1px;animation:focusWave 1s ease-in-out infinite}
+.focusWave i:nth-child(1){height:6px}
+.focusWave i:nth-child(2){height:12px;animation-delay:.15s}
+.focusWave i:nth-child(3){height:16px;animation-delay:.3s}
+.focusWave i:nth-child(4){height:10px;animation-delay:.45s}
+.focusWave i:nth-child(5){height:7px;animation-delay:.6s}
+@keyframes focusWave{0%,100%{transform:scaleY(.5)}50%{transform:scaleY(1)}}
+@media (max-width:1024px){
+  body.focusMode .stageWrap{grid-template-columns:minmax(0,1fr)}
+  body.focusMode #zoomScroll{grid-column:1;grid-row:1}
+  body.focusMode .notesAudioRow{grid-column:1;grid-row:2}
+}
 /* Narrow panes: the title badge is dropped so Change + zoom fit on one
    row — with it, the footer wrapped to three rows at phone widths and
    the page shrank. The book is the one just picked; its title is also
@@ -470,7 +548,19 @@ mark{background:#F2D887;color:#1A1A1A;padding:0 2px;border-radius:2px}
 .boardHead{position:relative;z-index:12;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;background:var(--surface);color:var(--text);border-bottom:1px solid var(--border);font-size:11px;font-weight:600;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
 .boardHead>span{display:inline-flex;align-items:center;gap:6px}
 .boardHeadActions{display:inline-flex;gap:4px;flex-wrap:wrap}
-.boardTools{display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:6px 8px;background:var(--surface);border-bottom:1px solid var(--border)}
+/* P3: the board tools live in a compact bottom floating pill inside the
+   board (mockup 10: Pen | Pan | 100% | Clear). Zoom in/out stays on
+   pinch/wheel; tapping the % label resets to 100%. */
+.boardTools{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:4px;max-width:calc(100% - 16px);padding:4px 6px;background:var(--surface);border:1px solid var(--border);border-radius:999px;box-shadow:var(--shadow-modal)}
+.boardTools .btn{min-height:36px}
+.boardColorSwatch{display:inline-block;width:14px;height:14px;border-radius:50%;border:1px solid rgba(0,0,0,.25);background:#fffdf6;vertical-align:-2px}
+/* P3: board mini-map (mockup 6). Fixed bottom-right of the screen so it
+   sits where the mockup shows it whatever the editor scroll; hidden unless
+   the board is open (see syncBoardMini) and hidden in Focus Mode. */
+.boardMini{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:61;width:200px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-modal);overflow:hidden}
+.boardMiniHead{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--border);font-size:12px;font-weight:600}
+.boardMiniActions{display:inline-flex;gap:4px}
+.boardMini canvas{display:block;width:200px;height:120px;background-image:radial-gradient(var(--border) 1px,transparent 1px);background-size:14px 14px}
 .boardCanvasWrap{position:relative;display:flex;flex:1 1 auto;min-height:0}
 #boardCanvas{display:block;flex:1 1 auto;width:100%;height:230px;min-height:0;background:transparent;cursor:crosshair;touch-action:none}
 .boardGrip{position:absolute;right:0;bottom:0;z-index:10;width:28px;height:28px;cursor:nwse-resize;touch-action:none}
