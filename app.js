@@ -118,7 +118,7 @@ let S={
   undoStack:[], redoStack:[],
   view:'library',
   stats:{writeSec:0, readSec:0, strokes:0, pagesRead:{}, focusDone:0},
-  split:false, recording:false, recStart:0,
+  split:false, focusMode:false, recording:false, recStart:0,
   searchResults:[], zoom:1, selection:[], selRect:null, paletteItems:[], paletteSel:-1,
   strokeStyle:'solid', eraserMode:'stroke', stabilize:28, snapGrid:false, clipboard:[]
 };
@@ -2387,14 +2387,16 @@ function toggleBoard(force){
   b.classList.toggle('hidden',!show);
   var bb=$('boardBtn'); if(bb) bb.setAttribute('aria-pressed', show?'true':'false');
   if(show){ loadBoard(); requestAnimationFrame(()=>{ sizeBoardCanvas(); var sh=$('canvasShell'); if(sh) sh.scrollIntoView({block:'nearest'}); }); }
+  syncBoardMini();
 }
 function loadBoard(){
   let bd=pageBoard(); if(!bd) return;
   if(boardFull){ boardFull=false; boardRestoreGeom=null; $('floatingBoard').classList.remove('boardFull'); setBtnContent('boardFsBtn','arrows-maximize','Expand'); }
   $('floatingBoard').style.background=BOARD_COLORS[bd.color];
   if(bd.color===6){ $('floatingBoard').style.color='#f8fafc'; } else { $('floatingBoard').style.color='#1b2a4a'; }
+  let sw=$('boardColorSwatch'); if(sw) sw.style.background=BOARD_COLORS[bd.color];
   applyBoardGeom(bd.geom||defaultBoardGeom());
-  sizeBoardCanvas(); redrawBoard();
+  sizeBoardCanvas(); redrawBoard(); syncBoardMini();
 }
 /* --- board window geometry: position + size, remembered per page ---
    The canvas inside stays infinite; only this window frame changes.
@@ -2415,7 +2417,7 @@ function toggleBoardFullscreen(){
   boardRestoreGeom=boardGeomFromEl();
   boardFull=true; el.classList.add('boardFull');
   setBtnContent('boardFsBtn','arrows-minimize','Restore');
-  sizeBoardCanvas();
+  sizeBoardCanvas(); syncBoardMini();
 }
 function exitBoardFullscreen(silent){
   let el=$('floatingBoard'); boardFull=false; el.classList.remove('boardFull');
@@ -2423,7 +2425,7 @@ function exitBoardFullscreen(silent){
   applyBoardGeom(g);
   if(bd) bd.geom=boardGeomFromEl();
   setBtnContent('boardFsBtn','arrows-maximize','Expand');
-  sizeBoardCanvas();
+  sizeBoardCanvas(); syncBoardMini();
   if(!silent) scheduleSave();
 }
 function sizeBoardCanvas(){
@@ -2442,6 +2444,7 @@ function redrawBoard(){
     bX.stroke();
   });
   bX.setTransform(1,0,0,1,0,0);
+  updateBoardZoomLabel(); updateBoardMini();
 }
 function boardWorld(e){ let r=boardC.getBoundingClientRect(); let bd=pageBoard(); let sx=(e.clientX-r.left)*(boardC.width/r.width), sy=(e.clientY-r.top)*(boardC.height/r.height); return { x:(sx-bd.view.x)/bd.view.k, y:(sy-bd.view.y)/bd.view.k, sx, sy }; }
 function setBoardTool(t){ boardTool=t; $('boardPenBtn').classList.toggle('primary',t==='pen'); $('boardPanBtn').classList.toggle('primary',t==='pan'); boardC.style.cursor= t==='pan'?'grab':'crosshair'; }
@@ -2474,12 +2477,47 @@ boardC.addEventListener('pointermove',e=>{
     let v=bd.view; bX.setTransform(v.k,0,0,v.k,v.x,v.y); bX.strokeStyle=bStroke.color; bX.lineWidth=bStroke.size; bX.lineCap='round'; bX.lineJoin='round'; bX.beginPath(); bX.moveTo(a.x,a.y); bX.lineTo(w.x,w.y); bX.stroke(); bX.setTransform(1,0,0,1,0,0);
     bLast=w; }
 });
-function boardEnd(e){ delete boardPointers[e.pointerId]; if(Object.keys(boardPointers).length<2) pinchStart=null; if(bDrawing && bStroke){ renderPages(); } bDrawing=false; bStroke=null; bLast=null; }
+function boardEnd(e){ delete boardPointers[e.pointerId]; if(Object.keys(boardPointers).length<2) pinchStart=null; if(bDrawing && bStroke){ renderPages(); updateBoardMini(); } bDrawing=false; bStroke=null; bLast=null; }
 boardC.addEventListener('pointerup',boardEnd); boardC.addEventListener('pointercancel',boardEnd);
 boardC.addEventListener('wheel',e=>{ e.preventDefault(); let bd=pageBoard(); let f=e.deltaY<0?1.12:0.89; bd.view.k=Math.max(0.2,Math.min(6,bd.view.k*f)); redrawBoard(); },{passive:false});
+function updateBoardZoomLabel(){ let bd=pageBoard(); let l=$('boardZoomLabel'); if(l&&bd) l.textContent=Math.round(bd.view.k*100)+'%'; }
+function boardZoomReset(){ let bd=pageBoard(); if(!bd) return; bd.view.k=1; redrawBoard(); }
 function boardZoom(f){ let bd=pageBoard(); bd.view.k=Math.max(0.2,Math.min(6,bd.view.k*f)); redrawBoard(); }
 function boardClear(){ let bd=pageBoard(); askConfirm('Clear this board?','The board on this page is emptied; the page itself is untouched.',()=>{ bd.strokes=[]; redrawBoard(); renderPages(); }); }
 function cycleBoardColor(){ let bd=pageBoard(); bd.color=(bd.color+1)%BOARD_COLORS.length; loadBoard(); scheduleSave(); toast('Board colour saved for this page'); }
+/* P3: board mini-map (mockup 6) — a live thumbnail of the board, bottom
+   right of the screen, headed Board with the board's own Expand / Close
+   actions. The thumbnail re-renders from the same stroke data as the
+   board, scaled to fit; it shows only while the board is open, not
+   fullscreen, at >=768px. Expand opens the board fullscreen; Close
+   closes the board — both reuse the existing handlers. */
+function updateBoardMini(){
+  let cv=$('boardMiniCanvas'); if(!cv) return;
+  let bd=pageBoard(); if(!bd) return;
+  let ctx=cv.getContext('2d'); if(!ctx) return;
+  ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,cv.width,cv.height);
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity,any=false;
+  bd.strokes.forEach(st=>{ st.points.forEach(p=>{ any=true; if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; }); });
+  if(!any) return;
+  let w=Math.max(1,maxX-minX), h=Math.max(1,maxY-minY);
+  let k=Math.min((cv.width-16)/w,(cv.height-16)/h);
+  let ox=(cv.width-w*k)/2-minX*k, oy=(cv.height-h*k)/2-minY*k;
+  bd.strokes.forEach(st=>{
+    if(!st.points.length) return;
+    ctx.strokeStyle=st.color; ctx.lineWidth=Math.max(1,st.size*k); ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.beginPath(); ctx.moveTo(st.points[0].x*k+ox,st.points[0].y*k+oy);
+    for(let i=1;i<st.points.length;i++) ctx.lineTo(st.points[i].x*k+ox,st.points[i].y*k+oy);
+    ctx.stroke();
+  });
+}
+function syncBoardMini(){
+  let m=$('boardMini'); if(!m) return;
+  let b=$('floatingBoard');
+  let show=b && !b.classList.contains('hidden') && !boardFull && window.matchMedia('(min-width:768px)').matches;
+  m.classList.toggle('hidden',!show);
+  if(show) updateBoardMini();
+}
+window.addEventListener('resize',()=>{ clearTimeout(window.__boardMiniT); window.__boardMiniT=setTimeout(syncBoardMini,150); });
 /* drag + resize board, built for steady controls:
    - the head captures the pointer, so a drag tracks one finger/mouse
      exactly and never drifts or gets lost mid-move;
@@ -2627,6 +2665,8 @@ function updateWordCount(){ let v=$('noteText').value; $('wordCount').textConten
 $('noteText').addEventListener('input',()=>{ saveEditorToModel(); updateWordCount(); });
 function toggleSplit(){
   S.split=!S.split;
+  document.body.classList.toggle('splitOn',S.split);
+  if(!S.split) closeRailPanel();
   var stb=$('splitTopBtn'); if(stb) stb.setAttribute('aria-pressed', S.split?'true':'false');
   $('stageWrap').classList.toggle('split',S.split);
   let pane=$('splitPane'); pane.classList.toggle('hidden',!S.split);
@@ -2644,6 +2684,30 @@ function toggleSplit(){
     pane.style.height='';
   }
 }
+/* P3: Split View icon rail (mockup 13) — desktop only. When split is on,
+   both sidebars collapse into a 48px rail; each rail button opens its
+   panel as an overlay drawer while split stays on. The drawer reuses the
+   real panel DOM (same ids, same handlers) — nothing is duplicated. */
+let railOpen=null; /* 'pages' | 'layers' | 'links' | null */
+function railPanelEl(which){ return which==='links'? $('linksPanel') : $('pagesPanel'); }
+function openRailPanel(which){
+  if(which!=='pages'&&which!=='layers'&&which!=='links') return;
+  let el=railPanelEl(which); if(!el) return;
+  if(which==='pages'||which==='layers') switchRailTab(which);
+  ['pagesPanel','linksPanel'].forEach(id=>{ let p=$(id); if(p&&p!==el) p.classList.remove('railDrawer'); });
+  el.classList.add('railDrawer');
+  railOpen=which;
+  ['pages','layers','links'].forEach(w=>{ let b=$('railBtn'+w[0].toUpperCase()+w.slice(1)); if(b) b.setAttribute('aria-pressed', w===which?'true':'false'); });
+  let bd=$('railBackdrop'); if(bd) bd.classList.remove('hidden');
+}
+function closeRailPanel(){
+  ['pagesPanel','linksPanel'].forEach(id=>{ let p=$(id); if(p) p.classList.remove('railDrawer'); });
+  railOpen=null;
+  ['pages','layers','links'].forEach(w=>{ let b=$('railBtn'+w[0].toUpperCase()+w.slice(1)); if(b) b.setAttribute('aria-pressed','false'); });
+  let bd=$('railBackdrop'); if(bd) bd.classList.add('hidden');
+}
+function toggleRailPanel(which){ if(railOpen===which) closeRailPanel(); else openRailPanel(which); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&railOpen) closeRailPanel(); });
 /* Split View book picker: the pane shows the notebook's picked book
    (persisted per notebook as splitBookId, like parallelWith on books),
    else the book open in the reader, else a chooser of the real books.
@@ -2666,7 +2730,7 @@ function renderSplitBook(pane,b){
   pane.dataset.bookId=b.id;
   syncSplitPaneHeight(); /* body height must be right before the page is fitted to it */
   let head='<div class="splitHead"><span class="badge">'+esc(b.title)+'</span><button type="button" class="btn small" onclick="splitShowPicker()">Change</button><span class="splitZoomGroup"><button type="button" class="btn small" onclick="splitPdfZoomBy(0.8)" aria-label="Zoom out">−</button><button type="button" class="btn small" id="splitZoomLabel" onclick="splitPdfZoomBy(0)" aria-label="Reset zoom" title="Tap to reset zoom">100%</button><button type="button" class="btn small" onclick="splitPdfZoomBy(1.25)" aria-label="Zoom in">+</button></span></div>';
-  if(b.kind==='epub'){ let c=(b.chapters||[])[b.ch]||{title:'',html:''}; pane.innerHTML='<div class="splitPaneBody"><h3>'+esc(c.title)+'</h3>'+c.html+'</div><div class="splitPaneFoot">'+head+'</div>'; }
+  if(b.kind==='epub'){ let c=(b.chapters||[])[b.ch]||{title:'',html:''}; let n=(b.chapters||[]).length; let nav=n>1?'<div class="splitEpubNav"><button type="button" class="btn small" onclick="splitEpubChapter(-1)" aria-label="Previous chapter"'+(b.ch<=0?' disabled':'')+'>\u2039</button><span class="kbd" id="splitEpubLabel">'+esc(c.title||('Chapter '+(b.ch+1)+' of '+n))+'</span><button type="button" class="btn small" onclick="splitEpubChapter(1)" aria-label="Next chapter"'+(b.ch>=n-1?' disabled':'')+'>\u203a</button></div>':''; pane.innerHTML='<div class="splitPaneBody"><h3>'+esc(c.title)+'</h3>'+c.html+'</div><div class="splitPaneFoot">'+head+nav+'</div>'; }
   else if(b.kind==='pdf'){
     pane.innerHTML='<div class="splitPaneBody"><div class="splitPdfHost" id="splitPdfHost"><p class="kbd">Loading page…</p></div></div><div class="splitPaneFoot">'+head+'<div class="splitPdfNav"><button type="button" class="btn small" onclick="splitPdfPage(-1)" aria-label="Previous page">‹</button><span class="kbd" id="splitPdfLabel">…</span><button type="button" class="btn small" onclick="splitPdfPage(1)" aria-label="Next page">›</button></div></div>';
     splitRenderPdfPage(pane,b);
@@ -2702,6 +2766,16 @@ function syncSplitPaneHeight(){
    page at a time, nothing eager, text layer included (which also fills
    that page's text cache on demand). */
 let splitPdfGen=0;
+/* P3: EPUB chapter stepper in the split pane (mockup 6 footer). Mirrors
+   splitPdfPage: step b.ch through b.chapters and re-render the pane. */
+function splitEpubChapter(d){
+  let nb=curNb(); if(!nb) return;
+  let b=splitBookFor(nb); if(!b||b.kind!=='epub') return;
+  let n=(b.chapters||[]).length; if(!n) return;
+  b.ch=Math.max(0,Math.min(n-1,(b.ch||0)+d));
+  scheduleSave();
+  let pane=$('splitPane'); if(pane) renderSplitBook(pane,b);
+}
 function splitPdfPage(d){
   let nb=curNb(); if(!nb) return;
   let b=splitBookFor(nb); if(!b||b.kind!=='pdf') return;
@@ -4508,20 +4582,71 @@ async function annotatePdf(id){
 function annotateCurrentPdf(){ let b=curBook(); if(b) annotatePdf(b.id); } function backToReading(){ let nb=curNb(); if(!nb||!nb.pdfBookId) return; saveEditorToModel(); saveNow(); /* flush the strokes now, not on the 700ms timer, so leaving annotation mode really saves them */ let b=S.items.find(i=>i.id===nb.pdfBookId); if(!b){ toast('The PDF for these annotations is no longer on the shelf'); return; } let p=nb.pages[nb.cur]; let pg=(p&&p.bgPdf&&p.bgPdf.page)||(nb.cur+1); if(b.kind==='pdf'&&b.numPages) b.page=Math.max(1,Math.min(b.numPages,pg)); openBook(nb.pdfBookId); }
 
 /* ============ focus timer ============ */
-let timerSec=25*60, timerInt=null;
+let timerSec=25*60, timerInt=null, timerPaused=false;
 /* P8: every Focus label updates together, the Library button
    (#timerLabel) and the editor's Focus button (.timerLabel), so the
    countdown is visible in whichever view the timer was started from. */
 function setTimerLabel(txt){ document.querySelectorAll('#timerLabel, .timerLabel').forEach(el=>{ el.textContent=txt; }); }
+function fmtTimer(sec){ let m=Math.floor(sec/60),s=sec%60; return m+':'+String(s).padStart(2,'0'); }
+/* P3: the timer tick is factored out so pause/resume reuse it. On
+   completion the session counts and the timer resets, exactly as before;
+   if Focus Mode is open, the view closes with the session. */
+function timerTick(){
+  timerSec--; setTimerLabel('Focus '+fmtTimer(timerSec)); updateFocusPill();
+  if(timerSec<=0){ clearInterval(timerInt); timerInt=null; timerPaused=false; timerSec=25*60; setTimerLabel('Focus 25:00'); S.stats.focusDone++; updateStatsPanel(); toast('Focus session done. Nice work.'); if(S.focusMode) setFocusMode(false); updateFocusPill(); }
+}
+function startTimer(){ timerSec=25*60; timerPaused=false; clearInterval(timerInt); timerInt=setInterval(timerTick,1000); setTimerLabel('Focus '+fmtTimer(timerSec)); toast('Focus timer started. 25 minutes.'); }
+function pauseTimer(){ if(!timerInt) return; clearInterval(timerInt); timerInt=null; timerPaused=true; updateFocusPill(); }
+function resumeTimer(){ if(timerInt||!timerPaused) return; timerPaused=false; timerInt=setInterval(timerTick,1000); updateFocusPill(); }
 function openTimer(){
-  if(timerInt){ clearInterval(timerInt); timerInt=null; timerSec=25*60; setTimerLabel('Focus 25:00'); toast('Focus timer stopped'); return; }
-  toast('Focus timer started. 25 minutes.');
-  timerInt=setInterval(()=>{ timerSec--; let m=Math.floor(timerSec/60),s=timerSec%60; setTimerLabel('Focus '+m+':'+String(s).padStart(2,'0'));
-    if(timerSec<=0){ clearInterval(timerInt); timerInt=null; timerSec=25*60; setTimerLabel('Focus 25:00'); S.stats.focusDone++; updateStatsPanel(); toast('Focus session done. Nice work.'); } },1000);
+  if(timerInt){ clearInterval(timerInt); timerInt=null; timerPaused=false; timerSec=25*60; setTimerLabel('Focus 25:00'); toast('Focus timer stopped'); updateFocusPill(); return; }
+  if(timerPaused){ resumeTimer(); toast('Focus timer resumed'); return; }
+  startTimer();
+}
+
+/* P3: Focus Mode (mockup 3). The timer engine above is reused, extended
+   with pause/resume; the view is the same editor with its chrome hidden
+   (see body.focusMode in styles.css) — no second canvas, no DOM moves.
+   Session N comes from existing data: (focusDone % 4) + 1. Entering from
+   the editor starts (or resumes) the timer and turns Split View off; the
+   timer started from library/drawer/palette still just runs the countdown. */
+function focusSessionNum(){ return (S.stats.focusDone%4)+1; }
+function updateFocusPill(){
+  let pill=$('focusPillText'); if(!pill) return;
+  pill.textContent='Focus '+fmtTimer(timerSec)+' \u00b7 Session '+focusSessionNum()+'/4 \u00b7 '+(timerInt?'Pause':(timerPaused?'Resume':'Pause'));
+  let fg=$('focusRingFg'); if(fg){ let C=2*Math.PI*9; fg.style.strokeDasharray=C.toFixed(2); fg.style.strokeDashoffset=(C*(1-timerSec/(25*60))).toFixed(2); }
+}
+function setFocusMode(on){
+  S.focusMode=on;
+  document.body.classList.toggle('focusMode',on);
+  let bar=$('focusBar'); if(bar){ bar.classList.toggle('hidden',!on); bar.setAttribute('aria-hidden',on?'false':'true'); }
+  updateFocusPill(); updateFocusAudioPill();
+  if(on){ let sh=$('canvasShell'); if(sh) sh.scrollIntoView({block:'nearest'}); }
+}
+function enterFocusMode(){
+  if(S.view!=='editor') return;
+  closeAllToolPops(); closeRailPanel();
+  if(S.split) toggleSplit();
+  if(timerInt){ /* already running */ }
+  else if(timerPaused){ resumeTimer(); }
+  else { startTimer(); }
+  setFocusMode(true);
+}
+function exitFocusMode(){
+  if(!S.focusMode) return;
+  pauseTimer();
+  setFocusMode(false);
+}
+function toggleFocusPause(){ if(timerInt) pauseTimer(); else if(timerPaused) resumeTimer(); }
+function updateFocusAudioPill(){
+  let pill=$('focusAudioPill'); if(!pill) return;
+  let show=S.focusMode && S.recording;
+  pill.classList.toggle('hidden',!show);
+  if(show){ let s=Math.floor((Date.now()-S.recStart)/1000); $('focusAudioText').textContent='Audio Recording \u00b7 '+fmtTimer(s); }
 }
 
 /* ============ session stats ticker ============ */
-setInterval(()=>{ if(S.view==='editor') S.stats.writeSec++; if(S.view==='reader') S.stats.readSec++; if(S.stats.writeSec%15===0||S.stats.readSec%15===0) updateStatsPanel(); },1000);
+setInterval(()=>{ if(S.view==='editor') S.stats.writeSec++; if(S.view==='reader') S.stats.readSec++; if(S.stats.writeSec%15===0||S.stats.readSec%15===0) updateStatsPanel(); updateFocusAudioPill(); },1000);
 
 /* ============ Parallel Read: two books side by side, synced scroll ============
    The book open in the reader sits in the left pane; any other PDF or
