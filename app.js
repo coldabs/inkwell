@@ -141,12 +141,13 @@ function curPageObj(){let nb=curNb();if(!nb)return null;return nb.pages[nb.cur]|
    Saves are debounced, flushed when the tab is hidden/closed, and a
    periodic signature check catches any edit path that forgot to ask. */
 const IDB_NAME='inkwell-db', IDB_STATE_KEY='library-v1';
-let persistReady=false, persistDirty=false, persistSaving=false, persistSaveAgain=false, inSave=false, lastSaveAt=0, saveTimer=null, restoreToken=0, startHash='';
+let persistReady=false, persistDirty=false, persistSaving=false, persistSaveAgain=false, inSave=false, lastSaveAt=0, saveTimer=null, restoreToken=0, startHash='', restoreState='pending';
 function idbOpen(){ return new Promise((res,rej)=>{ if(!('indexedDB' in window)){ rej(new Error('IndexedDB unavailable')); return; } let rq=indexedDB.open(IDB_NAME,1); rq.onupgradeneeded=()=>{ if(!rq.result.objectStoreNames.contains('kv')) rq.result.createObjectStore('kv'); }; rq.onsuccess=()=>{ const db = rq.result; db.onversionchange = () => { db.close(); _idbP = null; }; res(db); }; rq.onerror=()=>rej(rq.error); rq.onblocked=()=>rej(new Error('IndexedDB blocked')); }); }
 let _idbP=null; function idb(){ if(!_idbP) _idbP = idbOpen().catch(err => { _idbP = null; throw err; }); return _idbP; }
 async function idbGet(key){ let db=await idb(); return new Promise((res,rej)=>{ let rq=db.transaction('kv','readonly').objectStore('kv').get(key); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); }); }
 async function idbPut(key,val){ let db=await idb(); return new Promise((res,rej)=>{ let tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put(val,key); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error); }); }
 async function idbDel(key){ try{ let db=await idb(); await new Promise(res=>{ let tx=db.transaction('kv','readwrite'); tx.objectStore('kv').delete(key); tx.oncomplete=()=>res(); tx.onerror=()=>res(); tx.onabort=()=>res(); }); }catch(e){} }
+async function idbKeys(){ let db=await idb(); return new Promise((res,rej)=>{ let rq=db.transaction('kv','readonly').objectStore('kv').getAllKeys(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=()=>rej(rq.error); }); }
 function persistPdfFile(book){ if(book && book.fileData) return idbPut('pdf:'+book.id, book.fileData); return Promise.resolve(); }
 function deletePdfFile(id){ idbDel('pdf:'+id); }
 function updateSaveStatus(failed){
@@ -180,6 +181,7 @@ function serializeLibrary(){
 }
 async function saveNow(){
   if(!persistReady) return;
+  if(restoreState==='failed') return; /* a failed restore must never be papered over with the starter shelf */
   if(persistSaving){ persistSaveAgain=true; return; }
   persistSaving=true; persistDirty=false; inSave=true;
   try{
@@ -229,10 +231,49 @@ function decodeBgPdfImg(p){
   p.bgPdf._decodeP=work.catch(()=>{}).then(()=>{ p.bgPdf._decodeP=null; let nb=curNb(); if(nb && nb.pages[nb.cur]===p && S.view==='editor'){ redrawAll(); renderPages(); } /* the page's background just landed — refresh its thumbnail too, so the Pages panel shows the PDF preview instead of the blank template it was drawn with before the decode. This also covers warmed pages and the stored-picture path, whose decodes never reach renderPages. */ if(p.bgPdf && p.bgPdf.img && nb && nb.pages.indexOf(p)>=0) drawPageThumb(nb.pages.indexOf(p)); syncSplitPaneHeight(); splitRefitCurrentPage(); });
   return p.bgPdf._decodeP;
 }
+/* PDF file bytes live under their own 'pdf:<id>' keys, apart from the
+   library record. If that record was ever lost, the books vanish from the
+   shelf while their files survive — find those orphans and bring the
+   books back instead of leaving them invisible. */
+async function recoverOrphanPdfs(items){
+  let out=[];
+  try{
+    let keys=await idbKeys();
+    let known=new Set(items.map(i=>i.id));
+    for(let k of keys){
+      if(typeof k!=='string' || k.indexOf('pdf:')!==0) continue;
+      let id=k.slice(4);
+      if(known.has(id)) continue;
+      let fd=null;
+      try{ fd=await idbGet(k); }catch(e){}
+      if(!fd) continue;
+      let title='Recovered PDF';
+      if(fd && typeof fd.name==='string' && fd.name) title=fd.name.replace(/\.pdf$/i,'');
+      out.push({id:id,kind:'pdf',title:title,color:'#4a5a74',updated:'Recovered',openedAt:0,sample:false,fileName:(fd&&fd.name)||title,numPages:0,page:1,mode:'scroll',bookmarks:[],annotations:[],textCache:{},parallelNotes:{},parallelWith:null,parallelSync:'unit',parallelOffset:0,parallelZoom:1,ocrPages:{},markColor:null,markOpacity:0.6,markSettings:null,doc:null,fileData:fd});
+      known.add(id);
+    }
+  }catch(e){}
+  return out;
+}
 async function restoreLibrary(token){
-  let data=await idbGet(IDB_STATE_KEY);
+  /* A failed read is not an empty shelf: it must never be treated as a
+     fresh install, or the starter shelf gets saved over the real one.
+     restoreState reports 'ok' | 'empty' (genuinely nothing stored) |
+     'failed' (could not read — the data may still be intact). */
+  let data=null, readFailed=false;
+  try{ data=await idbGet(IDB_STATE_KEY); }catch(e){ readFailed=true; }
   if(token!==restoreToken) return false;
-  if(!data || !Array.isArray(data.items) || !data.items.length) return false;
+  if(readFailed){ restoreState='failed'; return false; }
+  if(!data || !Array.isArray(data.items) || !data.items.length){
+    restoreState='empty';
+    let recovered=await recoverOrphanPdfs([]);
+    if(recovered.length){
+      S.items=recovered.concat(S.items.filter(i=> recovered.every(r=>r.id!==i.id)));
+      restoreState='ok';
+      return true;
+    }
+    return false;
+  }
   if(data.stats) S.stats=data.stats;
   let items=[];
   for(let raw of data.items){
@@ -271,7 +312,12 @@ async function restoreLibrary(token){
     }
    }catch(e){ /* one damaged item must not cost the whole shelf */ }
   }
-  if(token!==restoreToken || !items.length) return false;
+  /* A book whose library entry was lost may still have its file under
+     its own key — recover it before deciding the shelf is empty. */
+  let recovered=await recoverOrphanPdfs(items);
+  if(recovered.length) items=items.concat(recovered);
+  if(token!==restoreToken) return false;
+  if(!items.length){ restoreState='failed'; return false; }
   /* merge, not replace: anything created while a slow restore was still
      running (e.g. on the starter shelf) survives the swap */
   let preExisting=S.items.filter(i=> items.every(r=>r.id!==i.id));
@@ -282,6 +328,7 @@ async function restoreLibrary(token){
   let backfilled=false;
   S.items.forEach(it=>{ if(it.annotations&&backfillAnnoIds(it.annotations)) backfilled=true; });
   if(backfilled) scheduleSave();
+  restoreState='ok';
   return true;
 }
 /* Turn a PDF book's stored bytes into a readable pdf.js doc, on demand.
@@ -1640,6 +1687,30 @@ function renderLive(){
   else { liveX.beginPath(); liveX.moveTo(pts[0].x,pts[0].y); for(let i=1;i<pts.length;i++) liveX.lineTo(pts[i].x,pts[i].y); liveX.stroke(); }
   liveX.restore();
 }
+/* Draw one new live segment instead of re-painting the whole in-progress
+   stroke for every coalesced point. renderLive() clears the overlay and
+   redraws every point so far, O(points) per move — the longer the stroke,
+   the further it lagged behind the finger. Same style as renderLive;
+   pen/calligraphy are opaque so overlapping round caps are invisible,
+   while the highlighter uses butt caps so its translucent segments meet
+   without double-darkened joints. */
+function drawLiveSegment(a,b){
+  let p=curPageObj(); if(!p||!curStroke) return;
+  liveX.save();
+  liveX.lineCap= curStroke.tool==='highlighter'? 'butt':'round';
+  liveX.lineJoin='round';
+  if(curStroke.tool==='highlighter'){
+    liveX.globalCompositeOperation=isDarkPage(p)?'screen':'multiply';
+    liveX.globalAlpha=0.42; liveX.strokeStyle=pageInkColor(curStroke.color,p);
+    liveX.lineWidth=curStroke.size*4.5;
+  } else {
+    liveX.strokeStyle=pageInkColor(curStroke.color,p);
+    liveX.lineWidth=Math.max(1.5,curStroke.size*1.4);
+    if(curStroke.style&&curStroke.style!=='solid') liveX.setLineDash(dashFor(curStroke));
+  }
+  liveX.beginPath(); liveX.moveTo(a.x,a.y); liveX.lineTo(b.x,b.y); liveX.stroke();
+  liveX.restore();
+}
 /* Stylus button mapping: the pen's eraser end or barrel button temporarily
    swaps in the mapped tool for the length of that stroke, then the chosen
    tool comes back, the toolbar never changes. */
@@ -1793,7 +1864,7 @@ inkC.addEventListener('pointermove',e=>{
     if(lastPt){ let keep=1-(S.stabilize||0)/100; pt.x=lastPt.x+(pt.x-lastPt.x)*keep; pt.y=lastPt.y+(pt.y-lastPt.y)*keep; } // input stabilization (streamline): Smooth slider sets how much jitter is filtered
     if(pt.p<=0 && curStroke && (curStroke.tool==='pen'||curStroke.tool==='calligraphy'||curStroke.tool==='highlighter')){ lastPt=pt; return; } /* dead zone: below 0.04 pressure, no point */
     if(S.tool==='eraser'){ eraseAt(pt); lastPt=pt; return; }
-    if(curStroke){ curStroke.points.push(pt); renderLive(); }
+    if(curStroke){ let prev=curStroke.points[curStroke.points.length-1]; curStroke.points.push(pt); if(prev) drawLiveSegment(prev,pt); else renderLive(); /* first point: a dot */ }
     lastPt=pt;
   });
 });
@@ -2077,6 +2148,30 @@ function drawEraserCursor(pt){
 /* Brush size in plain words, with a live preview drawn at the stroke's real
    width (in page-canvas units) in the current ink colour, so how thick the
    next stroke will be is obvious at a glance, no numbers to decode. */
+/* Brush size, remembered per tool: the size you pick for the pen stays
+   the pen's, the highlighter keeps its own. The sheet slider and the
+   pill size button both read and write the same value, stored in
+   localStorage so it survives a reload. */
+const BRUSH_SIZE_KEY='inkwell-brush-sizes';
+let brushSizes={};
+try{ brushSizes=JSON.parse(localStorage.getItem(BRUSH_SIZE_KEY)||'{}')||{}; }catch(e){ brushSizes={}; }
+function brushSizeFor(tool){ let v=+brushSizes[tool]; return (v>=1 && v<=16)? v : 4; }
+function setBrushSize(v){
+  v=Math.max(1,Math.min(16,Math.round(+v||4)));
+  brushSizes[S.tool]=v;
+  try{ localStorage.setItem(BRUSH_SIZE_KEY, JSON.stringify(brushSizes)); }catch(e){}
+  let slider=$('brushSize'); if(slider) slider.value=v;
+  updateSizeUI(); syncSizePop();
+}
+function applyBrushSizeForTool(){ let slider=$('brushSize'); if(slider) slider.value=brushSizeFor(S.tool); syncSizePop(); }
+function syncSizePop(){
+  let v=brushSizeFor(S.tool);
+  let line=$('pillSizeLine'); if(line) line.style.height=Math.round(1+v*0.55)+'px';
+  document.querySelectorAll('#sizePop [data-size]').forEach(b=>b.classList.toggle('active', +b.getAttribute('data-size')===v));
+  let btn=$('pillSizeBtn'); if(btn) btn.setAttribute('aria-label','Brush size: '+sizeWord(v));
+}
+function toggleSizePop(){ var pop=$('sizePop'), btn=$('pillSizeBtn'); if(!pop||!btn) return; var open=!pop.classList.contains('open'); if(open){ closeColorPop(); closeShapePop(); } pop.classList.toggle('open',open); btn.setAttribute('aria-expanded',String(open)); if(open) syncSizePop(); }
+function closeSizePop(){ var pop=$('sizePop'), btn=$('pillSizeBtn'); if(pop) pop.classList.remove('open'); if(btn) btn.setAttribute('aria-expanded','false'); }
 function sizeWord(v){ return v<=3? 'Thin' : v<=7? 'Medium' : v<=11? 'Thick' : 'Extra thick'; }
 function updateSizeUI(){
   let slider=$('brushSize'); if(!slider) return;
@@ -2157,7 +2252,7 @@ function setTool(t,el){
   S.tool=t; document.querySelectorAll('#mainToolbar .tool, #editorSheet .tool').forEach(b=>{ let on=b.dataset.tool===t; b.classList.toggle('active',on); b.setAttribute('aria-pressed',String(on)); });
   /* P2: the Shapes disclosure shows active while any shape tool is picked. */
   var sh=$('shapesBtn'); if(sh){ var isShape=['line','rect','ellipse','arrow','spline','compass'].indexOf(t)>=0; sh.classList.toggle('active',isShape); sh.setAttribute('aria-pressed',String(isShape)); }
-  updateInkTouchAction(); updateSizeUI(); updateToolOptsUI(); updateStatusBar();
+  updateInkTouchAction(); applyBrushSizeForTool(); updateSizeUI(); updateToolOptsUI(); updateStatusBar();
 }
 function setColor(c,el){ S.color=c;
   /* Colour-picker fix: the sheet swatches and the pill popover swatches
@@ -3037,7 +3132,7 @@ function importGpl(e){
 function setToolbarLayout(v){ let tb=$('mainToolbar'); tb.classList.remove('compact','minimal'); if(v) tb.classList.add(v); }
 /* Dismissal for the editor sheets (native <dialog> bottom sheets). The old
    popover names are kept because the sheet buttons and setTool() call them. */
-function closeAllToolPops(){ ['editorSheet','exportSheet','prMarksSheet'].forEach(id=>{ var d=$(id); if(d && d.open) d.close(); }); document.querySelectorAll('.toolPop.open, .shapePop.open, .colorPop.open').forEach(el=>el.classList.remove('open')); var sb=$('shapesBtn'); if(sb) sb.setAttribute('aria-expanded','false'); var cb=$('pillColorBtn'); if(cb) cb.setAttribute('aria-expanded','false'); }
+function closeAllToolPops(){ ['editorSheet','exportSheet','prMarksSheet'].forEach(id=>{ var d=$(id); if(d && d.open) d.close(); }); document.querySelectorAll('.toolPop.open, .shapePop.open, .colorPop.open, .sizePop.open').forEach(el=>el.classList.remove('open')); var sb=$('shapesBtn'); if(sb) sb.setAttribute('aria-expanded','false'); var cb=$('pillColorBtn'); if(cb) cb.setAttribute('aria-expanded','false'); var zb=$('pillSizeBtn'); if(zb) zb.setAttribute('aria-expanded','false'); }
 /* P2: Shapes popover on the floating pill toolbar. */
 function toggleShapePop(){
   var pop=$('shapePop'), btn=$('shapesBtn'); if(!pop||!btn) return;
@@ -3065,9 +3160,13 @@ document.addEventListener('pointerdown',e=>{
     var cb=$('pillColorBtn');
     if(!cp.contains(e.target) && !(cb && (e.target===cb || cb.contains(e.target)))) closeColorPop();
   }
+  var zp=$('sizePop'); if(zp&&zp.classList.contains('open')){
+    var zb=$('pillSizeBtn');
+    if(!zp.contains(e.target) && !(zb && (e.target===zb || zb.contains(e.target)))) closeSizePop();
+  }
 });
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){ var pop=$('shapePop'); if(pop&&pop.classList.contains('open')) closeShapePop(); var cp=$('colorPop'); if(cp&&cp.classList.contains('open')) closeColorPop(); if(S.view==='editor' && S.selection.length) clearSelection(); }
+  if(e.key==='Escape'){ var pop=$('shapePop'); if(pop&&pop.classList.contains('open')) closeShapePop(); var cp=$('colorPop'); if(cp&&cp.classList.contains('open')) closeColorPop(); var zp=$('sizePop'); if(zp&&zp.classList.contains('open')) closeSizePop(); if(S.view==='editor' && S.selection.length) clearSelection(); }
 });
 /* P2: inspector sheet tabs (Draw | Insert | Page | Notes & Audio). */
 function switchSheetTab(tab){
@@ -5687,7 +5786,7 @@ window.addEventListener('popstate',applyRoute);
 /* ============ init ============ */
 syncThemeToggle();
 updateInkTouchAction();
-updateSizeUI();
+applyBrushSizeForTool(); updateSizeUI();
 updateToolOptsUI();
 initApp();
 async function initApp(){
@@ -5702,7 +5801,7 @@ async function initApp(){
      shelf, exactly as a fast failed restore behaved before. */
   startHash=window.location.hash||'';
   let myToken=++restoreToken;
-  let restorePromise=(async()=>{ try{ return await restoreLibrary(myToken); }catch(e){ return false; } })();
+  let restorePromise=(async()=>{ try{ return await restoreLibrary(myToken); }catch(e){ restoreState='failed'; return false; } })();
   if(!S.items.length){ S.items.push(sampleBook()); S.items.push(samplePdfBook()); }
   renderLibrary(); showView('library');
   ensureSamplePdf();
@@ -5715,6 +5814,23 @@ function finishInit(restored){
   if(!S.items.some(i=>i.id===SAMPLE_ID)) S.items.unshift(sampleBook());
   if(!S.items.some(i=>i.id===SAMPLE_PDF_ID)){ let ix=S.items.findIndex(i=>i.id===SAMPLE_ID); S.items.splice(ix>=0? ix+1 : S.items.length, 0, samplePdfBook()); }
   ensureSamplePdf();
+  if(restoreState==='failed'){
+    /* The saved shelf could not be read — it may still be intact in this
+       browser. Do not arm saves and do not write the starter shelf over
+       it: retry the restore once, and only proceed when it succeeds. */
+    renderLibrary();
+    showView('library');
+    updateSaveStatus(true);
+    toast('Could not open your saved shelf — your books are safe in this browser. Retrying…', 5000);
+    setTimeout(async()=>{
+      let t=++restoreToken;
+      let ok=false;
+      try{ ok=await restoreLibrary(t); }catch(e){ restoreState='failed'; }
+      if(ok) finishInit(true);
+      else toast('Still could not open your saved shelf. Close other Inkwell tabs and reopen, or restore from a backup.', 6000);
+    }, 2000);
+    return;
+  }
   persistReady=true;
   renderLibrary();
   /* the starter render already reset the hash to the shelf, so replay
