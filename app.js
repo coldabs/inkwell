@@ -1495,24 +1495,96 @@ function recognizeStroke(st,pageObj){
   if(circ) return {stroke:circ, consumed:[]};
   return null;
 }
+/* Text boxes: tap to select, tap again to edit, drag the box to move,
+   drag the corner grip to resize (font size), × to remove. A tap only
+   selects — the keyboard must not pop open when the user just wants to
+   grab the box. A drag starts only after the pointer travels 6px, so a
+   tap never becomes an accidental move. The wrap carries touch-action:
+   none so a finger drag on a text box is never stolen by page scrolling.
+   During a move/resize the wrap is updated live in the DOM; nothing
+   re-renders the text layer mid-gesture, so the drag cannot be torn
+   down under the finger — the model is committed on pointerup only. */
+let selectedTextId=null;
+/* Echo-click guard: a tap that creates or selects a text box ends with a
+   compatibility click at the same point. The box appears under the finger,
+   so that click would land on the × delete button and delete the text the
+   tap just made. Ignore × clicks for 350ms after a create/select tap. */
+let textDelGuardUntil=0;
+function syncTextSelection(){ document.querySelectorAll('#pageTextLayer .canvasTextWrap').forEach(w=>w.classList.toggle('sel', w.dataset.tid===selectedTextId)); }
+function deselectTexts(){ if(selectedTextId===null) return; selectedTextId=null; syncTextSelection(); }
 function renderCanvasTexts(){
   let p=curPageObj(); let host=$('pageTextLayer'); if(!host) return; host.innerHTML=''; if(!p) return;
   (p.texts||[]).forEach(t=>{
+    let wrap=document.createElement('div'); wrap.className='canvasTextWrap'+(t.id===selectedTextId?' sel':''); wrap.dataset.tid=t.id;
+    wrap.style.left=(t.x/CW*100)+'%'; wrap.style.top=(t.y/PH*100)+'%';
     let d=document.createElement('div'); d.className='canvasText'; d.contentEditable='true'; d.textContent=t.text;
-    d.style.left=(t.x/CW*100)+'%'; d.style.top=(t.y/PH*100)+'%'; d.style.color=pageInkColor(t.color,p); if(t.font) d.style.fontFamily=t.font; let cwPx=inkC.getBoundingClientRect().width; let scale=cwPx? cwPx/CW : 0.55; d.style.fontSize=Math.max(10,(t.size||26)*scale)+'px';
+    d.style.color=pageInkColor(t.color,p); if(t.font) d.style.fontFamily=t.font; let cwPx=inkC.getBoundingClientRect().width; let scale=cwPx? cwPx/CW : 0.55; d.style.fontSize=Math.max(10,(t.size||26)*scale)+'px';
     d.addEventListener('input',()=>{ t.text=d.textContent; bumpV(p); });
-    d.addEventListener('blur',()=>{ if(!d.textContent.trim()){ p.texts=p.texts.filter(x=>x!==t); renderCanvasTexts(); renderPages(); } });
-    d.addEventListener('pointerdown',e=>e.stopPropagation());
-    host.appendChild(d);
+    d.addEventListener('blur',()=>{ if(!d.textContent.trim()){ p.texts=p.texts.filter(x=>x!==t); if(selectedTextId===t.id) selectedTextId=null; renderCanvasTexts(); renderPages(); } });
+    d.addEventListener('focus',()=>{ if(selectedTextId!==t.id){ selectedTextId=t.id; syncTextSelection(); } });
+    let grip=document.createElement('span'); grip.className='canvasTextGrip'; grip.textContent='↘'; grip.setAttribute('aria-hidden','true');
+    let del=document.createElement('button'); del.type='button'; del.className='miniBtn canvasTextDel'; del.textContent='×'; del.title='Remove text'; del.setAttribute('aria-label','Remove text');
+    del.addEventListener('click',e=>{ e.stopPropagation(); if(Date.now()<textDelGuardUntil) return; /* creating/selecting tap echo */ p.texts=p.texts.filter(x=>x!==t); if(selectedTextId===t.id) selectedTextId=null; bumpV(p); renderCanvasTexts(); renderPages(); });
+    wrap.appendChild(d); wrap.appendChild(grip); wrap.appendChild(del);
+    wrap.addEventListener('pointerdown',e=>{
+      if(e.target===grip||e.target===del) return;
+      /* A drag moves the box even out of edit mode: the 6px threshold
+         decides. A tap on a focused box keeps the caret native, so while
+         focused there is no preventDefault and no pointer capture (the
+         move/up listeners go on window instead, so the tap stays native);
+         stopPropagation still runs, or the canvas handler would deselect
+         the box we just selected. */
+      let wasFocused=document.activeElement===d;
+      let pid=e.pointerId;
+      if(!wasFocused){ e.preventDefault(); try{ wrap.setPointerCapture(pid); }catch(err){} }
+      e.stopPropagation();
+      let wasSel=selectedTextId===t.id; selectedTextId=t.id; syncTextSelection(); textDelGuardUntil=Date.now()+350;
+      let shell=inkC.getBoundingClientRect(); let sx=e.clientX, sy=e.clientY, ox=t.x, oy=t.y, moved=false;
+      function mv(ev){
+        if(ev.pointerId!==pid) return;
+        let dx=ev.clientX-sx, dy=ev.clientY-sy;
+        if(!moved && Math.hypot(dx,dy)<6) return;
+        if(!moved){ moved=true; if(wasFocused) d.blur(); } /* leaving edit mode to drag */
+        t.x=Math.max(0, ox+dx*(CW/shell.width)); t.y=Math.max(0, oy+dy*(PH/shell.height));
+        wrap.style.left=(t.x/CW*100)+'%'; wrap.style.top=(t.y/PH*100)+'%';
+      }
+      function up(ev){
+        if(ev && ev.pointerId!==pid) return;
+        let host=wasFocused?window:wrap;
+        host.removeEventListener('pointermove',mv); host.removeEventListener('pointerup',up); host.removeEventListener('pointercancel',up);
+        if(moved){ bumpV(p); renderPages(); }
+        else if(wasSel && !wasFocused){ d.focus(); try{ let r=document.createRange(); r.selectNodeContents(d); r.collapse(false); let s=getSelection(); s.removeAllRanges(); s.addRange(r); }catch(err){} } /* re-edit: caret at end, typing appends */
+      }
+      let host=wasFocused?window:wrap;
+      host.addEventListener('pointermove',mv); host.addEventListener('pointerup',up); host.addEventListener('pointercancel',up);
+    });
+    grip.addEventListener('pointerdown',e=>{
+      e.preventDefault(); e.stopPropagation();
+      if(document.activeElement===d) d.blur();
+      selectedTextId=t.id; syncTextSelection();
+      try{ grip.setPointerCapture(e.pointerId); }catch(err){}
+      let shell=inkC.getBoundingClientRect(); let sx=e.clientX, sy=e.clientY, s0=t.size||26; let scale=shell.width? shell.width/CW : 0.55;
+      function mv(ev){
+        let dist=((ev.clientX-sx)+(ev.clientY-sy))/2;
+        t.size=Math.max(10, Math.min(120, s0+dist*(CW/shell.width)));
+        d.style.fontSize=Math.max(10, t.size*scale)+'px';
+      }
+      function up(){
+        grip.removeEventListener('pointermove',mv); grip.removeEventListener('pointerup',up); grip.removeEventListener('pointercancel',up);
+        bumpV(p); renderPages();
+      }
+      grip.addEventListener('pointermove',mv); grip.addEventListener('pointerup',up); grip.addEventListener('pointercancel',up);
+    });
+    host.appendChild(wrap);
   });
   // scale text with canvas width via container query fallback: set font proportionally on resize is handled by % width; keep stored px size
 }
 function addPageText(pt){
   let p=curPageObj(); if(!p) return; if(!p.texts) p.texts=[];
   let fontSel=$('textFontSel'); let t={id:uid(),x:Math.max(0,snapVal(pt.x)-6),y:Math.max(0,snapVal(pt.y)-18),text:'Type here',color:S.color,size:16+ (+$('brushSize').value)*2,font:fontSel? fontSel.value:'Newsreader, serif'};
-  p.texts.push(t); bumpV(p); renderCanvasTexts(); renderPages();
+  p.texts.push(t); selectedTextId=t.id; textDelGuardUntil=Date.now()+350; bumpV(p); renderCanvasTexts(); renderPages();
   let els=$('pageTextLayer').querySelectorAll('.canvasText'); let el=els[els.length-1]; if(el){ el.focus(); document.execCommand && document.execCommand('selectAll',false,null); }
-  toast('Text on the page. Type to replace it, clear it to remove it.');
+  toast('Text on the page. Type to replace it. Tap it to select — drag to move, corner to resize, × to remove.');
 }
 function renderCanvasImages(){
   let p=curPageObj(); let host=$('pageImageLayer'); if(!host) return; host.innerHTML=''; if(!p) return;
@@ -1728,6 +1800,7 @@ inkC.addEventListener('pointerup',()=>{ if(barrelSavedTool!==null){ S.tool=barre
 inkC.addEventListener('pointercancel',()=>{ if(barrelSavedTool!==null){ S.tool=barrelSavedTool; barrelSavedTool=null; } });
 inkC.addEventListener('pointerleave',()=>hidePenHoverRing(inkC));
 inkC.addEventListener('pointerdown',e=>{
+  deselectTexts(); /* a tap on empty canvas drops any selected text box */
   inkPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY,type:e.pointerType});
   if(e.pointerType==='pen'){ notePenSeen(); hidePenHoverRing(inkC); }
   if(inkPtrs.size===2){
