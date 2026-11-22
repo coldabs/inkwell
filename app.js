@@ -1585,7 +1585,7 @@ function shouldDraw(e){ return S.tool!=='hand'; }
    after the pan ends is ignored until it lifts, so lifting one finger
    never drops the other back into a stroke mid-page. A touch that lands
    while a stylus is down is treated as a palm, not a pan. */
-let inkPtrs=new Map(), panMid=null, handPan=null, panDead=new Set(), strokeUndoPushed=false, pinchZoom=null, gesturePtr=null, strokePtr=null;
+let inkPtrs=new Map(), panMid=null, handPan=null, panDead=new Set(), strokeUndoPushed=false, pinchZoom=null, gesturePtr=null, strokePtr=null, panCandidate=null;
 function updateInkTouchAction(){ inkC.style.touchAction='none'; inkC.style.cursor= S.tool==='hand'? 'grab' : 'crosshair'; }
 function zoomScroller(){ return inkC.closest? inkC.closest('.zoomScroll') : null; }
 function panViewportBy(dx,dy){
@@ -1660,16 +1660,17 @@ inkC.addEventListener('pointerdown',e=>{
   inkPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY,type:e.pointerType});
   if(e.pointerType==='pen'){ notePenSeen(); hidePenHoverRing(inkC); }
   if(inkPtrs.size===2){
-    /* Second finger down: abandon whatever the first finger was doing and
-       turn the gesture into a two-finger pan. Skipped when a stylus is
-       down (that touch is a resting palm) or the new pointer isn't touch. */
+    /* Second finger down. Skipped when a stylus is down (that touch is a
+       resting palm) or the new pointer isn't touch. A resting thumb or
+       palm on a phone is a second touch too — it must not kill the stroke
+       on contact. So this only arms a possible pan: the gesture becomes a
+       two-finger pan only when the second finger actually moves (see the
+       panCandidate check in pointermove). Until then the first finger
+       keeps drawing, and a stationary second touch is ignored. */
     let types=Array.from(inkPtrs.values()).map(p=>p.type);
     if(e.pointerType!=='touch' || types.indexOf('pen')>=0) return;
-    e.preventDefault();
-    try{ inkC.setPointerCapture(e.pointerId); }catch(err){}
-    abortGestureForPan();
-    panMid=inkPtrMid(); pinchZoom={d0:Math.max(20,inkPtrDist()),z0:editorZoom};
-    inkPtrs.forEach((v,id)=>panDead.add(id));
+    panCandidate={secondId:e.pointerId, start:{x:e.clientX,y:e.clientY}};
+    try{ inkC.setPointerCapture(e.pointerId); }catch(err){} /* keep its moves arriving even if it slides off the canvas */
     return;
   }
   if(inkPtrs.size>2 || panMid || panDead.has(e.pointerId)) return;
@@ -1737,6 +1738,21 @@ inkC.addEventListener('pointermove',e=>{
   if(e.pointerType==='pen'){
     if(e.buttons===0 && !drawing && !panMid && !handPan && gesturePtr===null) penHoverMove(e);
     else hidePenHoverRing(inkC);
+  }
+  if(panCandidate && inkPtrs.size>=2){
+    /* A real two-finger pan starts only when the second finger moves:
+       the first finger moving alone (a resting thumb held down) keeps
+       drawing. 10px in client coordinates: a resting thumb jitters below
+       it, a deliberate two-finger drag passes it at once. */
+    let p=inkPtrs.get(panCandidate.secondId), s=panCandidate.start;
+    if(p && Math.hypot(p.x-s.x,p.y-s.y)>10){
+      e.preventDefault();
+      try{ inkC.setPointerCapture(e.pointerId); }catch(err){}
+      abortGestureForPan();
+      panMid=inkPtrMid(); pinchZoom={d0:Math.max(20,inkPtrDist()),z0:editorZoom};
+      inkPtrs.forEach((v,id)=>panDead.add(id));
+      panCandidate=null;
+    }
   }
   if(gesturePtr!==null && e.pointerId!==gesturePtr && !panMid) return; /* a resting palm moving while another pointer owns the gesture */
   if(panMid){
@@ -1809,12 +1825,15 @@ function endStroke(){
 }
 function inkPointerUp(e){
   let wasPan=!!panMid, wasHand=!!handPan;
+  let wasGesture=(e.pointerId===gesturePtr), wasStroke=(e.pointerId===strokePtr);
   inkPtrs.delete(e.pointerId); panDead.delete(e.pointerId);
+  if(inkPtrs.size<2) panCandidate=null; /* a stationary second touch lifted before any pan: the stroke survives */
   if(e.pointerId===gesturePtr) gesturePtr=null;
   if(e.pointerId===strokePtr) strokePtr=null;
   if(wasPan){ if(inkPtrs.size<2){ panMid=null; pinchZoom=null; } return; }
   if(panDead.size) return; /* a finger left over from a pan never draws */
-  if(wasHand){ handPan=null; return; }
+  if(wasHand){ if(wasGesture) handPan=null; return; }
+  if(!wasGesture && !wasStroke) return; /* a second touch lifting must not end the stroke in progress */
   endStroke();
   strokeUndoPushed=false;
 }
@@ -2375,7 +2394,7 @@ function renderPages(){
 }
 
 /* ============ floating board: true infinite canvas ============ */
-let boardTool='pen', bDrawing=false, bStroke=null, bLast=null, boardPointers={}, pinchStart=null;
+let boardTool='pen', bDrawing=false, bStroke=null, bLast=null, boardPointers={}, pinchStart=null, boardPinchCandidate=null, bDrawPtr=null;
 let boardFull=false, boardRestoreGeom=null, boardSizeQueued=false;
 const BOARD_MIN_W=260, BOARD_MIN_H=210;
 const boardC=$('boardCanvas'), bX=boardC.getContext('2d'); bX.lineCap='round'; bX.lineJoin='round';
@@ -2455,20 +2474,37 @@ function setBoardTool(t){ boardTool=t; $('boardPenBtn').classList.toggle('primar
 function boardInkColor(bd){ let c=S.color||'#1b2a4a'; if(bd && bd.color===6 && String(c).toLowerCase()==='#1b2a4a') return '#f8fafc'; return c; }
 boardC.addEventListener('pointerdown',e=>{
   boardC.setPointerCapture(e.pointerId); boardPointers[e.pointerId]={x:e.clientX,y:e.clientY};
-  if(Object.keys(boardPointers).length===2){ let ps=Object.values(boardPointers); pinchStart={d:Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y), k:pageBoard().view.k}; bDrawing=false; bStroke=null; return; }
+  if(Object.keys(boardPointers).length===2){
+    /* A resting thumb is a second touch too: only arm a possible pinch.
+       It becomes a pinch only when the second finger actually moves (see
+       pointermove); until then the first finger keeps drawing. */
+    boardPinchCandidate={secondId:e.pointerId, start:{x:e.clientX,y:e.clientY}};
+    return;
+  }
   let w=boardWorld(e);
-  if(boardTool==='pan'){ bLast={x:e.clientX,y:e.clientY}; bDrawing=true; return; }
-  bDrawing=true; let bd=pageBoard();
+  if(boardTool==='pan'){ bLast={x:e.clientX,y:e.clientY}; bDrawing=true; bDrawPtr=e.pointerId; return; }
+  bDrawing=true; bDrawPtr=e.pointerId; let bd=pageBoard();
   bStroke={color: boardInkColor(bd), size:3/bd.view.k*1.6, points:[{x:w.x,y:w.y}]};
   bLast=w;
 });
 boardC.addEventListener('pointermove',e=>{
   if(boardPointers[e.pointerId]) boardPointers[e.pointerId]={x:e.clientX,y:e.clientY};
   let bd=pageBoard(); if(!bd) return;
+  if(boardPinchCandidate && Object.keys(boardPointers).length===2){
+    /* A real pinch starts only when the second finger moves; a resting
+       thumb held down must not kill the board stroke. */
+    let p=boardPointers[boardPinchCandidate.secondId], s=boardPinchCandidate.start;
+    if(p && Math.hypot(p.x-s.x,p.y-s.y)>10){
+      let ps=Object.values(boardPointers);
+      pinchStart={d:Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y), k:pageBoard().view.k};
+      bDrawing=false; bStroke=null; bDrawPtr=null; boardPinchCandidate=null;
+    }
+  }
   if(pinchStart && Object.keys(boardPointers).length===2){
     let ps=Object.values(boardPointers); let d=Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y);
     bd.view.k=Math.max(0.2,Math.min(6, pinchStart.k*(d/Math.max(20,pinchStart.d)))); redrawBoard(); return;
   }
+  if(boardPinchCandidate && e.pointerId!==bDrawPtr) return; /* stationary second touch: ignore its moves */
   if(!bDrawing) return;
   if(boardTool==='pan' && bLast){ let r=boardC.getBoundingClientRect(); bd.view.x+=(e.clientX-bLast.x)*(boardC.width/r.width); bd.view.y+=(e.clientY-bLast.y)*(boardC.height/r.height); bLast={x:e.clientX,y:e.clientY}; redrawBoard(); return; }
   let w=boardWorld(e); if(bStroke){ let a=bLast; bStroke.points.push({x:w.x,y:w.y}); bd.strokes=bd.strokes.filter(s=>s!==bStroke); bd.strokes.push(bStroke);
@@ -2477,7 +2513,14 @@ boardC.addEventListener('pointermove',e=>{
     let v=bd.view; bX.setTransform(v.k,0,0,v.k,v.x,v.y); bX.strokeStyle=bStroke.color; bX.lineWidth=bStroke.size; bX.lineCap='round'; bX.lineJoin='round'; bX.beginPath(); bX.moveTo(a.x,a.y); bX.lineTo(w.x,w.y); bX.stroke(); bX.setTransform(1,0,0,1,0,0);
     bLast=w; }
 });
-function boardEnd(e){ delete boardPointers[e.pointerId]; if(Object.keys(boardPointers).length<2) pinchStart=null; if(bDrawing && bStroke){ renderPages(); updateBoardMini(); } bDrawing=false; bStroke=null; bLast=null; }
+function boardEnd(e){
+  let wasDraw=(e.pointerId===bDrawPtr);
+  delete boardPointers[e.pointerId];
+  if(Object.keys(boardPointers).length<2){ pinchStart=null; boardPinchCandidate=null; }
+  if(!wasDraw) return; /* a second touch lifting must not end the board stroke */
+  if(bDrawing && bStroke){ renderPages(); updateBoardMini(); }
+  bDrawing=false; bStroke=null; bLast=null; bDrawPtr=null;
+}
 boardC.addEventListener('pointerup',boardEnd); boardC.addEventListener('pointercancel',boardEnd);
 boardC.addEventListener('wheel',e=>{ e.preventDefault(); let bd=pageBoard(); let f=e.deltaY<0?1.12:0.89; bd.view.k=Math.max(0.2,Math.min(6,bd.view.k*f)); redrawBoard(); },{passive:false});
 function updateBoardZoomLabel(){ let bd=pageBoard(); let l=$('boardZoomLabel'); if(l&&bd) l.textContent=Math.round(bd.view.k*100)+'%'; }
@@ -5160,7 +5203,7 @@ window.addEventListener('resize',()=>{
    drawn from the PDF only when the editor first shows them. EPUB text
    reflows, so handwriting cannot stay attached to it: PDFs only. */
 const PRA={marksChanged:false, inkOn:{L:false,R:false}, inkBook:{L:null,R:null}, pending:{L:false,R:false}, barSide:null, hist:{}, tool:'pen', penColor:'#18202B', hiColor:'#F2D887', size:4, style:'solid', fill:false, eraserMode:'stroke',
-  undo:[], redo:[], stroke:null, strokeHolder:null, strokeSide:null, strokePtr:null, erase:null, ptrs:new Map(), pan:null, last:null, raf:0, selT:null, warnedEpub:false};
+  undo:[], redo:[], stroke:null, strokeHolder:null, strokeSide:null, strokePtr:null, erase:null, ptrs:new Map(), pan:null, panCandidate:null, last:null, raf:0, selT:null, warnedEpub:false};
 /* PRA.ink: is any book being annotated (read-only) */
 Object.defineProperty(PRA,'ink',{get(){ return !!(PRA.inkOn.L || PRA.inkOn.R); }});
 const PR_PEN_COLORS=['#18202B','#2C4A6E','#A83A2C','#3F5C46','#57425F','#A9652B','#2B5F5B','#9A4A60'];
@@ -5470,7 +5513,7 @@ function prInkPoint(P,h,e){
 function prMid(ps){ return {x:(ps[0].x+ps[1].x)/2, y:(ps[0].y+ps[1].y)/2}; }
 function prInkCancel(){
   let h=PRA.strokeHolder, side=PRA.strokeSide;
-  PRA.stroke=null; PRA.strokeHolder=null; PRA.strokeSide=null; PRA.strokePtr=null; PRA.erase=null; PRA.last=null;
+  PRA.stroke=null; PRA.strokeHolder=null; PRA.strokeSide=null; PRA.strokePtr=null; PRA.erase=null; PRA.last=null; PRA.panCandidate=null;
   if(h && PR.panes[side]) prRenderInk(PR.panes[side],h);
 }
 /* one undo / redo history for both books, in the order things were drawn */
@@ -5525,7 +5568,13 @@ function prInkDown(side,e){
   if(PRA.barSide!==side){ PRA.barSide=side; prRenderInkBar(); }
   let all=[...PRA.ptrs.values()], touches=all.filter(p=>p.type==='touch');
   if(e.pointerType==='touch' && all.some(p=>p.type==='pen')) return;            /* a palm resting while the pen draws */
-  if(touches.length>=2){ prInkCancel(); PRA.pan={side:side, mid:prMid(touches)}; e.preventDefault(); return; } /* two fingers: scroll */
+  if(touches.length>=2){
+    /* A resting thumb is a second touch too: only arm a possible pan.
+       It becomes a two-finger scroll only when the second finger actually
+       moves (see prInkMove); until then the first finger keeps drawing. */
+    PRA.panCandidate={secondId:e.pointerId, start:{x:e.clientX,y:e.clientY}, side:side};
+    e.preventDefault(); return;
+  } /* two fingers: scroll */
   if(e.pointerType==='touch' && penOnlyActive()){ prInkCancel(); PRA.pan={side:side, mid:{x:e.clientX,y:e.clientY}, single:e.pointerId}; e.preventDefault(); return; } /* Pen only: one finger scrolls */
   if(PRA.pan) return;
   let h=e.target.closest && e.target.closest(prSurfSel(P)); if(!h || !P.el.contains(h) || !prSurfReady(P,h)) return;
@@ -5546,6 +5595,17 @@ function prInkMove(e){
   if(!PRA.inkOn.L && !PRA.inkOn.R) return;
   let rec=PRA.ptrs.get(e.pointerId); if(rec){ rec.x=e.clientX; rec.y=e.clientY; }
   if(e.pointerType==='pen' && e.buttons===0 && !PRA.stroke && !PRA.pan && !PRA.erase){ prHoverMove(e,rec||prHoverRec(e)); } else if(e.pointerType==='pen'){ hidePenHoverRing(prHoverSurface(e,rec)); }
+  if(PRA.panCandidate){
+    /* A real two-finger scroll starts only when the second finger moves;
+       the first finger moving alone (a resting thumb held down) keeps
+       drawing. */
+    let touches=[...PRA.ptrs.values()].filter(p=>p.type==='touch');
+    let p=PRA.ptrs.get(PRA.panCandidate.secondId), s=PRA.panCandidate.start;
+    if(touches.length>=2 && p && Math.hypot(p.x-s.x,p.y-s.y)>10){
+      let side=PRA.panCandidate.side;
+      prInkCancel(); PRA.pan={side:side, mid:prMid(touches)};
+    } else if(touches.length<2){ PRA.panCandidate=null; }
+  }
   if(PRA.pan){
     if(PRA.pan.single){ let r2=PRA.ptrs.get(PRA.pan.single); if(!r2) return; let P=PR.panes[PRA.pan.side]; if(P){ P.el.scrollTop-=(r2.y-PRA.pan.mid.y); P.el.scrollLeft-=(r2.x-PRA.pan.mid.x); } PRA.pan.mid={x:r2.x,y:r2.y}; e.preventDefault(); return; }
     let touches=[...PRA.ptrs.values()].filter(p=>p.type==='touch'); if(touches.length<2) return;
@@ -5565,6 +5625,7 @@ function prInkMove(e){
 function prInkUp(e){
   if(!PRA.ptrs.has(e.pointerId)) return;
   PRA.ptrs.delete(e.pointerId);
+  if([...PRA.ptrs.values()].filter(p=>p.type==='touch').length<2) PRA.panCandidate=null;
   if(PRA.pan){ if(PRA.pan.single){ if(e.pointerId===PRA.pan.single) PRA.pan=null; return; } if([...PRA.ptrs.values()].filter(p=>p.type==='touch').length<2) PRA.pan=null; return; }
   if(PRA.erase){ if(e.pointerId===PRA.erase.ptr){ PRA.erase=null; prRenderInkBar(); } return; }
   if(!PRA.stroke || e.pointerId!==PRA.strokePtr) return; /* a palm lifting does not end the pen's stroke */
@@ -5581,7 +5642,7 @@ function prInkUp(e){
 ['L','R'].forEach(s=>$('prPane'+s).addEventListener('pointerdown',e=>prInkDown(s,e)));
 document.addEventListener('pointermove',prInkMove,{passive:false});
 document.addEventListener('pointerup',prInkUp);
-document.addEventListener('pointercancel',e=>{ if(PRA.ptrs.has(e.pointerId)){ PRA.ptrs.delete(e.pointerId); if(PRA.pan && [...PRA.ptrs.values()].filter(p=>p.type==='touch').length<2) PRA.pan=null; if((PRA.stroke && e.pointerId===PRA.strokePtr) || (PRA.erase && e.pointerId===PRA.erase.ptr)) prInkCancel(); } });
+document.addEventListener('pointercancel',e=>{ if(PRA.ptrs.has(e.pointerId)){ PRA.ptrs.delete(e.pointerId); if([...PRA.ptrs.values()].filter(p=>p.type==='touch').length<2){ PRA.panCandidate=null; if(PRA.pan) PRA.pan=null; } if((PRA.stroke && e.pointerId===PRA.strokePtr) || (PRA.erase && e.pointerId===PRA.erase.ptr)) prInkCancel(); } });
 document.addEventListener('keydown',e=>{
   if(!PR.on) return;
   if(e.key==='Escape'){ if(PRA.inkOn.L||PRA.inkOn.R){ prToggleInk(false); e.preventDefault(); } prHideSelBar(); prCloseMarks(); return; }
