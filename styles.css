@@ -716,7 +716,7 @@ body.prOn .layout{max-width:min(1800px,100%)}
 .prHelp{margin:0;line-height:1.55}
 .prCount{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:var(--radius-xs);background:var(--paper2);color:var(--text);font-size:10px;font-weight:600}
 .prCount:empty{display:none}
-.prInkBar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 10px;background:var(--surface);border:0;border-bottom:1px solid var(--border);border-radius:0}
+.prInkBar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 10px;background:var(--surface);border:0;border-bottom:1px solid var(--border);border-radius:0;position:sticky;top:0;z-index:30}
 .prInkBar.hidden{display:none!important}
 .prInkWhoWrap{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:240px}
 .prInkWho{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600}
@@ -925,8 +925,26 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px);over
   .ttsField.ttsSpeed input[type=range]{flex:1;width:auto}
   .ttsHint{flex:1 1 100%}
   .ttsClose{margin-left:auto}
-  .prGrid{grid-template-columns:minmax(0,1fr);gap:8px}
-  .prBody{height:calc((100vh - 344px) / 2);height:calc((100dvh - 344px) / 2);min-height:200px}
+  /* F5: the ink bar stays put while the user scrolls between the two
+     books, and it stops eating the screen — the "Annotating …" label and
+     the size preview go on small screens, and the tools run in one
+     sideways-scrolling row, like the editor toolbar. The two books stay
+     side by side from 769px up now; only phones stack them (see the
+     max-width:768px block). */
+  #prInkBar{gap:6px;padding:6px 8px}
+  .prInkWhoWrap{display:none}
+  #prInkSizePreview{display:none}
+  /* the size group shares a row here (the editor's full-width size row
+     does not apply inside this bar) */
+  #prInkBar .sizeGroup{flex:0 1 auto;padding-top:0;padding-bottom:0}
+  .prInkTools{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .prInkTools::-webkit-scrollbar{display:none}
+  /* while annotating, the top bar keeps only what annotating needs —
+     the sync / offset / marks controls come back when Done is tapped */
+  #parallelRead.prInking .prBar label[for="prSync"],
+  #parallelRead.prInking #prSync,
+  #parallelRead.prInking #prOffsetWrap,
+  #parallelRead.prInking #prMarksBtn{display:none}
   .chipRow{gap:20px}
 }
 
@@ -975,6 +993,18 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px);over
   .prZoom .prZoomLabel{min-width:48px}
   .prPane{padding:8px}
   .prMain>.prGrid{padding-left:8px}
+  /* F5: only phones stack the two books (tablets keep them side by side);
+     each pane gets half the room left after the bars. The ink bar gets
+     one more squeeze here: the tools take a full sideways-scrolling row,
+     the option labels go (the controls speak for themselves), and "Open
+     in editor" hides — the editor is one tap away from the normal reader.
+     That leaves three rows, so the second book's first page is on screen
+     without scrolling. */
+  .prGrid{grid-template-columns:minmax(0,1fr);gap:8px}
+  .prBody{height:calc((100vh - 344px) / 2);height:calc((100dvh - 344px) / 2);min-height:200px}
+  .prInkTools{flex:1 1 100%}
+  #prInkBar .tool-label{display:none}
+  #prOpenEditorBtn{display:none}
   .prRailBox{flex-basis:60px;width:60px}
   .prRailLabel{padding:9px 10px 7px;font-size:9px}
   .prRailNum{width:calc(100% - 8px);margin:0 4px 2px;padding:0 8px}
