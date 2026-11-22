@@ -118,7 +118,7 @@ let S={
   undoStack:[], redoStack:[],
   view:'library',
   stats:{writeSec:0, readSec:0, strokes:0, pagesRead:{}, focusDone:0},
-  split:false, recording:false, recStart:0,
+  split:false, focusMode:false, recording:false, recStart:0,
   searchResults:[], zoom:1, selection:[], selRect:null, paletteItems:[], paletteSel:-1,
   strokeStyle:'solid', eraserMode:'stroke', stabilize:28, snapGrid:false, clipboard:[]
 };
@@ -1585,7 +1585,7 @@ function shouldDraw(e){ return S.tool!=='hand'; }
    after the pan ends is ignored until it lifts, so lifting one finger
    never drops the other back into a stroke mid-page. A touch that lands
    while a stylus is down is treated as a palm, not a pan. */
-let inkPtrs=new Map(), panMid=null, handPan=null, panDead=new Set(), strokeUndoPushed=false, pinchZoom=null, gesturePtr=null, strokePtr=null;
+let inkPtrs=new Map(), panMid=null, handPan=null, panDead=new Set(), strokeUndoPushed=false, pinchZoom=null, gesturePtr=null, strokePtr=null, panCandidate=null;
 function updateInkTouchAction(){ inkC.style.touchAction='none'; inkC.style.cursor= S.tool==='hand'? 'grab' : 'crosshair'; }
 function zoomScroller(){ return inkC.closest? inkC.closest('.zoomScroll') : null; }
 function panViewportBy(dx,dy){
@@ -1660,16 +1660,17 @@ inkC.addEventListener('pointerdown',e=>{
   inkPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY,type:e.pointerType});
   if(e.pointerType==='pen'){ notePenSeen(); hidePenHoverRing(inkC); }
   if(inkPtrs.size===2){
-    /* Second finger down: abandon whatever the first finger was doing and
-       turn the gesture into a two-finger pan. Skipped when a stylus is
-       down (that touch is a resting palm) or the new pointer isn't touch. */
+    /* Second finger down. Skipped when a stylus is down (that touch is a
+       resting palm) or the new pointer isn't touch. A resting thumb or
+       palm on a phone is a second touch too — it must not kill the stroke
+       on contact. So this only arms a possible pan: the gesture becomes a
+       two-finger pan only when the second finger actually moves (see the
+       panCandidate check in pointermove). Until then the first finger
+       keeps drawing, and a stationary second touch is ignored. */
     let types=Array.from(inkPtrs.values()).map(p=>p.type);
     if(e.pointerType!=='touch' || types.indexOf('pen')>=0) return;
-    e.preventDefault();
-    try{ inkC.setPointerCapture(e.pointerId); }catch(err){}
-    abortGestureForPan();
-    panMid=inkPtrMid(); pinchZoom={d0:Math.max(20,inkPtrDist()),z0:editorZoom};
-    inkPtrs.forEach((v,id)=>panDead.add(id));
+    panCandidate={secondId:e.pointerId, start:{x:e.clientX,y:e.clientY}};
+    try{ inkC.setPointerCapture(e.pointerId); }catch(err){} /* keep its moves arriving even if it slides off the canvas */
     return;
   }
   if(inkPtrs.size>2 || panMid || panDead.has(e.pointerId)) return;
@@ -1737,6 +1738,21 @@ inkC.addEventListener('pointermove',e=>{
   if(e.pointerType==='pen'){
     if(e.buttons===0 && !drawing && !panMid && !handPan && gesturePtr===null) penHoverMove(e);
     else hidePenHoverRing(inkC);
+  }
+  if(panCandidate && inkPtrs.size>=2){
+    /* A real two-finger pan starts only when the second finger moves:
+       the first finger moving alone (a resting thumb held down) keeps
+       drawing. 10px in client coordinates: a resting thumb jitters below
+       it, a deliberate two-finger drag passes it at once. */
+    let p=inkPtrs.get(panCandidate.secondId), s=panCandidate.start;
+    if(p && Math.hypot(p.x-s.x,p.y-s.y)>10){
+      e.preventDefault();
+      try{ inkC.setPointerCapture(e.pointerId); }catch(err){}
+      abortGestureForPan();
+      panMid=inkPtrMid(); pinchZoom={d0:Math.max(20,inkPtrDist()),z0:editorZoom};
+      inkPtrs.forEach((v,id)=>panDead.add(id));
+      panCandidate=null;
+    }
   }
   if(gesturePtr!==null && e.pointerId!==gesturePtr && !panMid) return; /* a resting palm moving while another pointer owns the gesture */
   if(panMid){
@@ -1809,12 +1825,15 @@ function endStroke(){
 }
 function inkPointerUp(e){
   let wasPan=!!panMid, wasHand=!!handPan;
+  let wasGesture=(e.pointerId===gesturePtr), wasStroke=(e.pointerId===strokePtr);
   inkPtrs.delete(e.pointerId); panDead.delete(e.pointerId);
+  if(inkPtrs.size<2) panCandidate=null; /* a stationary second touch lifted before any pan: the stroke survives */
   if(e.pointerId===gesturePtr) gesturePtr=null;
   if(e.pointerId===strokePtr) strokePtr=null;
   if(wasPan){ if(inkPtrs.size<2){ panMid=null; pinchZoom=null; } return; }
   if(panDead.size) return; /* a finger left over from a pan never draws */
-  if(wasHand){ handPan=null; return; }
+  if(wasHand){ if(wasGesture) handPan=null; return; }
+  if(!wasGesture && !wasStroke) return; /* a second touch lifting must not end the stroke in progress */
   endStroke();
   strokeUndoPushed=false;
 }
@@ -2375,7 +2394,7 @@ function renderPages(){
 }
 
 /* ============ floating board: true infinite canvas ============ */
-let boardTool='pen', bDrawing=false, bStroke=null, bLast=null, boardPointers={}, pinchStart=null;
+let boardTool='pen', bDrawing=false, bStroke=null, bLast=null, boardPointers={}, pinchStart=null, boardPinchCandidate=null, bDrawPtr=null;
 let boardFull=false, boardRestoreGeom=null, boardSizeQueued=false;
 const BOARD_MIN_W=260, BOARD_MIN_H=210;
 const boardC=$('boardCanvas'), bX=boardC.getContext('2d'); bX.lineCap='round'; bX.lineJoin='round';
@@ -2387,14 +2406,16 @@ function toggleBoard(force){
   b.classList.toggle('hidden',!show);
   var bb=$('boardBtn'); if(bb) bb.setAttribute('aria-pressed', show?'true':'false');
   if(show){ loadBoard(); requestAnimationFrame(()=>{ sizeBoardCanvas(); var sh=$('canvasShell'); if(sh) sh.scrollIntoView({block:'nearest'}); }); }
+  syncBoardMini();
 }
 function loadBoard(){
   let bd=pageBoard(); if(!bd) return;
   if(boardFull){ boardFull=false; boardRestoreGeom=null; $('floatingBoard').classList.remove('boardFull'); setBtnContent('boardFsBtn','arrows-maximize','Expand'); }
   $('floatingBoard').style.background=BOARD_COLORS[bd.color];
   if(bd.color===6){ $('floatingBoard').style.color='#f8fafc'; } else { $('floatingBoard').style.color='#1b2a4a'; }
+  let sw=$('boardColorSwatch'); if(sw) sw.style.background=BOARD_COLORS[bd.color];
   applyBoardGeom(bd.geom||defaultBoardGeom());
-  sizeBoardCanvas(); redrawBoard();
+  sizeBoardCanvas(); redrawBoard(); syncBoardMini();
 }
 /* --- board window geometry: position + size, remembered per page ---
    The canvas inside stays infinite; only this window frame changes.
@@ -2415,7 +2436,7 @@ function toggleBoardFullscreen(){
   boardRestoreGeom=boardGeomFromEl();
   boardFull=true; el.classList.add('boardFull');
   setBtnContent('boardFsBtn','arrows-minimize','Restore');
-  sizeBoardCanvas();
+  sizeBoardCanvas(); syncBoardMini();
 }
 function exitBoardFullscreen(silent){
   let el=$('floatingBoard'); boardFull=false; el.classList.remove('boardFull');
@@ -2423,7 +2444,7 @@ function exitBoardFullscreen(silent){
   applyBoardGeom(g);
   if(bd) bd.geom=boardGeomFromEl();
   setBtnContent('boardFsBtn','arrows-maximize','Expand');
-  sizeBoardCanvas();
+  sizeBoardCanvas(); syncBoardMini();
   if(!silent) scheduleSave();
 }
 function sizeBoardCanvas(){
@@ -2442,6 +2463,7 @@ function redrawBoard(){
     bX.stroke();
   });
   bX.setTransform(1,0,0,1,0,0);
+  updateBoardZoomLabel(); updateBoardMini();
 }
 function boardWorld(e){ let r=boardC.getBoundingClientRect(); let bd=pageBoard(); let sx=(e.clientX-r.left)*(boardC.width/r.width), sy=(e.clientY-r.top)*(boardC.height/r.height); return { x:(sx-bd.view.x)/bd.view.k, y:(sy-bd.view.y)/bd.view.k, sx, sy }; }
 function setBoardTool(t){ boardTool=t; $('boardPenBtn').classList.toggle('primary',t==='pen'); $('boardPanBtn').classList.toggle('primary',t==='pan'); boardC.style.cursor= t==='pan'?'grab':'crosshair'; }
@@ -2452,20 +2474,37 @@ function setBoardTool(t){ boardTool=t; $('boardPenBtn').classList.toggle('primar
 function boardInkColor(bd){ let c=S.color||'#1b2a4a'; if(bd && bd.color===6 && String(c).toLowerCase()==='#1b2a4a') return '#f8fafc'; return c; }
 boardC.addEventListener('pointerdown',e=>{
   boardC.setPointerCapture(e.pointerId); boardPointers[e.pointerId]={x:e.clientX,y:e.clientY};
-  if(Object.keys(boardPointers).length===2){ let ps=Object.values(boardPointers); pinchStart={d:Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y), k:pageBoard().view.k}; bDrawing=false; bStroke=null; return; }
+  if(Object.keys(boardPointers).length===2){
+    /* A resting thumb is a second touch too: only arm a possible pinch.
+       It becomes a pinch only when the second finger actually moves (see
+       pointermove); until then the first finger keeps drawing. */
+    boardPinchCandidate={secondId:e.pointerId, start:{x:e.clientX,y:e.clientY}};
+    return;
+  }
   let w=boardWorld(e);
-  if(boardTool==='pan'){ bLast={x:e.clientX,y:e.clientY}; bDrawing=true; return; }
-  bDrawing=true; let bd=pageBoard();
+  if(boardTool==='pan'){ bLast={x:e.clientX,y:e.clientY}; bDrawing=true; bDrawPtr=e.pointerId; return; }
+  bDrawing=true; bDrawPtr=e.pointerId; let bd=pageBoard();
   bStroke={color: boardInkColor(bd), size:3/bd.view.k*1.6, points:[{x:w.x,y:w.y}]};
   bLast=w;
 });
 boardC.addEventListener('pointermove',e=>{
   if(boardPointers[e.pointerId]) boardPointers[e.pointerId]={x:e.clientX,y:e.clientY};
   let bd=pageBoard(); if(!bd) return;
+  if(boardPinchCandidate && Object.keys(boardPointers).length===2){
+    /* A real pinch starts only when the second finger moves; a resting
+       thumb held down must not kill the board stroke. */
+    let p=boardPointers[boardPinchCandidate.secondId], s=boardPinchCandidate.start;
+    if(p && Math.hypot(p.x-s.x,p.y-s.y)>10){
+      let ps=Object.values(boardPointers);
+      pinchStart={d:Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y), k:pageBoard().view.k};
+      bDrawing=false; bStroke=null; bDrawPtr=null; boardPinchCandidate=null;
+    }
+  }
   if(pinchStart && Object.keys(boardPointers).length===2){
     let ps=Object.values(boardPointers); let d=Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y);
     bd.view.k=Math.max(0.2,Math.min(6, pinchStart.k*(d/Math.max(20,pinchStart.d)))); redrawBoard(); return;
   }
+  if(boardPinchCandidate && e.pointerId!==bDrawPtr) return; /* stationary second touch: ignore its moves */
   if(!bDrawing) return;
   if(boardTool==='pan' && bLast){ let r=boardC.getBoundingClientRect(); bd.view.x+=(e.clientX-bLast.x)*(boardC.width/r.width); bd.view.y+=(e.clientY-bLast.y)*(boardC.height/r.height); bLast={x:e.clientX,y:e.clientY}; redrawBoard(); return; }
   let w=boardWorld(e); if(bStroke){ let a=bLast; bStroke.points.push({x:w.x,y:w.y}); bd.strokes=bd.strokes.filter(s=>s!==bStroke); bd.strokes.push(bStroke);
@@ -2474,12 +2513,54 @@ boardC.addEventListener('pointermove',e=>{
     let v=bd.view; bX.setTransform(v.k,0,0,v.k,v.x,v.y); bX.strokeStyle=bStroke.color; bX.lineWidth=bStroke.size; bX.lineCap='round'; bX.lineJoin='round'; bX.beginPath(); bX.moveTo(a.x,a.y); bX.lineTo(w.x,w.y); bX.stroke(); bX.setTransform(1,0,0,1,0,0);
     bLast=w; }
 });
-function boardEnd(e){ delete boardPointers[e.pointerId]; if(Object.keys(boardPointers).length<2) pinchStart=null; if(bDrawing && bStroke){ renderPages(); } bDrawing=false; bStroke=null; bLast=null; }
+function boardEnd(e){
+  let wasDraw=(e.pointerId===bDrawPtr);
+  delete boardPointers[e.pointerId];
+  if(Object.keys(boardPointers).length<2){ pinchStart=null; boardPinchCandidate=null; }
+  if(!wasDraw) return; /* a second touch lifting must not end the board stroke */
+  if(bDrawing && bStroke){ renderPages(); updateBoardMini(); }
+  bDrawing=false; bStroke=null; bLast=null; bDrawPtr=null;
+}
 boardC.addEventListener('pointerup',boardEnd); boardC.addEventListener('pointercancel',boardEnd);
 boardC.addEventListener('wheel',e=>{ e.preventDefault(); let bd=pageBoard(); let f=e.deltaY<0?1.12:0.89; bd.view.k=Math.max(0.2,Math.min(6,bd.view.k*f)); redrawBoard(); },{passive:false});
+function updateBoardZoomLabel(){ let bd=pageBoard(); let l=$('boardZoomLabel'); if(l&&bd) l.textContent=Math.round(bd.view.k*100)+'%'; }
+function boardZoomReset(){ let bd=pageBoard(); if(!bd) return; bd.view.k=1; redrawBoard(); }
 function boardZoom(f){ let bd=pageBoard(); bd.view.k=Math.max(0.2,Math.min(6,bd.view.k*f)); redrawBoard(); }
 function boardClear(){ let bd=pageBoard(); askConfirm('Clear this board?','The board on this page is emptied; the page itself is untouched.',()=>{ bd.strokes=[]; redrawBoard(); renderPages(); }); }
 function cycleBoardColor(){ let bd=pageBoard(); bd.color=(bd.color+1)%BOARD_COLORS.length; loadBoard(); scheduleSave(); toast('Board colour saved for this page'); }
+/* P3: board mini-map (mockup 6) — a live thumbnail of the board, bottom
+   right of the screen, headed Board with the board's own Expand / Close
+   actions. The thumbnail re-renders from the same stroke data as the
+   board, scaled to fit; it shows only while the board is open, not
+   fullscreen, at >=768px. Expand opens the board fullscreen; Close
+   closes the board — both reuse the existing handlers. */
+function updateBoardMini(){
+  let cv=$('boardMiniCanvas'); if(!cv) return;
+  let bd=pageBoard(); if(!bd) return;
+  let ctx=cv.getContext('2d'); if(!ctx) return;
+  ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,cv.width,cv.height);
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity,any=false;
+  bd.strokes.forEach(st=>{ st.points.forEach(p=>{ any=true; if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; }); });
+  if(!any) return;
+  let w=Math.max(1,maxX-minX), h=Math.max(1,maxY-minY);
+  let k=Math.min((cv.width-16)/w,(cv.height-16)/h);
+  let ox=(cv.width-w*k)/2-minX*k, oy=(cv.height-h*k)/2-minY*k;
+  bd.strokes.forEach(st=>{
+    if(!st.points.length) return;
+    ctx.strokeStyle=st.color; ctx.lineWidth=Math.max(1,st.size*k); ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.beginPath(); ctx.moveTo(st.points[0].x*k+ox,st.points[0].y*k+oy);
+    for(let i=1;i<st.points.length;i++) ctx.lineTo(st.points[i].x*k+ox,st.points[i].y*k+oy);
+    ctx.stroke();
+  });
+}
+function syncBoardMini(){
+  let m=$('boardMini'); if(!m) return;
+  let b=$('floatingBoard');
+  let show=b && !b.classList.contains('hidden') && !boardFull && window.matchMedia('(min-width:768px)').matches;
+  m.classList.toggle('hidden',!show);
+  if(show) updateBoardMini();
+}
+window.addEventListener('resize',()=>{ clearTimeout(window.__boardMiniT); window.__boardMiniT=setTimeout(syncBoardMini,150); });
 /* drag + resize board, built for steady controls:
    - the head captures the pointer, so a drag tracks one finger/mouse
      exactly and never drifts or gets lost mid-move;
@@ -2627,6 +2708,8 @@ function updateWordCount(){ let v=$('noteText').value; $('wordCount').textConten
 $('noteText').addEventListener('input',()=>{ saveEditorToModel(); updateWordCount(); });
 function toggleSplit(){
   S.split=!S.split;
+  document.body.classList.toggle('splitOn',S.split);
+  if(!S.split) closeRailPanel();
   var stb=$('splitTopBtn'); if(stb) stb.setAttribute('aria-pressed', S.split?'true':'false');
   $('stageWrap').classList.toggle('split',S.split);
   let pane=$('splitPane'); pane.classList.toggle('hidden',!S.split);
@@ -2644,6 +2727,30 @@ function toggleSplit(){
     pane.style.height='';
   }
 }
+/* P3: Split View icon rail (mockup 13) — desktop only. When split is on,
+   both sidebars collapse into a 48px rail; each rail button opens its
+   panel as an overlay drawer while split stays on. The drawer reuses the
+   real panel DOM (same ids, same handlers) — nothing is duplicated. */
+let railOpen=null; /* 'pages' | 'layers' | 'links' | null */
+function railPanelEl(which){ return which==='links'? $('linksPanel') : $('pagesPanel'); }
+function openRailPanel(which){
+  if(which!=='pages'&&which!=='layers'&&which!=='links') return;
+  let el=railPanelEl(which); if(!el) return;
+  if(which==='pages'||which==='layers') switchRailTab(which);
+  ['pagesPanel','linksPanel'].forEach(id=>{ let p=$(id); if(p&&p!==el) p.classList.remove('railDrawer'); });
+  el.classList.add('railDrawer');
+  railOpen=which;
+  ['pages','layers','links'].forEach(w=>{ let b=$('railBtn'+w[0].toUpperCase()+w.slice(1)); if(b) b.setAttribute('aria-pressed', w===which?'true':'false'); });
+  let bd=$('railBackdrop'); if(bd) bd.classList.remove('hidden');
+}
+function closeRailPanel(){
+  ['pagesPanel','linksPanel'].forEach(id=>{ let p=$(id); if(p) p.classList.remove('railDrawer'); });
+  railOpen=null;
+  ['pages','layers','links'].forEach(w=>{ let b=$('railBtn'+w[0].toUpperCase()+w.slice(1)); if(b) b.setAttribute('aria-pressed','false'); });
+  let bd=$('railBackdrop'); if(bd) bd.classList.add('hidden');
+}
+function toggleRailPanel(which){ if(railOpen===which) closeRailPanel(); else openRailPanel(which); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&railOpen) closeRailPanel(); });
 /* Split View book picker: the pane shows the notebook's picked book
    (persisted per notebook as splitBookId, like parallelWith on books),
    else the book open in the reader, else a chooser of the real books.
@@ -2666,7 +2773,7 @@ function renderSplitBook(pane,b){
   pane.dataset.bookId=b.id;
   syncSplitPaneHeight(); /* body height must be right before the page is fitted to it */
   let head='<div class="splitHead"><span class="badge">'+esc(b.title)+'</span><button type="button" class="btn small" onclick="splitShowPicker()">Change</button><span class="splitZoomGroup"><button type="button" class="btn small" onclick="splitPdfZoomBy(0.8)" aria-label="Zoom out">−</button><button type="button" class="btn small" id="splitZoomLabel" onclick="splitPdfZoomBy(0)" aria-label="Reset zoom" title="Tap to reset zoom">100%</button><button type="button" class="btn small" onclick="splitPdfZoomBy(1.25)" aria-label="Zoom in">+</button></span></div>';
-  if(b.kind==='epub'){ let c=(b.chapters||[])[b.ch]||{title:'',html:''}; pane.innerHTML='<div class="splitPaneBody"><h3>'+esc(c.title)+'</h3>'+c.html+'</div><div class="splitPaneFoot">'+head+'</div>'; }
+  if(b.kind==='epub'){ let c=(b.chapters||[])[b.ch]||{title:'',html:''}; let n=(b.chapters||[]).length; let nav=n>1?'<div class="splitEpubNav"><button type="button" class="btn small" onclick="splitEpubChapter(-1)" aria-label="Previous chapter"'+(b.ch<=0?' disabled':'')+'>\u2039</button><span class="kbd" id="splitEpubLabel">'+esc(c.title||('Chapter '+(b.ch+1)+' of '+n))+'</span><button type="button" class="btn small" onclick="splitEpubChapter(1)" aria-label="Next chapter"'+(b.ch>=n-1?' disabled':'')+'>\u203a</button></div>':''; pane.innerHTML='<div class="splitPaneBody"><h3>'+esc(c.title)+'</h3>'+c.html+'</div><div class="splitPaneFoot">'+head+nav+'</div>'; }
   else if(b.kind==='pdf'){
     pane.innerHTML='<div class="splitPaneBody"><div class="splitPdfHost" id="splitPdfHost"><p class="kbd">Loading page…</p></div></div><div class="splitPaneFoot">'+head+'<div class="splitPdfNav"><button type="button" class="btn small" onclick="splitPdfPage(-1)" aria-label="Previous page">‹</button><span class="kbd" id="splitPdfLabel">…</span><button type="button" class="btn small" onclick="splitPdfPage(1)" aria-label="Next page">›</button></div></div>';
     splitRenderPdfPage(pane,b);
@@ -2702,6 +2809,16 @@ function syncSplitPaneHeight(){
    page at a time, nothing eager, text layer included (which also fills
    that page's text cache on demand). */
 let splitPdfGen=0;
+/* P3: EPUB chapter stepper in the split pane (mockup 6 footer). Mirrors
+   splitPdfPage: step b.ch through b.chapters and re-render the pane. */
+function splitEpubChapter(d){
+  let nb=curNb(); if(!nb) return;
+  let b=splitBookFor(nb); if(!b||b.kind!=='epub') return;
+  let n=(b.chapters||[]).length; if(!n) return;
+  b.ch=Math.max(0,Math.min(n-1,(b.ch||0)+d));
+  scheduleSave();
+  let pane=$('splitPane'); if(pane) renderSplitBook(pane,b);
+}
 function splitPdfPage(d){
   let nb=curNb(); if(!nb) return;
   let b=splitBookFor(nb); if(!b||b.kind!=='pdf') return;
@@ -4508,20 +4625,71 @@ async function annotatePdf(id){
 function annotateCurrentPdf(){ let b=curBook(); if(b) annotatePdf(b.id); } function backToReading(){ let nb=curNb(); if(!nb||!nb.pdfBookId) return; saveEditorToModel(); saveNow(); /* flush the strokes now, not on the 700ms timer, so leaving annotation mode really saves them */ let b=S.items.find(i=>i.id===nb.pdfBookId); if(!b){ toast('The PDF for these annotations is no longer on the shelf'); return; } let p=nb.pages[nb.cur]; let pg=(p&&p.bgPdf&&p.bgPdf.page)||(nb.cur+1); if(b.kind==='pdf'&&b.numPages) b.page=Math.max(1,Math.min(b.numPages,pg)); openBook(nb.pdfBookId); }
 
 /* ============ focus timer ============ */
-let timerSec=25*60, timerInt=null;
+let timerSec=25*60, timerInt=null, timerPaused=false;
 /* P8: every Focus label updates together, the Library button
    (#timerLabel) and the editor's Focus button (.timerLabel), so the
    countdown is visible in whichever view the timer was started from. */
 function setTimerLabel(txt){ document.querySelectorAll('#timerLabel, .timerLabel').forEach(el=>{ el.textContent=txt; }); }
+function fmtTimer(sec){ let m=Math.floor(sec/60),s=sec%60; return m+':'+String(s).padStart(2,'0'); }
+/* P3: the timer tick is factored out so pause/resume reuse it. On
+   completion the session counts and the timer resets, exactly as before;
+   if Focus Mode is open, the view closes with the session. */
+function timerTick(){
+  timerSec--; setTimerLabel('Focus '+fmtTimer(timerSec)); updateFocusPill();
+  if(timerSec<=0){ clearInterval(timerInt); timerInt=null; timerPaused=false; timerSec=25*60; setTimerLabel('Focus 25:00'); S.stats.focusDone++; updateStatsPanel(); toast('Focus session done. Nice work.'); if(S.focusMode) setFocusMode(false); updateFocusPill(); }
+}
+function startTimer(){ timerSec=25*60; timerPaused=false; clearInterval(timerInt); timerInt=setInterval(timerTick,1000); setTimerLabel('Focus '+fmtTimer(timerSec)); toast('Focus timer started. 25 minutes.'); }
+function pauseTimer(){ if(!timerInt) return; clearInterval(timerInt); timerInt=null; timerPaused=true; updateFocusPill(); }
+function resumeTimer(){ if(timerInt||!timerPaused) return; timerPaused=false; timerInt=setInterval(timerTick,1000); updateFocusPill(); }
 function openTimer(){
-  if(timerInt){ clearInterval(timerInt); timerInt=null; timerSec=25*60; setTimerLabel('Focus 25:00'); toast('Focus timer stopped'); return; }
-  toast('Focus timer started. 25 minutes.');
-  timerInt=setInterval(()=>{ timerSec--; let m=Math.floor(timerSec/60),s=timerSec%60; setTimerLabel('Focus '+m+':'+String(s).padStart(2,'0'));
-    if(timerSec<=0){ clearInterval(timerInt); timerInt=null; timerSec=25*60; setTimerLabel('Focus 25:00'); S.stats.focusDone++; updateStatsPanel(); toast('Focus session done. Nice work.'); } },1000);
+  if(timerInt){ clearInterval(timerInt); timerInt=null; timerPaused=false; timerSec=25*60; setTimerLabel('Focus 25:00'); toast('Focus timer stopped'); updateFocusPill(); return; }
+  if(timerPaused){ resumeTimer(); toast('Focus timer resumed'); return; }
+  startTimer();
+}
+
+/* P3: Focus Mode (mockup 3). The timer engine above is reused, extended
+   with pause/resume; the view is the same editor with its chrome hidden
+   (see body.focusMode in styles.css) — no second canvas, no DOM moves.
+   Session N comes from existing data: (focusDone % 4) + 1. Entering from
+   the editor starts (or resumes) the timer and turns Split View off; the
+   timer started from library/drawer/palette still just runs the countdown. */
+function focusSessionNum(){ return (S.stats.focusDone%4)+1; }
+function updateFocusPill(){
+  let pill=$('focusPillText'); if(!pill) return;
+  pill.textContent='Focus '+fmtTimer(timerSec)+' \u00b7 Session '+focusSessionNum()+'/4 \u00b7 '+(timerInt?'Pause':(timerPaused?'Resume':'Pause'));
+  let fg=$('focusRingFg'); if(fg){ let C=2*Math.PI*9; fg.style.strokeDasharray=C.toFixed(2); fg.style.strokeDashoffset=(C*(1-timerSec/(25*60))).toFixed(2); }
+}
+function setFocusMode(on){
+  S.focusMode=on;
+  document.body.classList.toggle('focusMode',on);
+  let bar=$('focusBar'); if(bar){ bar.classList.toggle('hidden',!on); bar.setAttribute('aria-hidden',on?'false':'true'); }
+  updateFocusPill(); updateFocusAudioPill();
+  if(on){ let sh=$('canvasShell'); if(sh) sh.scrollIntoView({block:'nearest'}); }
+}
+function enterFocusMode(){
+  if(S.view!=='editor') return;
+  closeAllToolPops(); closeRailPanel();
+  if(S.split) toggleSplit();
+  if(timerInt){ /* already running */ }
+  else if(timerPaused){ resumeTimer(); }
+  else { startTimer(); }
+  setFocusMode(true);
+}
+function exitFocusMode(){
+  if(!S.focusMode) return;
+  pauseTimer();
+  setFocusMode(false);
+}
+function toggleFocusPause(){ if(timerInt) pauseTimer(); else if(timerPaused) resumeTimer(); }
+function updateFocusAudioPill(){
+  let pill=$('focusAudioPill'); if(!pill) return;
+  let show=S.focusMode && S.recording;
+  pill.classList.toggle('hidden',!show);
+  if(show){ let s=Math.floor((Date.now()-S.recStart)/1000); $('focusAudioText').textContent='Audio Recording \u00b7 '+fmtTimer(s); }
 }
 
 /* ============ session stats ticker ============ */
-setInterval(()=>{ if(S.view==='editor') S.stats.writeSec++; if(S.view==='reader') S.stats.readSec++; if(S.stats.writeSec%15===0||S.stats.readSec%15===0) updateStatsPanel(); },1000);
+setInterval(()=>{ if(S.view==='editor') S.stats.writeSec++; if(S.view==='reader') S.stats.readSec++; if(S.stats.writeSec%15===0||S.stats.readSec%15===0) updateStatsPanel(); updateFocusAudioPill(); },1000);
 
 /* ============ Parallel Read: two books side by side, synced scroll ============
    The book open in the reader sits in the left pane; any other PDF or
@@ -5035,7 +5203,7 @@ window.addEventListener('resize',()=>{
    drawn from the PDF only when the editor first shows them. EPUB text
    reflows, so handwriting cannot stay attached to it: PDFs only. */
 const PRA={marksChanged:false, inkOn:{L:false,R:false}, inkBook:{L:null,R:null}, pending:{L:false,R:false}, barSide:null, hist:{}, tool:'pen', penColor:'#18202B', hiColor:'#F2D887', size:4, style:'solid', fill:false, eraserMode:'stroke',
-  undo:[], redo:[], stroke:null, strokeHolder:null, strokeSide:null, strokePtr:null, erase:null, ptrs:new Map(), pan:null, last:null, raf:0, selT:null, warnedEpub:false};
+  undo:[], redo:[], stroke:null, strokeHolder:null, strokeSide:null, strokePtr:null, erase:null, ptrs:new Map(), pan:null, panCandidate:null, last:null, raf:0, selT:null, warnedEpub:false};
 /* PRA.ink: is any book being annotated (read-only) */
 Object.defineProperty(PRA,'ink',{get(){ return !!(PRA.inkOn.L || PRA.inkOn.R); }});
 const PR_PEN_COLORS=['#18202B','#2C4A6E','#A83A2C','#3F5C46','#57425F','#A9652B','#2B5F5B','#9A4A60'];
@@ -5345,7 +5513,7 @@ function prInkPoint(P,h,e){
 function prMid(ps){ return {x:(ps[0].x+ps[1].x)/2, y:(ps[0].y+ps[1].y)/2}; }
 function prInkCancel(){
   let h=PRA.strokeHolder, side=PRA.strokeSide;
-  PRA.stroke=null; PRA.strokeHolder=null; PRA.strokeSide=null; PRA.strokePtr=null; PRA.erase=null; PRA.last=null;
+  PRA.stroke=null; PRA.strokeHolder=null; PRA.strokeSide=null; PRA.strokePtr=null; PRA.erase=null; PRA.last=null; PRA.panCandidate=null;
   if(h && PR.panes[side]) prRenderInk(PR.panes[side],h);
 }
 /* one undo / redo history for both books, in the order things were drawn */
@@ -5400,7 +5568,13 @@ function prInkDown(side,e){
   if(PRA.barSide!==side){ PRA.barSide=side; prRenderInkBar(); }
   let all=[...PRA.ptrs.values()], touches=all.filter(p=>p.type==='touch');
   if(e.pointerType==='touch' && all.some(p=>p.type==='pen')) return;            /* a palm resting while the pen draws */
-  if(touches.length>=2){ prInkCancel(); PRA.pan={side:side, mid:prMid(touches)}; e.preventDefault(); return; } /* two fingers: scroll */
+  if(touches.length>=2){
+    /* A resting thumb is a second touch too: only arm a possible pan.
+       It becomes a two-finger scroll only when the second finger actually
+       moves (see prInkMove); until then the first finger keeps drawing. */
+    PRA.panCandidate={secondId:e.pointerId, start:{x:e.clientX,y:e.clientY}, side:side};
+    e.preventDefault(); return;
+  } /* two fingers: scroll */
   if(e.pointerType==='touch' && penOnlyActive()){ prInkCancel(); PRA.pan={side:side, mid:{x:e.clientX,y:e.clientY}, single:e.pointerId}; e.preventDefault(); return; } /* Pen only: one finger scrolls */
   if(PRA.pan) return;
   let h=e.target.closest && e.target.closest(prSurfSel(P)); if(!h || !P.el.contains(h) || !prSurfReady(P,h)) return;
@@ -5421,6 +5595,17 @@ function prInkMove(e){
   if(!PRA.inkOn.L && !PRA.inkOn.R) return;
   let rec=PRA.ptrs.get(e.pointerId); if(rec){ rec.x=e.clientX; rec.y=e.clientY; }
   if(e.pointerType==='pen' && e.buttons===0 && !PRA.stroke && !PRA.pan && !PRA.erase){ prHoverMove(e,rec||prHoverRec(e)); } else if(e.pointerType==='pen'){ hidePenHoverRing(prHoverSurface(e,rec)); }
+  if(PRA.panCandidate){
+    /* A real two-finger scroll starts only when the second finger moves;
+       the first finger moving alone (a resting thumb held down) keeps
+       drawing. */
+    let touches=[...PRA.ptrs.values()].filter(p=>p.type==='touch');
+    let p=PRA.ptrs.get(PRA.panCandidate.secondId), s=PRA.panCandidate.start;
+    if(touches.length>=2 && p && Math.hypot(p.x-s.x,p.y-s.y)>10){
+      let side=PRA.panCandidate.side;
+      prInkCancel(); PRA.pan={side:side, mid:prMid(touches)};
+    } else if(touches.length<2){ PRA.panCandidate=null; }
+  }
   if(PRA.pan){
     if(PRA.pan.single){ let r2=PRA.ptrs.get(PRA.pan.single); if(!r2) return; let P=PR.panes[PRA.pan.side]; if(P){ P.el.scrollTop-=(r2.y-PRA.pan.mid.y); P.el.scrollLeft-=(r2.x-PRA.pan.mid.x); } PRA.pan.mid={x:r2.x,y:r2.y}; e.preventDefault(); return; }
     let touches=[...PRA.ptrs.values()].filter(p=>p.type==='touch'); if(touches.length<2) return;
@@ -5440,6 +5625,7 @@ function prInkMove(e){
 function prInkUp(e){
   if(!PRA.ptrs.has(e.pointerId)) return;
   PRA.ptrs.delete(e.pointerId);
+  if([...PRA.ptrs.values()].filter(p=>p.type==='touch').length<2) PRA.panCandidate=null;
   if(PRA.pan){ if(PRA.pan.single){ if(e.pointerId===PRA.pan.single) PRA.pan=null; return; } if([...PRA.ptrs.values()].filter(p=>p.type==='touch').length<2) PRA.pan=null; return; }
   if(PRA.erase){ if(e.pointerId===PRA.erase.ptr){ PRA.erase=null; prRenderInkBar(); } return; }
   if(!PRA.stroke || e.pointerId!==PRA.strokePtr) return; /* a palm lifting does not end the pen's stroke */
@@ -5456,7 +5642,7 @@ function prInkUp(e){
 ['L','R'].forEach(s=>$('prPane'+s).addEventListener('pointerdown',e=>prInkDown(s,e)));
 document.addEventListener('pointermove',prInkMove,{passive:false});
 document.addEventListener('pointerup',prInkUp);
-document.addEventListener('pointercancel',e=>{ if(PRA.ptrs.has(e.pointerId)){ PRA.ptrs.delete(e.pointerId); if(PRA.pan && [...PRA.ptrs.values()].filter(p=>p.type==='touch').length<2) PRA.pan=null; if((PRA.stroke && e.pointerId===PRA.strokePtr) || (PRA.erase && e.pointerId===PRA.erase.ptr)) prInkCancel(); } });
+document.addEventListener('pointercancel',e=>{ if(PRA.ptrs.has(e.pointerId)){ PRA.ptrs.delete(e.pointerId); if([...PRA.ptrs.values()].filter(p=>p.type==='touch').length<2){ PRA.panCandidate=null; if(PRA.pan) PRA.pan=null; } if((PRA.stroke && e.pointerId===PRA.strokePtr) || (PRA.erase && e.pointerId===PRA.erase.ptr)) prInkCancel(); } });
 document.addEventListener('keydown',e=>{
   if(!PR.on) return;
   if(e.key==='Escape'){ if(PRA.inkOn.L||PRA.inkOn.R){ prToggleInk(false); e.preventDefault(); } prHideSelBar(); prCloseMarks(); return; }
