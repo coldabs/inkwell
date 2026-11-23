@@ -109,7 +109,7 @@ function applyCanvasTransform(){ [bgX,hiX,inkX,liveX].forEach(c=>{ c.setTransfor
 function rescaleCanvases(){ if(!curPageObj()||S.view!=='editor') return; let k=canvasScaleTarget(); if(Math.abs(k-canvasScale)<0.02){ syncSplitPaneHeight(); return; } canvasScale=k; redrawAll(); syncSplitPaneHeight(); }
 function syncPageHeight(){ let h=pageH(curPageObj()); let W=Math.round(CW*canvasScale), H=Math.round(h*canvasScale); if(h!==PH||bgC.width!==W||bgC.height!==H){ PH=h; [bgC,hiC,inkC,liveC].forEach(c=>{c.width=W;c.height=H;}); [bgX,hiX,inkX,liveX].forEach(c=>{c.lineCap='round';c.lineJoin='round'}); } applyCanvasTransform(); }
 const SAMPLE_ID='sample-book';
-function blankPage(){return {ink:[],hi:[],text:'',stickies:[],table:null,board:null,audio:null,bgPdf:null,texts:[],images:[],texs:[],bgColor:'#fffdf6'}}
+function blankPage(){return {ink:[],hi:[],text:'',stickies:[],table:null,board:null,audio:null,bgPdf:null,texts:[],images:[],texs:[],bgColor:'#FAF7F0'}}
 function blankBoard(){return {color:0,strokes:[],view:{x:0,y:0,k:1},geom:null}}
 const BOARD_COLORS=['#fffdf6','#f6e8c8','#d9e9f7','#dcf0dd','#f8e0e0','#e6def6','#39404e'];
 let S={
@@ -972,7 +972,7 @@ function openNotebook(id){
      to b.page; one tap in Pages returns. */
   if(nb.pdfBookId){ let b=S.items.find(i=>i.id===nb.pdfBookId); if(b){ let pg=Math.max(1,Math.min(b.numPages||nb.pages.length,b.page||1)); let idx=nb.pages.findIndex(p=>p.bgPdf && p.bgPdf.page===pg); nb.cur= idx>=0 ? idx : Math.max(0,Math.min(nb.pages.length-1,pg-1)); } }
   $('noteTitle').value=nb.title;
-  $('templateSel').value=nb.template;
+  $('templateSel').value=nb.template; syncTemplateTiles(nb.template);
   loadPageIntoEditor();
   showView('editor');
   layoutEditorSheet();
@@ -999,7 +999,8 @@ function saveEditorToModel(){
   p.text=$('noteText').value;
   scheduleSave();
 }
-function setTemplate(v){ let nb=curNb(); if(nb) nb.template=v; drawBackground(); scheduleSave(); }
+function setTemplate(v){ let nb=curNb(); if(nb) nb.template=v; var sel=$('templateSel'); if(sel) sel.value=v; syncTemplateTiles(v); drawBackground(); scheduleSave(); }
+function syncTemplateTiles(v){ document.querySelectorAll('#templateTiles [data-template]').forEach(b=>{ var on=b.getAttribute('data-template')===v; b.classList.toggle('active',on); b.setAttribute('aria-pressed',String(on)); }); }
 
 /* ============ editor: canvas engine ============ */
 const bgC=$('bgCanvas'), hiC=$('hiCanvas'), inkC=$('inkCanvas'), liveC=$('liveCanvas');
@@ -1805,10 +1806,9 @@ let barrelSavedTool=null;
 function applyStylusButton(e){
   if(e.pointerType!=='pen') return;
   let mapEl=$('stylusBtnSel'); let map=mapEl? mapEl.value : 'eraser';
-  if(map==='none') return;
   if(e.button===5 || e.button===1 || (e.buttons&32)){
     barrelSavedTool=S.tool;
-    S.tool= map==='select'? 'select':'eraser';
+    S.tool= map==='select'? 'select' : map==='highlighter'? 'highlighter' : 'eraser';
   }
 }
 inkC.addEventListener('pointerup',()=>{ if(barrelSavedTool!==null){ S.tool=barrelSavedTool; barrelSavedTool=null; } });
@@ -2243,9 +2243,9 @@ function drawEraserCursor(pt){
 const BRUSH_SIZE_KEY='inkwell-brush-sizes';
 let brushSizes={};
 try{ brushSizes=JSON.parse(localStorage.getItem(BRUSH_SIZE_KEY)||'{}')||{}; }catch(e){ brushSizes={}; }
-function brushSizeFor(tool){ let v=+brushSizes[tool]; return (v>=1 && v<=16)? v : 4; }
+function brushSizeFor(tool){ let v=+brushSizes[tool]; return (v>=1 && v<=18)? v : 4; }
 function setBrushSize(v){
-  v=Math.max(1,Math.min(16,Math.round(+v||4)));
+  v=Math.max(1,Math.min(18,Math.round(+v||4)));
   brushSizes[S.tool]=v;
   try{ localStorage.setItem(BRUSH_SIZE_KEY, JSON.stringify(brushSizes)); }catch(e){}
   let slider=$('brushSize'); if(slider) slider.value=v;
@@ -2265,27 +2265,26 @@ function updateSizeUI(){
   let slider=$('brushSize'); if(!slider) return;
   let v=+slider.value;
   let w=$('sizeWord'); if(w) w.textContent=sizeWord(v);
-  let c=$('sizePreview'); if(!c) return;
-  let x=c.getContext('2d'); x.clearRect(0,0,c.width,c.height);
-  x.lineCap='round'; x.lineJoin='round';
-  let midY=c.height/2;
+  let path=$('sizePreviewPath'), ring=$('sizePreviewRing'); if(!path) return;
   if(S.tool==='eraser' && S.eraserMode!=='whiteout'){
     /* Preview the eraser's touch zone instead of a stroke. */
-    x.strokeStyle='#b2261e'; x.lineWidth=1.6; x.setLineDash([4,3]);
-    x.beginPath(); x.arc(c.width/2,midY,Math.min(13,5+v*0.55),0,7); x.stroke(); x.setLineDash([]);
+    path.style.display='none';
+    ring.style.display='';
+    ring.setAttribute('r', Math.min(13, 5+v*0.55));
     return;
   }
+  path.style.display='';
+  ring.style.display='none';
   let width, alpha=1;
   if(S.tool==='highlighter'){ width=Math.min(26, v*4.5); alpha=0.45; }
   else if(S.tool==='eraser'){ width=Math.min(28, Math.max(10, v*3)*1.8); } /* whiteout paints a page-coloured stroke */
   else if(isShapeTool(S.tool) || S.tool==='compass'){ width=Math.max(1.5, v*1.4); }
   else if(S.tool==='calligraphy'){ width=v*1.7; }
   else { width=v*1.8; }
-  x.strokeStyle= S.tool==='eraser'? '#c9c2ae' : S.color;
-  x.globalAlpha= (S.tool==='eraser')? 1 : alpha;
-  x.lineWidth=Math.max(1,width);
-  x.beginPath(); x.moveTo(5,midY+3); x.quadraticCurveTo(c.width/2,midY-4,(c.width-5),midY+3); x.stroke();
-  x.globalAlpha=1;
+  path.setAttribute('stroke', S.tool==='eraser'? '#c9c2ae' : S.color);
+  path.setAttribute('stroke-width', Math.max(1, width));
+  path.setAttribute('opacity', (S.tool==='eraser')? 1 : alpha);
+  path.setAttribute('stroke-dasharray', (S.strokeStyle==='dashed')? '14 10' : 'none');
 }
 function eraseAt(pt){
   let p=curPageObj(); if(!p) return;
@@ -2367,10 +2366,11 @@ document.addEventListener('keydown',e=>{
 });
 
 
-/* P2: on phones the Draw/Insert/Page/Notes&Audio controls live in the
-   inspector's bottom-sheet tabs; on wider screens they live in the
-   rails and under the canvas. The nodes themselves move -- same ids,
-   same handlers -- so nothing is duplicated or re-bound. */
+/* Screen 10: the inspector is Tools & Paper only -- no tabs, so no
+   nodes move into it. The rail panels and the written-notes/audio
+   blocks stay where they are at every width: in the left rail on
+   desktop, stacked below the canvas on phones/tablets (the same
+   single-column layout tablets already used). */
 let edSheetMode=null;
 function layoutEditorSheet(){
   /* Links panel state is applied on every layout pass (load + resize)
@@ -2385,33 +2385,20 @@ function layoutEditorSheet(){
   try{
   var pp=$('pagesPanel'), rp=$('railPages'), rl=$('railLayers'),
       nb=document.querySelector('.noteBlock'), sr=document.querySelector('.studioRow'),
-      tabPage=$('sheetTabPage'), tabDraw=$('sheetTabDraw'), tabNotes=$('sheetTabNotes'),
       stage=$('stageWrap'), th=$('tableHost');
-  if(!pp||!rp||!rl||!nb||!sr||!tabPage||!tabDraw||!tabNotes||!stage||!th) return;
-  if(mobile){
-    tabPage.appendChild(rp);
-    tabDraw.appendChild(rl);
-    tabNotes.appendChild(nb);
-    tabNotes.appendChild(sr);
-    /* Each panel lives alone in its own sheet tab now, so both must be
-       shown: the rail tab buttons that used to toggle them are inside
-       #pagesPanel, which hides on mobile. */
-    rp.hidden=false; rl.hidden=false;
-    pp.classList.add('mobileMoved');
-  }else{
-    var d=$('editorSheet'); if(d) d.style.height='';
-    var help=pp.querySelector('.helpBox');
-    pp.appendChild(rp); pp.appendChild(rl); if(help) pp.appendChild(help);
-    /* Restore the rail-tab state the buttons show (Pages by default). */
-    switchRailTab(($('railTabLayers') && $('railTabLayers').getAttribute('aria-selected')==='true') ? 'layers' : 'pages');
-    /* Pass 2 audit (mockup 17): on desktop the notes + audio live in
-       the .notesAudioRow flex row (side by side) — put them back in
-       the wrapper, not loose before the status bar. */
-    var wrap=document.querySelector('.notesAudioRow');
-    if(wrap){ wrap.appendChild(nb); wrap.appendChild(sr); }
-    else { var anchor=$('editorStatus')||th; var parent=anchor.parentNode; parent.insertBefore(nb, anchor); parent.insertBefore(sr, anchor); }
-    pp.classList.remove('mobileMoved');
-  }
+  if(!pp||!rp||!rl||!nb||!sr||!stage||!th) return;
+  var d=$('editorSheet'); if(d) d.style.height='';
+  var help=pp.querySelector('.helpBox');
+  pp.appendChild(rp); pp.appendChild(rl); if(help) pp.appendChild(help);
+  /* Restore the rail-tab state the buttons show (Pages by default). */
+  switchRailTab(($('railTabLayers') && $('railTabLayers').getAttribute('aria-selected')==='true') ? 'layers' : 'pages');
+  /* Pass 2 audit (mockup 17): on desktop the notes + audio live in
+     the .notesAudioRow flex row (side by side) -- put them back in
+     the wrapper, not loose before the status bar. */
+  var wrap=document.querySelector('.notesAudioRow');
+  if(wrap){ wrap.appendChild(nb); wrap.appendChild(sr); }
+  else { var anchor=$('editorStatus')||th; var parent=anchor.parentNode; parent.insertBefore(nb, anchor); parent.insertBefore(sr, anchor); }
+  pp.classList.remove('mobileMoved');
   }catch(err){ try{ console.warn('layoutEditorSheet', err); }catch(e){} }
 }
 /* P2: drag the inspector's grip to resize the bottom sheet (phones). */
@@ -2452,9 +2439,9 @@ function loadPageIntoEditor(){
   let nb=curNb(); if(!nb) return;
   let p=nb.pages[nb.cur];
   decodeBgPdfImg(p); /* restored pages decode their PDF background on view, not at startup */
-  $('templateSel').value=nb.template;
+  $('templateSel').value=nb.template; syncTemplateTiles(nb.template);
   $('noteText').value=p.text||'';
-  if(!p.texts) p.texts=[]; if(!p.images) p.images=[]; if(!p.texs) p.texs=[]; if(!p.bgColor) p.bgColor='#fffdf6';
+  if(!p.texts) p.texts=[]; if(!p.images) p.images=[]; if(!p.texs) p.texs=[]; if(!p.bgColor) p.bgColor='#FAF7F0';
   let bgSel=$('pageBgSel'); if(bgSel) bgSel.value=p.bgColor; syncPageBgSwatches(p.bgColor);
   S.selection=[]; S.selRect=null; let sb=$('selBar'); if(sb) sb.classList.remove('open');
   redrawAll(); rescaleCanvases(); renderStickies(); renderTable(); renderPages(); refreshLinks(); updateWordCount(); updateAudioUI(); renderCanvasTexts(); renderCanvasImages(); renderTexLayer(); let btr=$('backToReadingBtn'); if(btr) btr.classList.toggle('hidden',!nb.pdfBookId);
@@ -2496,12 +2483,11 @@ function editorPageStep(d){
   let i=nb.cur+d; if(i<0 || i>=nb.pages.length) return;
   switchPage(i);
 }
-/* Page-navigation pill label: jump to the thumbnails. On phones the
-   thumbnails live in the inspector's Page tab (layoutEditorSheet moves
-   #railPages there at <=768px); on tablets (769-1024px) they stay in
-   #pagesPanel, which is stacked below the stage in the single-column
-   layout — so reveal that panel instead of opening an inspector tab
-   that has no thumbnails in it. */
+/* Page-navigation pill label: on phones it opens the Tools & Paper
+   inspector scrolled to the PAGE section (Screen 10: the sheet has
+   no tabs any more); the thumbnails themselves live in #pagesPanel,
+   stacked below the stage in the single-column layout — on tablets
+   (769-1024px) reveal that panel instead. */
 function openPageNavList(){
   if(window.matchMedia('(max-width:768px)').matches){ openInspector('page'); return; }
   var pp=$('pagesPanel'); if(!pp) return;
@@ -2935,8 +2921,9 @@ function closeRailPanel(){
 function toggleRailPanel(which){ if(railOpen===which) closeRailPanel(); else openRailPanel(which); }
 /* Screen 09: top-bar rail toggle. Desktop (>=1025px) collapses the 210px
    rail in place; tablet (769-1024px) opens it as a slide-over drawer;
-   on phones (<=768px) the Pages list lives in the inspector's Page tab
-   (layoutEditorSheet moves it there), so the toggle opens that sheet. */
+   on phones (<=768px) it opens the Tools & Paper inspector scrolled
+   to the PAGE section (Screen 10: the sheet has no tabs any more;
+   the Pages list itself lives in #pagesPanel below the stage). */
 function toggleEditorRail(){
   var b=$('editorRailToggle');
   if(window.matchMedia('(max-width:768px)').matches){ openInspector('page'); return; }
@@ -3267,15 +3254,6 @@ document.addEventListener('pointerdown',e=>{
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){ var pop=$('shapePop'); if(pop&&pop.classList.contains('open')) closeShapePop(); var cp=$('colorPop'); if(cp&&cp.classList.contains('open')) closeColorPop(); var zp=$('sizePop'); if(zp&&zp.classList.contains('open')) closeSizePop(); if(S.view==='editor' && S.selection.length) clearSelection(); }
 });
-/* P2: inspector sheet tabs (Draw | Insert | Page | Notes & Audio). */
-function switchSheetTab(tab){
-  ['draw','insert','page','notes'].forEach(t=>{
-    var cap=t[0].toUpperCase()+t.slice(1);
-    var b=$('sheetTabBtn'+cap), p=$('sheetTab'+cap);
-    if(b) b.setAttribute('aria-selected',String(t===tab));
-    if(p) p.hidden=(t!==tab);
-  });
-}
 /* P2: page-colour swatches (the select stays as the state mirror). */
 function hexToRgb(h){ h=String(h||'').replace('#',''); return 'rgb('+parseInt(h.substr(0,2),16)+', '+parseInt(h.substr(2,2),16)+', '+parseInt(h.substr(4,2),16)+')'; }
 function syncPageBgSwatches(v){
@@ -3290,20 +3268,99 @@ function pickPageBg(v){
   var sel=$('pageBgSel'); if(sel) sel.value=v;
   setPageBg(v); syncPageBgSwatches(v);
 }
-/* P2: open the Tools & Insert inspector (side drawer on desktop,
-   4-tab bottom sheet on mobile). */
+/* Screen 10: open the Tools & Paper inspector (side drawer on
+   desktop/tablet, bottom sheet on mobile). 'draw' opens at the top;
+   'page' opens scrolled to the PAGE section (the phone rail toggle
+   and the page-nav pill both use it); anything else opens at the top. */
+/* Screen 10 fix round: opening the sheet on desktop/tablet closes
+   the left rail so the paper uses the full width (as the mockups draw
+   it — rail closed, paper ~900px wide at 1280); closing the sheet
+   restores the rail to the state it was in. Phones keep their own
+   rail behaviour (the sheet is a bottom sheet there). The restore
+   runs on every close path via the dialog's 'close' event (Esc, X,
+   backdrop tap, programmatic close) — the dialog guide's sanctioned
+   hook for post-close work. */
+var sheetRailSaved=null; /* {hidden:boolean} on desktop, {panel:string|null} on tablet */
+function sheetRailCloseForSheet(){
+  if(window.matchMedia('(max-width:768px)').matches) return;
+  if(window.matchMedia('(max-width:1024px)').matches){
+    sheetRailSaved={panel:railOpen};
+    if(railOpen) closeRailPanel();
+  } else {
+    var v=$('view-editor');
+    sheetRailSaved={hidden: v ? v.classList.contains('railHidden') : true};
+    if(v && !v.classList.contains('railHidden')){
+      v.classList.add('railHidden');
+      var b=$('editorRailToggle'); if(b) b.setAttribute('aria-pressed','false');
+    }
+  }
+}
+function sheetRailRestoreAfterSheet(){
+  if(!sheetRailSaved) return;
+  var saved=sheetRailSaved; sheetRailSaved=null;
+  if(window.matchMedia('(max-width:768px)').matches) return;
+  if(window.matchMedia('(max-width:1024px)').matches){
+    if(saved.panel) openRailPanel(saved.panel);
+  } else {
+    var v=$('view-editor'); if(!v) return;
+    v.classList.toggle('railHidden', !!saved.hidden);
+    var b=$('editorRailToggle'); if(b) b.setAttribute('aria-pressed', String(!saved.hidden));
+  }
+}
 function openInspector(section){
   var d=$('editorSheet'); if(!d) return;
-  if(!d.open) d.showModal();
-  var b=$('pillInsertBtn'); if(b) b.setAttribute('aria-expanded','true');
-  if(section && typeof switchSheetTab==='function') switchSheetTab(section);
+  var wasOpen=d.open;
+  if(!wasOpen){ d.showModal(); sheetRailCloseForSheet(); }
+  syncSheetSegs();
+  var body=d.querySelector('.sheetBody');
+  var target= section==='page' ? $('sheetSectionPage') : null;
+  requestAnimationFrame(function(){
+    if(!body) return;
+    /* Instant, not smooth: html sets scroll-behavior:smooth, and a
+       gliding jump here stalls (or never lands) in headless Chrome —
+       the rail toggle must land on PAGE at once. Scroll ONLY the
+       sheet body: scrollIntoView would also scroll the dialog itself
+       (its grip and title slide out of view), and the jump clamps at
+       the body's max scroll — PAGE lands as high as the content
+       allows, fully in view. */
+    if(target){
+      var top=target.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop;
+      body.scrollTo({top:Math.max(0, top), behavior:'instant'});
+    } else body.scrollTo({top:0, behavior:'instant'});
+  });
 }
-/* Pass 2 audit (mockup 17): on desktop the pill's Insert button opens a
-   popover menu under the pill (menu guide: popover + focusgroup,
-   script-positioned like the + New menu); on phones it opens the
-   inspector sheet, as before. */
+/* Screen 10: keep every segmented control in the sheet in sync with
+   the live setting when the sheet opens (the settings can also change
+   from the dock popovers). */
+function syncSheetSegs(){
+  var st=$('strokeStyleSeg'); if(st) st.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.getAttribute('data-style')===S.strokeStyle)));
+  /* No visible pen-button control (fix round: removed at the user's
+     explicit direction — the toolbar dock already has the Eraser
+     tool); the #stylusBtnSel mirror keeps its value for
+     applyStylusButton. */
+  syncToolbarDensitySeg();
+  var nb=curNb(); if(nb) syncTemplateTiles(nb.template);
+  var p=curPageObj(); if(p) syncPageBgSwatches(p.bgColor);
+  updateSizeUI();
+}
+function syncToolbarDensitySeg(){
+  var tb=$('mainToolbar'); if(!tb) return;
+  var v= tb.classList.contains('compact')? 'compact' : tb.classList.contains('minimal')? 'minimal' : '';
+  var seg=$('toolbarDensitySeg'); if(seg) seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.getAttribute('data-density')===v)));
+}
+function setStrokeStyle(v){ S.strokeStyle=v; var seg=$('strokeStyleSeg'); if(seg) seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.getAttribute('data-style')===v))); updateSizeUI(); }
+/* Screen 10 fix round: the "Pen button" row is gone — the user
+   confirmed explicitly that the toolbar dock already has the
+   Eraser tool, so the sheet must not duplicate it. The hidden
+   #stylusBtnSel mirror stays (default 'eraser', still read by
+   applyStylusButton); setStylusBtn keeps writing it. */
+function setStylusBtn(v){ var sel=$('stylusBtnSel'); if(sel) sel.value=v; }
+function setToolbarDensity(v){ setToolbarLayout(v); syncToolbarDensitySeg(); }
+/* Screen 10: the pill's Insert button opens the insert popover menu
+   at every width (the menu flips above the pill when there is no
+   room below, so it works from the phone bottom dock too). The
+   inspector sheet is Tools & Paper only now. */
 function onPillInsertClick(){
-  if(window.matchMedia('(max-width:768px)').matches){ openInspector('insert'); return; }
   let m=$('insertMenu'); if(!m) return;
   if(m.matches(':popover-open')) m.hidePopover(); else m.showPopover({source:$('pillInsertBtn')});
 }
@@ -3332,7 +3389,7 @@ function focusWrittenNotes(){ let t=$('noteText'); if(t){ t.scrollIntoView({bloc
 /* Toolbar guide: focusgroup gives the roving tab stop natively; where
    it is unsupported, a small roving-tabindex fallback does the same. */
 (function(){
-  var d=$('editorSheet'); if(d) d.addEventListener('close',()=>{ var b=$('pillInsertBtn'); if(b) b.setAttribute('aria-expanded','false'); });
+  var d=$('editorSheet'); if(d) d.addEventListener('close',()=>{ var b=$('pillInsertBtn'); if(b) b.setAttribute('aria-expanded','false'); sheetRailRestoreAfterSheet(); });
   if('focusGroup' in HTMLElement.prototype) return;
   var bar=$('mainToolbar'); if(!bar) return;
   function items(){ return Array.from(bar.querySelectorAll('button:not([disabled])')).filter(b=>b.offsetParent!==null); }
@@ -3348,7 +3405,7 @@ function focusWrittenNotes(){ let t=$('noteText'); if(t){ t.scrollIntoView({bloc
 })();
 function closeAllPopovers(){ closeAllToolPops(); closeExportPop(); }
 const TOOL_LABELS={pen:'Pen',calligraphy:'Calligraphy',highlighter:'Highlighter',eraser:'Eraser',hand:'Hand',select:'Select',text:'Text',line:'Line',rect:'Rectangle',ellipse:'Ellipse',arrow:'Arrow',spline:'Spline',compass:'Compass',lasso:'Lasso',vspace:'Vertical space'};
-function updateToolOptsUI(){ var label=TOOL_LABELS[S.tool]||'Tool'; var btn=$('toolOptsBtn'); if(btn) btn.innerHTML=label+' options '+icon('chevron-down','ic-sm'); var title=$('toolOptsTitle'); if(title) title.textContent=label+' options'; document.querySelectorAll('.toolOptSection').forEach(sec=>{ var tools=(sec.getAttribute('data-tools')||'').split(/\s+/); sec.classList.toggle('show', tools.indexOf(S.tool)>=0); }); }
+function updateToolOptsUI(){ document.querySelectorAll('.toolOptSection').forEach(sec=>{ var tools=(sec.getAttribute('data-tools')||'').split(/\s+/); sec.classList.toggle('show', tools.indexOf(S.tool)>=0); }); }
 function updateStatusBar(){ var nb=curNb(); var sp=$('statusPage'); if(sp && nb) sp.textContent=(nb.cur+1)+' / '+nb.pages.length; var sl=$('statusLayer'); if(sl){ var inkOn=!$('layerInkTgl')||$('layerInkTgl').checked; var hiOn=!$('layerHiTgl')||$('layerHiTgl').checked; sl.textContent= S.tool==='highlighter'?'Highlight': (inkOn&&hiOn?'Ink + Highlight': inkOn?'Ink': hiOn?'Highlight':'None'); } var lc=$('layerChip'); if(lc) lc.textContent='Layer: '+(S.tool==='highlighter'?'Highlight':'Ink'); var sz=$('statusZoom'); if(sz) sz.textContent=Math.round((typeof editorZoom!=='undefined'?editorZoom:1)*100)+'%'; var st=$('statusTool'); if(st) st.textContent=TOOL_LABELS[S.tool]||S.tool;
   /* Page-navigation pill: same numbers as the status bar, updated on
      every path that changes the page (renderPages calls this on every

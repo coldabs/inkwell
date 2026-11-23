@@ -259,7 +259,6 @@ progress{width:100%;height:6px;accent-color:var(--accent)}
 .sizeGroup{display:inline-flex;align-items:center;gap:8px;flex:0 0 auto;white-space:nowrap;min-height:34px}
 .sizeGroup input[type=range]{width:96px}
 .sizeWord{font-size:11px;font-weight:600;white-space:nowrap;color:var(--text)}
-#sizePreview{width:44px;height:22px;display:block;flex:0 0 auto}
 .swatch{position:relative;width:24px;height:24px;min-height:24px;padding:0;border:1px solid rgba(0,0,0,.18);border-radius:50%;flex:0 0 auto;box-shadow:0 0 0 1px transparent}
 .swatch::after{content:"";position:absolute;inset:-10px}
 .swatch.active{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--text)}
@@ -1385,36 +1384,23 @@ body.inEditor .pageNavFab{display:flex}
 .railTab{flex:1;min-height:44px;padding:8px 4px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer}
 .railTab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
 
-/* --- inspector: side drawer on desktop, 4-tab bottom sheet on mobile --- */
+/* --- inspector: side drawer on desktop, bottom sheet on mobile --- */
 #editorSheet .sheetGrip{display:none}
-/* Pass 2 audit (mockups 7/8): no title row on the mobile sheet; on the
-   desktop drawer the title is gone too (mockup 8 starts at Pen
-   Options) and the close is the terracotta X, right-aligned. */
-#editorSheet .sheetHead h2{display:none}
-#editorSheet .sheetHead{justify-content:flex-end}
-@media (max-width:768px){#editorSheet .sheetHead{display:none}}
+/* Screen 10: the header is visible at every width — "Tools & Paper"
+   in Newsreader serif with the terracotta X close. (The Pass 2
+   audit hid the title; the Screen 10 mockups show it.) */
 /* Mockup 8 shows the canvas undimmed beside the panel: the drawer
    backdrop is transparent on desktop (the dialog stays modal — the
    canvas is visible but not clickable while the panel is open). */
 @media (min-width:769px){#editorSheet::backdrop{background:transparent;backdrop-filter:none}}
-.sheetTabs{display:none}
 @media (max-width:768px){
   dialog.sheet#editorSheet.drawerRight{width:min(560px,100vw);height:auto;max-height:92dvh;margin:auto auto 0;border:1px solid var(--border);border-left:1px solid var(--border);border-radius:18px 18px 0 0}
   #editorSheet .sheetGrip{display:block;width:40px;height:5px;border-radius:999px;background:var(--border-strong);margin:10px auto 0;cursor:grab;touch-action:none;flex:none}
-  .sheetTabs{display:flex;flex:none;gap:4px;padding:0 12px;border-bottom:1px solid var(--border)}
-  .sheetTab{flex:1;min-width:0;min-height:48px;padding:8px 2px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  /* Pass 2 audit (mockup 7): the active tab is a terracotta filled
-     pill, not an underline. */
-  .sheetTab[aria-selected="true"]{color:var(--accent-text);background:var(--accent);border-bottom-color:transparent;border-radius:999px}
-  .sheetTabPanel[hidden]{display:none}
-}
-@media (min-width:769px){
-  .sheetTabPanel[hidden]{display:block}
 }
 
 /* --- switches (switch guide: native checkbox + switch attribute,
    custom track/knob fallback so Chrome renders the same switch) --- */
-#editorSheet label.switchRow{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:48px;padding:8px 0;font-size:13px;font-weight:500;cursor:pointer}
+#editorSheet label.switchRow{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:28px;padding:0;font-size:13px;font-weight:500;cursor:pointer}
 #editorSheet label.switchRow span{flex:1}
 .switchRow input[type="checkbox"][switch]{appearance:none;-webkit-appearance:none;width:48px;height:28px;min-height:28px;margin:0;border:1px solid var(--border-strong);border-radius:999px;background:var(--paper2);position:relative;cursor:pointer;flex:0 0 auto;transition:background .15s ease}
 .switchRow input[type="checkbox"][switch]::after{content:"";position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .15s ease}
@@ -1438,7 +1424,7 @@ body.inEditor .pageNavFab{display:flex}
 
 /* --- Page colour swatches --- */
 .pageSwatches{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.pageSwatch{width:32px;height:32px;min-height:32px}
+.pageSwatch{width:24px;height:24px;min-height:24px}
 .pageSwatch.active{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--text)}
 /* Pass 2 audit (mockup 8): a visible label under each page swatch. */
 .pageSwatchWrap{display:inline-flex;flex-direction:column;align-items:center;gap:4px}
@@ -2206,4 +2192,98 @@ body.prOn #readerMobileBar{display:none}
   #view-editor .canvasShell{margin-top:0;border:0;border-radius:0;box-shadow:none}
   #view-editor .zoomFab{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
   #view-editor .pageNavFab{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+}
+
+/* ============ Screen 10: Tools & Paper inspector ============
+   Single-scroll panel: Pen options / Size & colour / Page /
+   Toolbar density. Right slide-over drawer ~360px on desktop/tablet,
+   slide-up bottom sheet on mobile. 100% opaque surface throughout —
+   no glass, no backdrop blur on the sheet itself. */
+@media (min-width:769px){ dialog.sheet.drawerRight#editorSheet{width:min(360px,100vw)} }
+/* Header: visible at every width. Newsreader serif title (design
+   system: headings in Newsreader); the small "Inkwell" wordmark
+   shows on tablet only, per the mockup. */
+#editorSheet .sheetHead{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+#editorSheet .sheetHead h2{display:block;font-family:var(--font-display);font-size:19px;font-weight:600}
+#editorSheet .sheetWordmark{display:none}
+@media (min-width:769px) and (max-width:834px){
+  #editorSheet .sheetWordmark{display:block;flex:1 1 100%;font:600 11px/1 var(--font-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  #editorSheet .sheetHead h2{flex:1}
+}
+@media (min-width:835px) and (max-width:1024px){
+  /* Landscape tablet: the wordmark sits inline on the title row
+     (the portrait mockup's two-row header would cost 19px of the
+     768px-tall viewport — the fit budget needs it here; the
+     wordmark still shows). */
+  #editorSheet .sheetWordmark{display:block;flex:0 0 auto;font:600 11px/1 var(--font-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  #editorSheet .sheetHead h2{flex:1}
+}
+@media (max-width:768px){
+  /* Mobile bottom sheet: grip + centred title; the X stays hidden
+     (mockup shows the title only — dismiss via grip, backdrop or Esc). */
+  #editorSheet .sheetHead{padding:2px 16px 10px}
+  #editorSheet .sheetHead h2{text-align:center}
+  #editorSheet .sheetHead .drawerClose{display:none}
+}
+/* Segmented controls (Style, Toolbar density): grey
+   track, the active segment a raised white pill — as the mockups
+   draw it. */
+#editorSheet .segCtl{display:flex;flex:1;min-width:0;padding:2px;gap:2px;border-radius:999px;background:var(--paper2)}
+#editorSheet .segCtl button{flex:1;min-width:0;min-height:30px;padding:4px 8px;border:0;border-radius:999px;background:transparent;color:var(--muted);font:600 12px/1.2 var(--font-ui);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+#editorSheet .segCtl button[aria-pressed="true"]{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.18)}
+#editorSheet .segCtl button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* Smoothness slider end labels. */
+#editorSheet .sliderRow{padding-bottom:0}
+#editorSheet .sliderEnds{display:flex;justify-content:space-between;padding:0 0 2px;font-size:11px;color:var(--muted)}
+/* Size preview: on desktop/tablet the live SVG stroke curve is a
+   full-width box (as the mockup draws it) with the Size slider row
+   beneath it; on phones it stays the compact box beside the slider
+   (mobile mockup). */
+#editorSheet .sizeTopRow{display:flex;gap:12px;align-items:center;padding:4px 0}
+#editorSheet .sizePreviewBox{flex:0 0 120px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);padding:4px 8px}
+#editorSheet .sizePreviewBox svg{display:block;width:100%;height:36px}
+#editorSheet .sizeTopRow .sizeGroup{flex:1;min-width:0}
+#editorSheet .sizeTopRow .sizeGroup input[type=range]{flex:1;min-width:60px}
+@media (min-width:769px){
+  #editorSheet .sizeTopRow{flex-direction:column;align-items:stretch;gap:6px}
+  #editorSheet .sizePreviewBox{flex:1 1 auto;padding:2px 8px}
+  #editorSheet .sizePreviewBox svg{height:36px}
+  #editorSheet .sizeTopRow .sizeGroup{min-height:30px}
+}
+/* Template tiles: 4-across grid on desktop/tablet, scroll row on
+   phones (see the mobile rule above). */
+#editorSheet .templateTiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+#editorSheet .templateTile{display:flex;flex-direction:column;gap:4px;min-width:0;padding:4px 4px 2px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font:600 11px/1.2 var(--font-ui);text-align:center;cursor:pointer}
+#editorSheet .templateTile.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+#editorSheet .templateTile span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#editorSheet .tplPrev{display:block;height:24px;border:1px solid var(--border);border-radius:4px;background:var(--surface)}
+#editorSheet .tpl-lined{background-image:repeating-linear-gradient(to bottom,transparent 0 8px,var(--border-strong) 8px 9px)}
+#editorSheet .tpl-grid{background-image:repeating-linear-gradient(to right,transparent 0 9px,var(--border-strong) 9px 10px),repeating-linear-gradient(to bottom,transparent 0 9px,var(--border-strong) 9px 10px)}
+#editorSheet .tpl-dotted{background-image:radial-gradient(var(--border-strong) 1px,transparent 1.2px);background-size:10px 10px}
+#editorSheet .tpl-music{background-image:repeating-linear-gradient(to bottom,var(--border-strong) 0 1px,transparent 1px 7px)}
+#editorSheet .tpl-cornell{background-image:linear-gradient(to right,transparent 0 30%,var(--border-strong) 30% calc(30% + 1px),transparent calc(30% + 1px)),linear-gradient(to bottom,transparent 0 62%,var(--border-strong) 62% calc(62% + 1px),transparent calc(62% + 1px)),repeating-linear-gradient(to bottom,transparent 0 8px,var(--border-strong) 8px 9px)}
+#editorSheet .tpl-checklist{background-image:linear-gradient(var(--border-strong),var(--border-strong)),linear-gradient(var(--border-strong),var(--border-strong));background-size:9px 9px,9px 9px;background-position:8px 8px,8px 24px;background-repeat:no-repeat}
+/* Screen 10 fix round: the "Pen button" row is gone (the toolbar
+   dock already has the Eraser tool) — no replacement control. The
+   compact fit below is what makes all four sections + header fit
+   without scrolling at 1280x900 / 1024x768 / 834x1112 (measured by
+   scrollHeight vs clientHeight of the sheet body). */
+#editorSheet .sheetSection{padding:6px 0}
+#editorSheet .sheetSection>h3{margin-bottom:2px}
+#editorSheet .sheetBody{padding:2px 16px calc(2px + env(safe-area-inset-bottom,0px))}
+#editorSheet .sheetSection .popRow{padding:0}
+#editorSheet .sheetHead{padding:8px 16px 6px;gap:8px}
+#editorSheet .popChecks{gap:2px!important}
+/* Small-caps sub-labels inside a section ("Template icons",
+   "Page colour") — as the mockups draw them. */
+#editorSheet .sheetSubLabel{font:600 10px/1.3 var(--font-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+#editorSheet .pageColourRow{padding-top:0}
+
+/* Screen 10: mobile template tiles scroll horizontally (mockup cuts
+   off at "Checkl…"). Kept after the grid rule on purpose: same
+   specificity, so this must come later to win at <=768px. */
+@media (max-width:768px){
+  #editorSheet .templateTiles{display:flex;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  #editorSheet .templateTiles::-webkit-scrollbar{display:none}
+  #editorSheet .templateTile{flex:0 0 76px}
 }
