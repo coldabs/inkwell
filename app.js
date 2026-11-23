@@ -3640,13 +3640,30 @@ function setReaderMode(m){
   toast(m==='scroll'?'Scroll view':'Page view, one at a time. Use Prev and Next.');
 }
 function setReaderTheme(v){ $('readerArticle').className='reader '+v; $('parallelRead').dataset.theme=v; let pv=$('pdfView'); pv.style.filter= v==='dark'? 'invert(0.92) hue-rotate(180deg)':''; }
-function readerFont(d){ let cur=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--reader-fs'))||19; let next=Math.max(15,Math.min(26,cur+d*1.5)); document.documentElement.style.setProperty('--reader-fs',next+'px'); }
+function readerFont(d){ let cur=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--reader-fs'))||19; let next=Math.max(15,Math.min(26,cur+d*1.5)); document.documentElement.style.setProperty('--reader-fs',next+'px'); let s=$('readerFontSlider'); if(s) s.value=next; }
+function readerFontSlider(v){ let next=Math.max(15,Math.min(26,+v||19)); document.documentElement.style.setProperty('--reader-fs',next+'px'); }
 function toggleReaderSide(){ prLeave(); $('readerSide').classList.toggle('open'); }
+/* P4: the reader side panel is a 4-tab rail now (Contents / Bookmarks /
+   Annotations / Thumbnails, mockup 18) — tabs guide: aria-selected drives
+   the style, initial state is in the HTML. */
+function readerSideTab(name,open){
+  let tabs=['contents','bookmarks','annotations','thumbnails'];
+  tabs.forEach(n=>{ let t=$('sideTab-'+n), p=$('sidePanel-'+n); if(t){ let on=n===name; t.setAttribute('aria-selected',String(on)); if(on) t.setAttribute('focusgroupstart',''); else t.removeAttribute('focusgroupstart'); } if(p) p.hidden=(n!==name); });
+  if(open){ let s=$('readerSide'); if(s) s.classList.add('open'); }
+}
+function setReaderThemeSwatch(v){ let s=$('themeSel'); if(s) s.value=v; setReaderTheme(v); syncReaderThemeUI(); }
+function syncReaderThemeUI(){ let v=($('themeSel')||{}).value||''; document.querySelectorAll('#readerThemeSwatches .themeSwatch').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.theme===v))); }
+function syncTtsRateLabel(){ let r=$('ttsRate'), v=$('ttsRateVal'); if(r&&v) v.textContent=(+r.value).toString()+'×'; }
+let _sheetDrag=null;
+function sheetDragStart(ev){ if(ev.isPrimary===false) return; let d=ev.target.closest('dialog'); if(!d) return; _sheetDrag={d:d,y0:ev.clientY,dy:0}; try{ ev.target.setPointerCapture(ev.pointerId); }catch(e){} window.addEventListener('pointermove',sheetDragMove); window.addEventListener('pointerup',sheetDragEnd,{once:true}); }
+function sheetDragMove(ev){ if(!_sheetDrag) return; let dy=Math.max(0,ev.clientY-_sheetDrag.y0); _sheetDrag.dy=dy; _sheetDrag.d.style.transform='translateY('+dy+'px)'; }
+function sheetDragEnd(){ if(!_sheetDrag) return; let s=_sheetDrag; _sheetDrag=null; window.removeEventListener('pointermove',sheetDragMove); s.d.style.transform=''; if(s.dy>90) s.d.close(); }
 function updateResume(){ updateReadProgress();
   let b=curBook(); if(!b) return;
   scheduleSave();
   if(b.kind==='pdf'){ $('pageLabel').textContent='Page '+b.page+' / '+b.numPages; $('resumeLabel').textContent='Reading · '+b.title+' · Page '+b.page+' of '+b.numPages+' · '+Math.round(b.page/b.numPages*100)+'%. Resumes here.'; S.stats.pagesRead['pdf:'+b.id+':'+b.page]=1; }
   else { $('pageLabel').textContent='Chapter '+(b.ch+1)+' / '+b.chapters.length; $('resumeLabel').textContent='Reading · '+b.title+' · Chapter '+(b.ch+1)+' of '+b.chapters.length+'. Resumes here.'; S.stats.pagesRead['epub:'+b.id+':'+b.ch]=1; }
+  let tw=$('ttsWhere'); if(tw) tw.textContent=$('pageLabel').textContent;
   syncBookmarkBtn();
 }
 
@@ -3658,6 +3675,7 @@ function renderEpubBook(){
   ['ocrBox'].forEach(id=>{ let el=$(id); if(el && el.closest('#readerBody')) $('readerArticle').appendChild(el); });
   $('readerBadge').textContent=(b.sample?'Sample book':'EPUB')+' • '+b.chapters.length+' chapters';
   $('readerTitle').textContent=b.title;
+  let rt=$('readerTopTitle'); if(rt) rt.textContent=b.title;
   let body=$('readerBody');
   if(b.mode==='page'){ let c=b.chapters[b.ch]; body.innerHTML='<h3>'+esc(c.title)+'</h3>'+c.html; }
   else { body.innerHTML=b.chapters.map((c,i)=>'<div data-ch="'+i+'"><h3>'+esc(c.title)+'</h3>'+c.html+'</div>').join(''); }
@@ -3950,6 +3968,7 @@ async function renderPdfBook(){
   if(pdfObserver){ pdfObserver.disconnect(); pdfObserver=null; }
   if(pdfDrawIO){ pdfDrawIO.disconnect(); pdfDrawIO=null; }
   $('pdfName').textContent=b.title||b.fileName;
+  let rt2=$('readerTopTitle'); if(rt2) rt2.textContent=b.title||b.fileName;
   $('pdfMeta').textContent=b.numPages+' page'+(b.numPages===1?'':'s')+' • Fit to width • Text is selectable';
   let st=$('pdfStatus'); st.classList.remove('hidden'); st.textContent='Rendering pages…';
   let live=()=> token===pdfToken && curBook()===b && S.view==='reader';
@@ -4092,6 +4111,7 @@ function syncBookmarkBtn(){
   let at= b.kind==='pdf'? b.page : b.ch;
   let on=(b.bookmarks||[]).some(x=>x.at===at);
   btn.classList.toggle('marked',on); btn.setAttribute('aria-pressed',String(on));
+  let tb=$('readerTopBookmarkBtn'); if(tb){ tb.classList.toggle('marked',on); tb.setAttribute('aria-pressed',String(on)); }
 }
 function toggleBookmark(){
   let b=curBook(); if(!b){ toast('Open a book first'); return; }
@@ -4102,8 +4122,8 @@ function toggleBookmark(){
   syncBookmarkBtn();
   renderReaderSide();
   /* P7: open the Bookmarks panel so the new bookmark is actually
-     visible, it used to land inside a collapsed <details>. */
-  let bd=$('bookmarkDetails'); if(bd) bd.open=true;
+     visible — the old <details> is now the 4-tab rail. */
+  readerSideTab('bookmarks',true);
 }
 function changePage(d){
   let b=curBook(); if(!b){ toast('Open a book first'); return; }
@@ -4371,7 +4391,7 @@ function annotateSelection(kind){
   sel.removeAllRanges();
   renderReaderSide(); renderLibrary(); scheduleSave(); syncReaderToolUI();;
   /* P7: open the Annotations panel so the new entry is visible. */
-  let ad=$('annoDetails'); if(ad) ad.open=true;
+  readerSideTab('annotations',true);
   toast((kind==='highlight'?'Highlighted': kind==='underline'?'Underlined':'Struck through')+' & saved to annotations');
 }
 function highlightSelection(){ annotateSelection('highlight'); }
@@ -4638,7 +4658,7 @@ async function ocrSourceCanvas(){
   return null;
 }
 async function saveOcrToPage(book,pageNum,text,words){if(!book||book.kind!=='pdf'||!book.doc)return '';try{let pg=await book.doc.getPage(pageNum);let tc=await pg.getTextContent();if(tc.items.some(i=>(i.str||'').trim()))return 'real';}catch(e){}if(!book.ocrPages)book.ocrPages={};book.ocrPages[pageNum]={text:text,words:words||[],source:'ocr',lang:$('ocrLang').value,at:Date.now()};if(!book.textCache)book.textCache={};book.textCache[pageNum]=text;scheduleSave();ocrRedrawPage(book,pageNum);return 'saved';} async function runOcrOn(source,label){
-  if(!window.Tesseract){ toast('OCR engine could not load. Check the connection.'); return; }
+  if(!window.Tesseract){ hideOcrRegion(); toast('OCR engine could not load. Check the connection.'); return; }
   let st=$('ocrStatus'), pr=$('ocrProgress'), btn=$('ocrRunBtn');
   pr.classList.remove('hidden'); pr.value=0; btn.disabled=true; ocrCancelled=false;let cancelBtn=$('ocrCancelBtn');if(cancelBtn)cancelBtn.classList.remove('hidden');let pdfBook=curBook(),pdfPage=(pdfBook&&pdfBook.kind==='pdf'&&label==='this page')?pdfBook.page:0;st.textContent='Starting OCR ('+label+')…';
   try{
@@ -4649,9 +4669,14 @@ async function saveOcrToPage(book,pageNum,text,words){if(!book||book.kind!=='pdf
     $('ocrNoteBtn').classList.toggle('hidden', !lastOcrText);
     st.textContent= lastOcrText? 'Done. '+lastOcrText.split(/\s+/).length+' words recognised.'+(ocrSaved==='saved'?' Saved to this page, so you can select, highlight and search it after a reload.':ocrSaved==='real'?' This page already has real text, so the recognised text was not saved over it.':'') : 'Nothing recognised.';
   }catch(err){ if(ocrCancelled||(err&&err.message==='cancelled'))st.textContent='OCR cancelled. You can run it again.';else st.textContent='OCR failed ('+(err&&err.message?err.message:'error')+'). Language data downloads on first use, so check the connection and retry.'; }
-  pr.classList.add('hidden');btn.disabled=false;let cb=$('ocrCancelBtn');if(cb)cb.classList.add('hidden');if(ocrWorker){ocrWorker.terminate().catch(()=>{});ocrWorker=null;}
+  pr.classList.add('hidden');btn.disabled=false;let cb=$('ocrCancelBtn');if(cb)cb.classList.add('hidden');hideOcrRegion();if(ocrWorker){ocrWorker.terminate().catch(()=>{});ocrWorker=null;}
 }
-async function ocrRedrawPage(book,pageNum){if(!book||!book.doc)return;document.querySelectorAll('.pdfHolder[data-n="'+pageNum+'"]').forEach(h=>{if(!h.isConnected||h._drawing||h.clientWidth<10)return;h.querySelectorAll('.textLayer').forEach(x=>x.remove());book.doc.getPage(pageNum).then(pg=>{let v0=pg.getViewport({scale:1});renderPdfTextLayer(pg,pg.getViewport({scale:h.clientWidth/v0.width}),h,book,pageNum);}).catch(()=>{});});} async function runOCR(){ let src=await ocrSourceCanvas(); if(!src){ toast('Open a PDF page (or a notebook page) to OCR'); return; } runOcrOn(src,'this page'); }
+async function ocrRedrawPage(book,pageNum){if(!book||!book.doc)return;document.querySelectorAll('.pdfHolder[data-n="'+pageNum+'"]').forEach(h=>{if(!h.isConnected||h._drawing||h.clientWidth<10)return;h.querySelectorAll('.textLayer').forEach(x=>x.remove());book.doc.getPage(pageNum).then(pg=>{let v0=pg.getViewport({scale:1});renderPdfTextLayer(pg,pg.getViewport({scale:h.clientWidth/v0.width}),h,book,pageNum);}).catch(()=>{});});} /* P4: the dashed terracotta OCR region box (mockup 2) marks the page being
+   recognised — the region is the current PDF page; it shows while OCR runs
+   and hides when it finishes, is cancelled or fails. */
+function showOcrRegion(){ let b=curBook(); if(!b||b.kind!=='pdf') return; let h=document.querySelector('.pdfHolder[data-n="'+b.page+'"]'); let r=$('ocrRegion'); if(!h||!r) return; h.appendChild(r); r.classList.remove('hidden'); }
+function hideOcrRegion(){ let r=$('ocrRegion'); if(!r) return; r.classList.add('hidden'); let col=document.querySelector('.readerColumn'); if(col && r.parentNode!==col) col.appendChild(r); }
+async function runOCR(){ showOcrRegion(); let src=await ocrSourceCanvas(); if(!src){ hideOcrRegion(); toast('Open a PDF page (or a notebook page) to OCR'); return; } runOcrOn(src,'this page'); }
 function ocrImageFile(e){ let f=e.target.files[0]; e.target.value=''; if(!f) return; let img=new Image(); img.onload=()=>runOcrOn(img,'image'); img.src=URL.createObjectURL(f); }
 function copyOcrText(){ if(navigator.clipboard) navigator.clipboard.writeText(lastOcrText).then(()=>toast('OCR text copied')); }
 function ocrToNote(){
@@ -4914,7 +4939,7 @@ async function openParallelReadPair(firstId, secondId){
   PR.on=true; PR.lastW=window.innerWidth; document.body.classList.add('prOn');
   $('readerGrid').classList.add('hidden'); $('annotateFab').classList.add('hidden');
   $('parallelRead').classList.remove('hidden');
-  $('prSync').value=L.parallelSync; $('prOffset').value=L.parallelOffset;
+  syncPrSyncSeg(); $('prOffset').value=L.parallelOffset;
   $('prOffsetWrap').classList.toggle('hidden', L.parallelSync!=='unit');
   prFillSecondBtn(L);
   window.scrollTo({top:0});
@@ -5294,10 +5319,22 @@ function prUpdatePositions(){
   updateResume(); /* the left book's resume label + a save */
 }
 function prPickRight(id){ let L=curBook(); if(!L) return; L.parallelWith=id; prFillSecondBtn(L); scheduleSave(); prRenderBoth(); }
+/* P4: Parallel Read top bar (mockup 9) — Sync is a segmented control now,
+   the old <select id="prSync"> is gone; syncPrSyncSeg keeps the segments
+   and the mobile bottom-bar Sync button in step with the book's mode. */
+function syncPrSyncSeg(){ let b=curBook(); if(!b) return; let v=b.parallelSync||'unit'; document.querySelectorAll('#prSyncSeg [data-sync]').forEach(x=>x.classList.toggle('active',x.dataset.sync===v)); let bs=$('prBottomSync'); if(bs) bs.setAttribute('aria-pressed',String(v!=='off')); }
+function prOffsetStep(d){ let el=$('prOffset'); prSetOffset((el? +el.value||0 : 0)+d); }
+function prToggleSync(){ let b=curBook(); if(!b) return; prSetSync(b.parallelSync==='off'?'unit':'off'); }
+let _prSplitDrag=null;
+function prSplitCur(){ let v=parseFloat(getComputedStyle($('parallelRead')).getPropertyValue('--pr-split')); return isFinite(v)? v : 0.5; }
+function prDividerStart(ev){ if(ev.isPrimary===false) return; ev.preventDefault(); let g=document.querySelector('.prGrid'); if(!g) return; _prSplitDrag={y0:ev.clientY,split:prSplitCur(),h:g.getBoundingClientRect().height}; try{ ev.currentTarget.setPointerCapture(ev.pointerId); }catch(e){} window.addEventListener('pointermove',prDividerMove); window.addEventListener('pointerup',prDividerEnd,{once:true}); }
+function prDividerMove(ev){ if(!_prSplitDrag) return; let total=Math.max(1,_prSplitDrag.h-28); let next=Math.max(0.25,Math.min(0.75,_prSplitDrag.split+(ev.clientY-_prSplitDrag.y0)/total)); $('parallelRead').style.setProperty('--pr-split',next.toFixed(3)); }
+function prDividerEnd(){ _prSplitDrag=null; window.removeEventListener('pointermove',prDividerMove); }
 function prSetSync(v){
   let L=curBook(); if(!L) return;
   L.parallelSync=(['unit','percent','off'].indexOf(v)>=0)? v : 'unit';
   $('prOffsetWrap').classList.toggle('hidden', L.parallelSync!=='unit');
+  syncPrSyncSeg();
   scheduleSave(); prSyncFrom('L'); prRefreshRails();
   toast(L.parallelSync==='off'? 'Sync off, each book scrolls on its own' : L.parallelSync==='percent'? 'Synced by overall position' : 'Synced by chapter / page');
 }
