@@ -3647,6 +3647,7 @@ function setReaderMode(m){
   $('modeScrollBtn').classList.toggle('active',m==='scroll'); $('modePageBtn').classList.toggle('active',m==='page');
   let b=curBook(); if(b){ b.mode=m; if(b.kind==='pdf') renderPdfBook(); else renderEpubBook(); }
   toast(m==='scroll'?'Scroll view':'Page view, one at a time. Use Prev and Next.');
+  syncSepiaPageMode();
 }
 function setReaderTheme(v){
   /* Theme fix (2026-11-23): the old line overwrote readerArticle.className
@@ -3672,6 +3673,26 @@ function setReaderTheme(v){
      used to reset to Paper on every reload. The page still gets themed
      even if storage throws. */
   try{ localStorage.setItem(READER_THEME_KEY,v); }catch(e){}
+  syncSepiaPageMode();
+}
+/* SCREEN 07: Sepia Page Mode is one state — EPUB + Sepia theme + Page
+   mode. The .sepiaPage class on #view-reader scopes every Screen 07
+   style, so the PDF reader, Library, palette and EPUB Paper/Obsidian/
+   Scroll are untouched. This also keeps the mode-dependent labels in
+   step: the top title becomes "Ch. X of Y · <chapter>" and the mobile
+   bottom-bar label becomes "Page Mode" (per the mockups); anything else
+   keeps the labels updateResume already sets. Called from
+   setReaderTheme, setReaderMode and updateResume, which together cover
+   every theme/mode/chapter transition. */
+function syncSepiaPageMode(){
+  let b=curBook(), vr=$('view-reader'); if(!vr) return;
+  let on=!!(b&&b.kind==='epub'&&b.mode==='page'&&$('readerArticle').classList.contains('sepia'));
+  vr.classList.toggle('sepiaPage',on);
+  if(!b||b.kind!=='epub'||!b.chapters.length) return;
+  let rt=$('readerTopTitle');
+  if(rt) rt.textContent= on ? 'Ch. '+(b.ch+1)+' of '+b.chapters.length+' · '+b.chapters[b.ch].title : b.title;
+  let mp=$('mobilePageLabel');
+  if(mp) mp.textContent= on ? 'Page Mode' : 'Chapter '+(b.ch+1)+' / '+b.chapters.length;
 }
 function readerFont(d){ let cur=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--reader-fs'))||19; let next=Math.max(15,Math.min(26,cur+d*1.5)); document.documentElement.style.setProperty('--reader-fs',next+'px'); let s=$('readerFontSlider'); if(s) s.value=next; }
 function readerFontSlider(v){ let next=Math.max(15,Math.min(26,+v||19)); document.documentElement.style.setProperty('--reader-fs',next+'px'); }
@@ -3710,6 +3731,9 @@ function updateResume(){ updateReadProgress();
   let th=$('thumbList'); if(th&&th.dataset.bookId===b.id){ if(b.kind==='pdf') th.querySelectorAll('.thumbItem').forEach((el,i)=>el.classList.toggle('active',i+1===b.page)); else th.querySelectorAll('.thumbItem').forEach((el,i)=>el.classList.toggle('active',i===b.ch)); }
   let tw=$('ttsWhere'); if(tw) tw.textContent=$('pageLabel').textContent;
   syncBookmarkBtn();
+  /* Screen 07: keep the active chapter marked in the Contents list. */
+  if(b.kind==='epub'){ let tc=$('tocList'); if(tc&&tc.dataset.bookId===b.id) tc.querySelectorAll('.tocItem').forEach((el,i)=>el.classList.toggle('active',i===b.ch)); }
+  syncSepiaPageMode();
 }
 
 /* --- EPUB rendering --- */
@@ -4082,8 +4106,8 @@ window.addEventListener('resize',()=>{
   bm.innerHTML= b.bookmarks.length? b.bookmarks.map(x=>'<div class="listRow"><span>'+esc(x.label)+'</span><button class="btn small" onclick="jumpBookmark('+x.at+')">Go</button></div>').join('') : '<p class="kbd">No bookmarks yet</p>';
   an.innerHTML= b.annotations.length? b.annotations.map(a=>'<div class="listRow"><span class="annoSwatch" style="background:'+annoSwatch(a)+'"></span><span style="font-size:13px;line-height:1.45">“'+esc(a.text.slice(0,90))+'”<br/><span class="kbd">'+esc(a.where)+(a.kind&&a.kind!=='highlight'?' · '+esc(a.kind):'')+'</span></span></div>').join('')+'<button class="btn small" style="margin-top:8px" onclick="exportAnnotations()">Export annotations</button>' : '<p class="kbd">Select text → Highlight, Underline or Strikethrough</p>';
   if(b.kind==='epub'){
-    th.dataset.bookId=b.id;
-    toc.innerHTML=b.chapters.map((c,i)=>'<div class="tocItem" onclick="jumpToChapter('+i+')">'+(i+1)+'. '+esc(c.title)+'</div>').join('');
+    th.dataset.bookId=b.id; toc.dataset.bookId=b.id;
+    toc.innerHTML=b.chapters.map((c,i)=>'<div class="tocItem'+(i===b.ch?' active':'')+'" onclick="jumpToChapter('+i+')">'+(i+1)+'. '+esc(c.title)+'</div>').join('');
     th.innerHTML=b.chapters.map((c,i)=>'<div class="thumbItem '+(i===b.ch?'active':'')+'" onclick="jumpToChapter('+i+')"><b style="font-size:12px">Ch. '+(i+1)+'</b><br/><span class="kbd">'+esc(c.text.slice(0,70))+'…</span></div>').join('');
   } else {
     if(th.dataset.bookId===b.id){ th.querySelectorAll('.thumbItem').forEach((el,i)=>el.classList.toggle('active',i+1===b.page)); return; }

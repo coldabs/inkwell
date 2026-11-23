@@ -1913,3 +1913,56 @@ body.prOn #readerMobileBar{display:none}
   #readerSide.open{top:auto;left:0;right:0;bottom:0;width:auto;height:min(72dvh,560px);border-right:0;border-top:1px solid var(--border);border-radius:16px 16px 0 0;box-shadow:0 -12px 32px rgba(0,0,0,.28);overflow:hidden}
   #readerSide.open::before{content:"";display:block;width:40px;height:5px;margin:10px auto 0;border-radius:999px;background:var(--border-strong);flex:0 0 auto}
 }
+
+/* ============ SCREEN 07: EPUB Reader, Sepia Page Mode ============
+   Every rule here is scoped under #view-reader.sepiaPage, a class JS
+   adds only when the open book is an EPUB in Sepia theme AND Page
+   mode — so the PDF reader (Screen 05), Library, palette and EPUB
+   Paper/Obsidian/Scroll are untouched. Palette per the brief:
+   surround #EFE6D5, book card #F7F1E3, ink #2B241D, terracotta #C85A32.
+   (MWG css-layout guide, retrieved 2026-11-23: long prose that should
+   split into balanced columns uses multi-column, newspaper-style.) */
+#view-reader.sepiaPage{background:#EFE6D5}
+#view-reader.sepiaPage .readerTop{background:#F7F1E3;border-bottom-color:#DDD2BC;margin-bottom:0}
+#view-reader.sepiaPage .readerTop .iconBtn,#view-reader.sepiaPage .readerTop .btn{background:#F7F1E3;border-color:#DDD2BC}
+#view-reader.sepiaPage .readerTop .seg{background:#EFE6D5;border-color:#DDD2BC}
+#view-reader.sepiaPage .readerTopTitle{display:block;text-align:center}
+#view-reader.sepiaPage #readerTopPage{display:none}
+/* The 2.5px terracotta progress line, spanning the bottom edge of the
+   top header: the native <progress> sits directly under the bar
+   (margin-bottom:0 above) and sticks under it while scrolling. */
+#view-reader.sepiaPage #readProgress{display:block;height:2.5px;position:sticky;top:56px;z-index:30}
+#view-reader.sepiaPage #readProgress::-webkit-progress-value{background:#C85A32}
+#view-reader.sepiaPage #readProgress::-moz-progress-bar{background:#C85A32}
+/* Sepia palette for the book card (the base .reader.sepia stays as it
+   was, so Sepia in Scroll mode is unchanged). The book title + badge
+   are hidden in Page mode — the chapter heading carries the page, as
+   in the mockups. Highlights are already translucent (0.6 opacity
+   inline); multiply blends the wash into the cream paper. */
+#view-reader.sepiaPage .reader.sepia{--paper:#F7F1E3;--text:#2B241D;--text-soft:#4A3E2E;--muted:#7A6C5C;--border:#DCCFB2;--border-strong:#C9B78F;background:#F7F1E3;color:#2B241D}
+#view-reader.sepiaPage #readerTitle,#view-reader.sepiaPage #readerBadge{display:none}
+#view-reader.sepiaPage #readerBody mark{mix-blend-mode:multiply}
+/* Sidebar: flat cream card, opaque in every form (drawer / bottom
+   sheet included — no translucency, per the ban). The active chapter
+   gets the terracotta left indicator + pale wash from the mockups. */
+#view-reader.sepiaPage #readerSide{background:#F7F1E3;border:1px solid #DDD2BC}
+#view-reader.sepiaPage #readerSide.open{background:#F7F1E3}
+#view-reader.sepiaPage .sideTab{background:#F7F1E3;border-color:#DDD2BC}
+#view-reader.sepiaPage .sideTab[aria-selected="true"]{background:#F7F1E3;border-color:#C85A32}
+#view-reader.sepiaPage .tocItem.active{color:#C85A32;background:rgba(200,90,50,.08);box-shadow:inset 3px 0 0 #C85A32}
+/* Bottom bars keep the sepia card colour. */
+#view-reader.sepiaPage .readerPager{background:#F7F1E3;border-color:#DDD2BC}
+#view-reader.sepiaPage .readerMobileBar{background:#F7F1E3;border-top-color:#DDD2BC}
+/* Desktop: the book card widens and the prose flows in two balanced
+   columns, as in the desktop mockup; the chapter heading never strands
+   at the bottom of a column. Tablet and phone stay single-column. */
+@media (min-width:1025px){
+  #view-reader.sepiaPage .reader{max-width:880px}
+  #view-reader.sepiaPage #readerBody{columns:2;column-gap:48px}
+  #view-reader.sepiaPage #readerBody h3{break-after:avoid}
+}
+/* Mobile: the top bar is static, so the progress line flows under it
+   instead of sticking to the viewport. */
+@media (max-width:720px){
+  #view-reader.sepiaPage #readProgress{position:static}
+}
