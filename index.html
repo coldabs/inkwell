@@ -454,6 +454,12 @@
       <button type="button" class="pageNavLabel" id="pageNavLabel" onclick="openPageNavList()" aria-label="Open page list" title="Open page list">1 / 1</button>
       <button type="button" class="pageNavBtn" id="pageNavNext" onclick="editorPageStep(1)" aria-label="Next page" title="Next page"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-chevron-right"></use></svg></button>
     </div>
+    <!-- Phone "Add page" (Screen 09, user call 2026-11-23: "It's not
+         available on mobile also"): the phone top bar is full, so the
+         one-tap way in is a labeled pill stacked above the
+         page-navigation pill. Same addPage() handler as the rail and
+         top-bar buttons. -->
+    <button type="button" class="pageAddFab" id="pageAddFab" onclick="addPage()" aria-label="Add page" title="Add page"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-plus"></use></svg> Add page</button>
   </section>
 
   <!-- Reader -->

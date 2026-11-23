@@ -2098,6 +2098,33 @@ body.prOn #readerMobileBar{display:none}
    Desktop keeps the rail in place (base rule hides it ≥1025px);
    phones keep the slim bar (hidden ≤768px). */
 @media (max-width:768px){ #view-editor .editorTop #addPageTopBtn{display:none} }
+/* Tablet (user call 2026-11-23: "It's not even available on the
+   tablet"): at 769–1024px the button was icon-only — a bare "+" next
+   to Export that does not read as "Add page", so the user could not
+   find it. The label shows for THIS button only; every other top-bar
+   button keeps the icon-only tablet treatment from the <=1024px rule.
+   The title input flexes (flex:1; min-width:0) and truncates, so the
+   bar still fits — measured by the check, not assumed. */
+@media (min-width:769px) and (max-width:1024px){
+  #view-editor .editorTop #addPageTopBtn .tbLabel{display:inline}
+}
+/* Phone "Add page" pill (user call 2026-11-23: "It's not available on
+   mobile also"): measured, not guessed — forcing the labeled top-bar
+   button in overflows the phone bar by 48px at 390 (26px at 412) and
+   crushes the title to 8px wide, and the middle gap between the zoom
+   pill (right edge 146) and the page-nav pill (left edge 208) is only
+   62px, so neither candidate spot fits a labeled button; widening the
+   nav pill itself to hold it would overlap the zoom pill by 35px at
+   390 (13px at 412). So the one-tap control is a labeled pill stacked
+   above the page-navigation pill: the nav pill top sits at 76px + 54px
+   = 130px from the bottom, so this sits at 140px (10px gap), same
+   floating-pill styling, clear of the zoom pill, the nav pill and the
+   bottom dock. Phones only (<=768px); the :not(.focusMode) guard hides
+   it in Focus mode, like its sibling pills. */
+#view-editor #pageAddFab{display:none}
+@media (max-width:768px){
+  body:not(.focusMode) #view-editor #pageAddFab{position:fixed;right:12px;bottom:calc(140px + env(safe-area-inset-bottom,0px));z-index:40;display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 12px;background:var(--surface);border:1px solid var(--border);border-radius:999px;box-shadow:var(--shadow-modal);color:var(--text);font-family:var(--font-ui);font-size:13px;font-weight:600;line-height:1;white-space:nowrap}
+}
 /* Counters removed (user call 2026-11-23): the "This notebook" stats
    block is not in the mockups. CSS-only hide, scoped to the editor's
    Links panel — the elements and their JS updates stay intact, and the
@@ -2136,6 +2163,13 @@ body.prOn #readerMobileBar{display:none}
 @media (min-width:1025px){
   body:not(.splitOn):not(.focusMode) #view-editor.railHidden #pagesPanel{display:none}
   body:not(.splitOn):not(.focusMode) #view-editor.railHidden .editorWrap{grid-template-columns:minmax(0,1fr)}
+  /* Desktop rail closed (user call 2026-11-23: "You told me that you'll
+     add a add page button without opening the toggle — where is it?"):
+     the rail's own "+ Add page" is out of reach, so the top-bar button
+     shows instead — the one-tap way in without opening the toggle.
+     Rail open: stays hidden (the Pass 2 rule at line 1266 owns that
+     state). Specificity (2,4,1) beats the (0,1,0) hide rule. */
+  body:not(.splitOn):not(.focusMode) #view-editor.railHidden .editorTop #addPageTopBtn{display:inline-flex}
 }
 /* Pages | Layers as a segmented pill control. */
 #view-editor .railTabs{display:flex;gap:0;background:var(--surface-muted);border:0;border-radius:999px;padding:3px;margin-bottom:12px}
