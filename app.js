@@ -399,18 +399,30 @@ function sampleBook(){
         'Reading slowly is not reading less. It is noticing what speed hides: the turn of an argument, the weight of a word, the place where you stopped agreeing and started merely nodding. A page read once, carefully, stays with you longer than three pages skimmed in a hurry.',
         'Speed feels like progress because it produces a number: pages turned, chapters finished. But a number is not understanding. The reader who races to the end of a chapter often arrives there having met none of its ideas, the way a traveller who flies over a country has visited it without ever standing in it.',
         'Slow reading begins with permission: permission to stop, to re-read a sentence, to argue in the margin. The margin is where reading becomes thinking. A mark in the margin is a small act of honesty: here I was confused, here I disagreed, here something mattered.',
-        'Try it with this book. Select any sentence and highlight it. Add a bookmark where you want to return. Switch the theme to Sepia or Night. Press Listen and hear the page read aloud. Nothing here is locked, and everything you mark is saved in this browser, so it is still here when you come back.']),
+        'Try it with this book. Select any sentence and highlight it. Add a bookmark where you want to return. Switch the theme to Sepia or Night. Press Listen and hear the page read aloud. Nothing here is locked, and everything you mark is saved in this browser, so it is still here when you come back.',
+        'The eye has habits of its own. It skips the middle of a paragraph, trusts the first sentence, and assumes the rest will agree. Slow reading is not a cure for that habit so much as a way of noticing it: you catch yourself gliding, and you go back. The second pass is often the real reading. The first pass only tells you what the chapter is about; the second tells you what it is saying.',
+        'A book is not a race with a finish line. Nobody remembers how fast they read a good chapter, only what it left behind. The reader who finishes slowly has not lost time; they have spent it. And the spending shows, weeks later, when a sentence from the book surfaces in a conversation, or a margin note answers a question you had forgotten asking.']),
       ch('Margins and marks',[
         'Every serious reader develops a private shorthand: a star for what matters, a question mark for what doubts, a line beside what sings. These marks are not vandalism. They are the visible half of a conversation between the reader and the page.',
         'Annotations age well. Return to a book after a year and your old marks show you who you were: what you feared, what you hoped, what you had not yet understood. The unmarked page tells you nothing about the person who read it.',
-        'That is why this reader keeps your highlights in a list beside the text, and why you can export them. A highlight you cannot find again is only a coloured sentence; a highlight you can revisit is a thought you can build on.']),
+        'That is why this reader keeps your highlights in a list beside the text, and why you can export them. A highlight you cannot find again is only a coloured sentence; a highlight you can revisit is a thought you can build on.',
+        'A simple system is enough. A star for what matters, a line beside what sings, a question mark for what you doubt. The system only works if you trust it: mark in the moment, while the feeling is fresh, and do not worry about marking too much. You can always let a mark go later. What you cannot do is recover the thought you felt and failed to write down.',
+        'Marks are also a record of change. The sentence you starred at twenty will not be the sentence you star at forty, and that difference is worth seeing. A book you have marked is a book you have lived with, and returning to it is less like re-reading than like meeting an old friend who remembers you better than you remember yourself.',
+        'Keep the marks where you can find them. A highlight buried in a chapter you never revisit is only a coloured sentence; the same highlight, gathered beside the text and read again a week later, becomes a thought you can build on. That is why the marks live in a list of their own, and why they are yours to keep.']),
       ch('Reading aloud',[
         'Reading aloud is the oldest form of slow reading. The voice cannot skim: it must give every word its moment, and in doing so it catches what the eye forgives: the clumsy sentence, the hidden rhythm, the argument that only sounds convincing.',
         'Poets have always known this, and so have teachers. A paragraph read aloud either holds together or falls apart in the mouth. When you study, read your notes aloud once; the parts you stumble on are the parts you do not yet know.',
-        'Use the Listen bar below to hear this chapter. Change the accent, slow the voice down, and notice how the same words become a different text when they are given time.']),
+        'Use the Listen bar below to hear this chapter. Change the accent, slow the voice down, and notice how the same words become a different text when they are given time.',
+        'Reading aloud to someone else changes the text a second time. A child listening will stop you at the word they do not know, and the stop is the lesson: the sentence you thought was clear was only familiar. A listener asks the questions an editor would ask, without malice, and they are answered on the spot.',
+        'The ear is a stricter editor than the eye. A sentence that looks fine on the page can stumble in the mouth, and the stumble is information: a clause too long, a rhythm that trips, a word chosen for show instead of sense. When your own writing will not read aloud smoothly, it is not ready. Read it once, out loud, and listen to where it catches.',
+        'If you are reading in a language that is not your first, reading aloud is the fastest way to make it yours. The mouth learns the shape of words the eye only recognises, and the rhythm of a sentence settles in the ear before it settles in the mind. Slow down, give each word its moment, and let the voice teach the eye how the language moves.']),
       ch('The quiet habit',[
         'Slow reading is not a technique to master but a habit to keep: one page with full attention is worth more than a chapter at a glance. Keep the book open a moment after you finish. Let the last sentence settle.',
-        'Then close it, and write one line of your own. Reading that ends in writing is reading that stays.'])
+        'Then close it, and write one line of your own. Reading that ends in writing is reading that stays.',
+        'Pick a time and keep it. The habit does not need an hour; it needs a regular hour, or half of one, or twenty minutes before the house wakes. The same chair helps, and the same cup, but what matters most is the sameness itself: the mind learns that this is the hour for one page, and it arrives already quiet.',
+        'The line you write afterwards can be anything. A question the chapter left you with. A sentence you disagree with, and why. A line of your own that the chapter made possible. It does not need to be clever; it needs to be yours. A notebook of such lines, kept over a year, becomes a record of a mind paying attention.',
+        'Some days the page will resist you. The words will slide past without landing, and the same paragraph will need reading three times. That is not failure; it is the habit doing its work. Attention is a muscle, and the days it feels weak are the days it is growing. Close the book, write your line anyway — even the line that says the page would not stay still — and come back tomorrow.',
+        'Over weeks, the habit compounds. One page a day is a book a month, and a book a month is twelve books a year that you actually read, instead of a shelf of books you only carried. The quiet is the point: not silence for its own sake, but the small daily proof that you can give one thing your full attention, and that the thing repays it.'])
     ]};
 }
 
@@ -3647,6 +3659,7 @@ function setReaderMode(m){
   $('modeScrollBtn').classList.toggle('active',m==='scroll'); $('modePageBtn').classList.toggle('active',m==='page');
   let b=curBook(); if(b){ b.mode=m; if(b.kind==='pdf') renderPdfBook(); else renderEpubBook(); }
   toast(m==='scroll'?'Scroll view':'Page view, one at a time. Use Prev and Next.');
+  syncSepiaPageMode();
 }
 function setReaderTheme(v){
   /* Theme fix (2026-11-23): the old line overwrote readerArticle.className
@@ -3672,6 +3685,26 @@ function setReaderTheme(v){
      used to reset to Paper on every reload. The page still gets themed
      even if storage throws. */
   try{ localStorage.setItem(READER_THEME_KEY,v); }catch(e){}
+  syncSepiaPageMode();
+}
+/* SCREEN 07: Sepia Page Mode is one state — EPUB + Sepia theme + Page
+   mode. The .sepiaPage class on #view-reader scopes every Screen 07
+   style, so the PDF reader, Library, palette and EPUB Paper/Obsidian/
+   Scroll are untouched. This also keeps the mode-dependent labels in
+   step: the top title becomes "Ch. X of Y · <chapter>" and the mobile
+   bottom-bar label becomes "Page Mode" (per the mockups); anything else
+   keeps the labels updateResume already sets. Called from
+   setReaderTheme, setReaderMode and updateResume, which together cover
+   every theme/mode/chapter transition. */
+function syncSepiaPageMode(){
+  let b=curBook(), vr=$('view-reader'); if(!vr) return;
+  let on=!!(b&&b.kind==='epub'&&b.mode==='page'&&$('readerArticle').classList.contains('sepia'));
+  vr.classList.toggle('sepiaPage',on);
+  if(!b||b.kind!=='epub'||!b.chapters.length) return;
+  let rt=$('readerTopTitle');
+  if(rt) rt.textContent= on ? 'Ch. '+(b.ch+1)+' of '+b.chapters.length+' · '+b.chapters[b.ch].title : b.title;
+  let mp=$('mobilePageLabel');
+  if(mp) mp.textContent= on ? 'Page Mode' : 'Chapter '+(b.ch+1)+' / '+b.chapters.length;
 }
 function readerFont(d){ let cur=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--reader-fs'))||19; let next=Math.max(15,Math.min(26,cur+d*1.5)); document.documentElement.style.setProperty('--reader-fs',next+'px'); let s=$('readerFontSlider'); if(s) s.value=next; }
 function readerFontSlider(v){ let next=Math.max(15,Math.min(26,+v||19)); document.documentElement.style.setProperty('--reader-fs',next+'px'); }
@@ -3710,6 +3743,9 @@ function updateResume(){ updateReadProgress();
   let th=$('thumbList'); if(th&&th.dataset.bookId===b.id){ if(b.kind==='pdf') th.querySelectorAll('.thumbItem').forEach((el,i)=>el.classList.toggle('active',i+1===b.page)); else th.querySelectorAll('.thumbItem').forEach((el,i)=>el.classList.toggle('active',i===b.ch)); }
   let tw=$('ttsWhere'); if(tw) tw.textContent=$('pageLabel').textContent;
   syncBookmarkBtn();
+  /* Screen 07: keep the active chapter marked in the Contents list. */
+  if(b.kind==='epub'){ let tc=$('tocList'); if(tc&&tc.dataset.bookId===b.id) tc.querySelectorAll('.tocItem').forEach((el,i)=>el.classList.toggle('active',i===b.ch)); }
+  syncSepiaPageMode();
 }
 
 /* --- EPUB rendering --- */
@@ -4082,8 +4118,8 @@ window.addEventListener('resize',()=>{
   bm.innerHTML= b.bookmarks.length? b.bookmarks.map(x=>'<div class="listRow"><span>'+esc(x.label)+'</span><button class="btn small" onclick="jumpBookmark('+x.at+')">Go</button></div>').join('') : '<p class="kbd">No bookmarks yet</p>';
   an.innerHTML= b.annotations.length? b.annotations.map(a=>'<div class="listRow"><span class="annoSwatch" style="background:'+annoSwatch(a)+'"></span><span style="font-size:13px;line-height:1.45">“'+esc(a.text.slice(0,90))+'”<br/><span class="kbd">'+esc(a.where)+(a.kind&&a.kind!=='highlight'?' · '+esc(a.kind):'')+'</span></span></div>').join('')+'<button class="btn small" style="margin-top:8px" onclick="exportAnnotations()">Export annotations</button>' : '<p class="kbd">Select text → Highlight, Underline or Strikethrough</p>';
   if(b.kind==='epub'){
-    th.dataset.bookId=b.id;
-    toc.innerHTML=b.chapters.map((c,i)=>'<div class="tocItem" onclick="jumpToChapter('+i+')">'+(i+1)+'. '+esc(c.title)+'</div>').join('');
+    th.dataset.bookId=b.id; toc.dataset.bookId=b.id;
+    toc.innerHTML=b.chapters.map((c,i)=>'<div class="tocItem'+(i===b.ch?' active':'')+'" onclick="jumpToChapter('+i+')">'+(i+1)+'. '+esc(c.title)+'</div>').join('');
     th.innerHTML=b.chapters.map((c,i)=>'<div class="thumbItem '+(i===b.ch?'active':'')+'" onclick="jumpToChapter('+i+')"><b style="font-size:12px">Ch. '+(i+1)+'</b><br/><span class="kbd">'+esc(c.text.slice(0,70))+'…</span></div>').join('');
   } else {
     if(th.dataset.bookId===b.id){ th.querySelectorAll('.thumbItem').forEach((el,i)=>el.classList.toggle('active',i+1===b.page)); return; }
