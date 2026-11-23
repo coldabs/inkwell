@@ -1687,3 +1687,80 @@ body.inEditor .pageNavFab{display:flex}
   }
   #view-library .libFab .ic{width:20px;height:20px}
 }
+
+/* ============ Screen 03: Shelf Options drawer/sheet ============
+   Redesign of the existing #librarySheet (Pass 1) to match the Screen 03
+   mockups (desktop/tablet/mobile) 1:1. Section order follows the brief
+   on all devices (This shelf -> Library backup -> Quick launch ->
+   Samples & app); the mobile mockup orders Focus before Backup, which
+   is a mockup-vs-brief difference — the brief wins. All rules are
+   scoped to #librarySheet so no earlier screen changes.
+   Guides used: navigation-drawer (modal <dialog> in the top layer,
+   Esc + light dismiss + Close button), dialog (aria-labelledby, no
+   role/aria-modal on a native modal, overscroll-behavior:contain on
+   dialog:modal + ::backdrop), light-dismiss-a-dialog (closedby="any"
+   with the existing closedBy fallback in app.js). */
+
+/* 340px right-hand slide-over on desktop/tablet; 100% opaque. */
+dialog.sheet.drawerRight#librarySheet{width:min(340px,100vw)}
+/* Subtle backdrop dim, no blur — the drawer itself is fully opaque. */
+dialog.sheet.drawerRight#librarySheet::backdrop{background:rgba(20,16,12,.45);backdrop-filter:none;overflow:hidden}
+
+/* Stat tiles: big number on top, label below (mockups); the icon only
+   shows on mobile, top-right, as in the mobile mockup. Labels are set
+   lowercase by renderLibrary (plural()), so capitalize for display. */
+#librarySheet .statCard{position:relative}
+#librarySheet .statCard b{order:-1}
+#librarySheet .statCard>span:not(.statIcon){text-transform:capitalize;color:var(--text);font-weight:500}
+#librarySheet .statCard .statIcon{display:none;position:absolute;top:10px;right:10px;color:var(--muted)}
+@media (max-width:768px){
+  #librarySheet .statCard .statIcon{display:block}
+}
+
+/* Storage: "Local Storage" row with the measured value, bar, then the
+   "Local-first IndexedDB" caption — the desktop/mobile mockup layout.
+   The bar fill is ink, not terracotta, as the mockups draw it. */
+#librarySheet .storageCard{background:transparent;border:0;border-radius:0;padding:0;margin-top:4px}
+#librarySheet .storageRow{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px}
+#librarySheet .storageRow>span{font-size:12px;color:var(--muted)}
+#librarySheet .storageRow>b{font-size:12px;font-weight:600}
+#librarySheet .storageCard .storageBar{background:var(--paper2)}
+#librarySheet .storageFill{background:var(--text)}
+#librarySheet .storageCard .sheetNote{margin:6px 0 0}
+
+/* Row groups: separate bordered buttons with gaps on desktop/tablet
+   (mockups), the grouped rounded card on mobile (mobile mockup). */
+#librarySheet .drawerRows{background:transparent;border:0;border-radius:0;gap:8px;overflow:visible}
+#librarySheet .drawerRow{border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface)}
+#librarySheet .drawerRow:last-child{border-bottom:1px solid var(--border)}
+@media (max-width:768px){
+  #librarySheet .drawerRows{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);gap:0;overflow:hidden}
+  #librarySheet .drawerRow{border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent}
+  #librarySheet .drawerRow:last-child{border-bottom:0}
+}
+
+/* Quick launch: standalone full-width terracotta button, label centred.
+   The timer label is JetBrains Mono; it is one span because
+   setTimerLabel() rewrites the span's textContent on every tick
+   (shared with the editor's Focus button), so the "Start Focus " prefix
+   cannot live in a separate span. */
+#librarySheet .focusBtn{background:var(--accent);border-color:var(--accent);color:var(--accent-text);font-weight:600}
+#librarySheet .focusBtn:hover{background:var(--accent);filter:brightness(1.07)}
+#librarySheet .focusBtn .ic{color:var(--accent-text)}
+#librarySheet .focusBtn .drawerChev{display:none}
+#librarySheet .focusBtn>span{flex:1;text-align:center}
+#librarySheet .focusBtn #timerLabel{font-family:var(--font-mono);font-weight:600}
+
+/* Mobile: rounded slide-up bottom sheet (not the full-height sheet the
+   generic drawerRight rule gives). The grip shows on mobile only via
+   the generic .sheetGrip rule. */
+@media (max-width:768px){
+  dialog.sheet.drawerRight#librarySheet{
+    width:100vw;height:auto;max-height:92dvh;margin:auto auto 0;
+    border:1px solid var(--border);border-radius:18px 18px 0 0;
+  }
+}
+@keyframes sheetUp{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:no-preference) and (max-width:768px){
+  dialog.sheet.drawerRight#librarySheet:modal{animation:sheetUp .18s ease}
+}

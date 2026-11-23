@@ -190,8 +190,9 @@
 
     <div id="libraryGrid" class="grid"></div>
 
-    <dialog class="sheet drawerRight" id="librarySheet" closedby="any">
-      <div class="sheetHead"><h2>Shelf Options</h2><form method="dialog"><button class="drawerClose" type="submit" aria-label="Close shelf options"><svg class="ic" aria-hidden="true"><use href="#ticon-x"></use></svg></button></form></div>
+    <dialog class="sheet drawerRight" id="librarySheet" closedby="any" aria-labelledby="librarySheetTitle">
+      <div class="sheetGrip" aria-hidden="true"><span></span></div>
+      <div class="sheetHead"><h2 id="librarySheetTitle">Shelf Options</h2><form method="dialog"><button class="drawerClose" type="submit" aria-label="Close shelf options" autofocus><svg class="ic" aria-hidden="true"><use href="#ticon-x"></use></svg></button></form></div>
       <div class="sheetBody">
       <section class="sheetSection">
         <h3>This shelf</h3>
@@ -201,7 +202,7 @@
           <div class="statCard"><span class="statIcon"><svg class="ic" aria-hidden="true"><use href="#ticon-file-text"></use></svg></span><span id="statPagesLabel">pages</span><b id="statPages">0</b></div>
           <div class="statCard"><span class="statIcon"><svg class="ic" aria-hidden="true"><use href="#ticon-highlighter"></use></svg></span><span id="statAnnosLabel">annotations</span><b id="statAnnos">0</b></div>
         </div>
-        <div class="storageCard"><div class="storageBar" role="img" aria-label="Storage used"><span class="storageFill" id="storageFill" style="width:0%"></span></div><p class="sheetNote" id="storageText">Checking storage use…</p></div>
+        <div class="storageCard"><div class="storageRow"><span>Local Storage</span><b id="storageValue">—</b></div><div class="storageBar" role="img" aria-label="Storage used"><span class="storageFill" id="storageFill" style="width:0%"></span></div><p class="sheetNote" id="storageText">Local-first IndexedDB</p></div>
       </section>
       <section class="sheetSection">
         <h3>Library backup</h3>
@@ -213,9 +214,7 @@
       </section>
       <section class="sheetSection">
         <h3>Quick launch</h3>
-        <div class="drawerRows">
-          <button class="drawerRow" onclick="openTimer()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-clock"></use></svg><span id="timerLabel">Start Focus 25:00</span><svg class="ic ic-sm drawerChev" aria-hidden="true"><use href="#ticon-chevron-right"></use></svg></button>
-        </div>
+        <button class="drawerRow focusBtn" onclick="openTimer()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-clock"></use></svg><span id="timerLabel">Start Focus 25:00</span><svg class="ic ic-sm drawerChev" aria-hidden="true"><use href="#ticon-chevron-right"></use></svg></button>
       </section>
       <section class="sheetSection">
         <h3>Samples &amp; app</h3>
