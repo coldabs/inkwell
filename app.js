@@ -4434,6 +4434,9 @@ function annotateSelection(kind){
   }catch(e){ toast('Select a clean stretch inside one paragraph'); return; }
   b.annotations.push({id:annoId, text:text, where:where, kind:kind, color:markColorFor(b,kind), opacity:markOpacityFor(b,kind)});
   sel.removeAllRanges();
+  /* The mark consumed this selection: drop the saved range so no later
+     handler can resurrect it and re-apply the same mark on a loop. */
+  lastReaderSel=null;
   renderReaderSide(); renderLibrary(); scheduleSave(); syncReaderToolUI();;
   /* No auto-open of the Annotations panel: on mobile it is a bottom
      drawer, so opening it after every highlight hijacked the screen and
@@ -4530,7 +4533,7 @@ function undoLastAnnotation(){
   renderReaderSide(); renderLibrary(); syncReaderToolUI(); scheduleSave();
   toast(gone?'Undid last annotation':'Undo didn’t clear that mark — reopen the book to clear it');
 }
-let readerActiveTool='', readerPointerDown=false, readerAutoMarkT=null, _lastReaderTool='highlight', _armedHintShown={};
+let readerActiveTool='', readerPointerDown=false, readerAutoMarkT=null, readerShiftHeld=false, _lastReaderTool='highlight', _armedHintShown={};
 /* Xiaomi Focus Pen in the reader: dragging the pen across text selects
    it instead of scrolling the page, and a palm landing mid-selection
    neither scrolls nor collapses the selection. The browser's native
@@ -4590,7 +4593,7 @@ function toggleReaderToolPanel(forceOpen){ let p=$('readerToolPanel'); if(!p) re
 function toggleReaderTool(tool){
   readerActiveTool=(readerActiveTool===tool)?'':tool;
   if(!readerActiveTool) clearTimeout(readerAutoMarkT);
-  else{
+  if(readerActiveTool){
     _lastReaderTool=tool;
     toggleReaderToolPanel(false); /* armed: get the panel out of the way so the page is clear to drag over */
     if(!_armedHintShown[tool]){ _armedHintShown[tool]=true; toast('Drag over text to '+(tool==='highlight'?'highlight':tool==='underline'?'underline':'strikethrough')); }
@@ -4614,10 +4617,38 @@ function syncReaderToolUI(){
   let su=$('readerSelUndo'); if(su) su.disabled=!hasMarks;
   let qu=$('readerQuickUndo'); if(qu) qu.classList.toggle('hidden',!hasMarks);
 }
-function scheduleAutoReaderMark(){ clearTimeout(readerAutoMarkT); if(!readerActiveTool||readerPointerDown||PR.on||S.view!=='reader') return; readerAutoMarkT=setTimeout(()=>{ if(!readerActiveTool||readerPointerDown||PR.on||S.view!=='reader') return; let sel=readerSelection(); if(sel&&sel.toString().trim()) annotateSelection(readerActiveTool); },500); }
+/* Armed Quick Markup: apply shortly after the selection gesture ends, so
+   the mark lands on the FINAL selection — a handle adjustment starting
+   inside the 500ms window cancels the pending apply and the next gesture
+   end re-arms it, so adjusting never produces a second overlapping mark.
+   The old code had the same delay but only pointerup re-armed the timer:
+   a drag that starts inside the selection fires dragstart + pointercancel
+   with no pointerup at all, so the pending apply was killed and never
+   re-scheduled — the mark never applied and the user had to pick again in
+   the selection bar (probe4). Now pointercancel and dragend re-arm it too,
+   so every pointerdown is always followed by a re-arm. Live selection
+   only — never resurrect lastReaderSel here, or the just-marked range would
+   re-apply on a 500ms loop (probe2-D: five annotate calls for one mark).
+   The bar stays hidden while a tool is armed; it still appears for
+   unarmed selections. */
+function scheduleAutoReaderMark(){
+  clearTimeout(readerAutoMarkT);
+  if(!readerActiveTool||readerPointerDown||readerShiftHeld||PR.on||S.view!=='reader') return;
+  readerAutoMarkT=setTimeout(()=>{
+    if(!readerActiveTool||readerPointerDown||readerShiftHeld||PR.on||S.view!=='reader') return;
+    let sel=window.getSelection();
+    if(sel&&sel.rangeCount&&!sel.isCollapsed&&sel.toString().trim()) annotateSelection(readerActiveTool);
+  },500);
+}
+/* Keyboard selection with a tool armed: Shift+arrows extend the range, so
+   hold the apply until Shift is released — that release is the selection
+   end for the keyboard, the same role pointerup plays for mouse/touch. */
+document.addEventListener('keydown',e=>{ if(e.key==='Shift') readerShiftHeld=true; },true);
+document.addEventListener('keyup',e=>{ if(e.key==='Shift'){ readerShiftHeld=false; scheduleAutoReaderMark(); } },true);
 document.addEventListener('pointerdown',e=>{ if(penSel && e.pointerType==='touch') return; /* palm during a pen selection */ readerPointerDown=true; clearTimeout(readerAutoMarkT); let p=$('readerToolPanel'); if(p&&!p.classList.contains('hidden')&&!e.target.closest('#readerToolPanel')&&!e.target.closest('#readerToolFab')&&!e.target.closest('#readerFab')&&!e.target.closest('#mobileMarkupBtn')) toggleReaderToolPanel(false); },true);
 document.addEventListener('pointerup',e=>{ if(penSel && e.pointerType==='touch') return; /* palm lifting must not end the pen's selection early */ readerPointerDown=false; if(readerActiveTool&&!PR.on&&S.view==='reader') scheduleAutoReaderMark(); },true);
-document.addEventListener('pointercancel',e=>{ if(penSel && e.pointerType==='touch') return; readerPointerDown=false; },true);
+document.addEventListener('pointercancel',e=>{ if(penSel && e.pointerType==='touch') return; readerPointerDown=false; /* a drag that starts inside the selection ends here (dragstart + pointercancel, no pointerup): re-arm, or the pending apply is lost */ if(readerActiveTool&&!PR.on&&S.view==='reader') scheduleAutoReaderMark(); },true);
+document.addEventListener('dragend',()=>{ /* backup for the same gesture: the drag truly ends here */ if(readerActiveTool&&!PR.on&&S.view==='reader') scheduleAutoReaderMark(); },true);
 /* --- "<Tool> color" bottom sheet (reference video r06: colour grid + Opacity slider) --- */
 const TOOL_COLORS=['#0A84FF','#30D158','#FFE600','#FF9F0A','#FF3B30','#BF5AF2','#64D2FF','#7EE787','#FFF3A3','#FFD9B3','#FF6482','#E84393','#FFFFFF','#E8E4DA','#AEAEB2','#6E6E73','#3A3A3C','#000000'];
 let _colorSheetTool='highlight', _toolColorGridBuilt=false;
