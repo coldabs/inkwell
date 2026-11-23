@@ -243,15 +243,17 @@
     <div id="focusAudioPill" class="focusAudioPill hidden" aria-hidden="true"><span class="focusRecDot"></span><span id="focusAudioText">Audio Recording \u00b7 00:00</span><span class="focusWave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span></div>
     <div class="editorTop">
       <button class="iconBtn" onclick="showView('library')" aria-label="Back to library" title="Back to library"><svg class="ic" aria-hidden="true"><use href="#ticon-arrow-left"></use></svg></button>
+      <button type="button" class="iconBtn" id="editorRailToggle" onclick="toggleEditorRail()" aria-label="Toggle pages panel" aria-pressed="true" title="Pages and layers"><svg class="ic" aria-hidden="true"><use href="#ticon-list"></use></svg></button>
       <button type="button" class="btn small hidden" id="backToReadingBtn" onclick="backToReading()"><span class="backLong">← Back to reading</span><span class="backShort">← Back</span></button><div class="titleField">
         <label class="srOnly" for="noteTitle">Notebook title</label>
         <input id="noteTitle" value="Untitled notebook" oninput="syncTitle()"/>
+        <svg class="ic ic-sm titleEditIc" aria-hidden="true"><use href="#ticon-pencil"></use></svg>
       </div>
-      <button type="button" class="btn small" id="linksToggleBtn" onclick="toggleLinksPanel()" aria-pressed="false" aria-controls="linksPanel" title="Show or hide the links panel"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-link"></use></svg> <span class="tbLabel">Links</span></button>
-      <button type="button" class="btn small" id="addPageTopBtn" onclick="addPage()" title="Add a page to this notebook" aria-label="Add page"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-plus"></use></svg> <span class="tbLabel">Add page</span></button>
       <button class="btn small edFocus" onclick="enterFocusMode()" title="Start a 25 minute focus session"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-clock"></use></svg> <span class="timerLabel">Focus 25:00</span></button>
       <button type="button" class="tbBoardBtn" id="boardBtn" aria-pressed="false" onclick="toggleBoard()" title="Floating board, an infinite canvas for drafting"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-layout-board"></use></svg> <span class="tbLabel">Board</span></button>
       <button type="button" class="btn small" id="splitTopBtn" onclick="toggleSplit()" aria-pressed="false" title="Parallel Read, read beside this notebook"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-columns"></use></svg> <span class="tbLabel">Parallel Read</span></button>
+      <button type="button" class="btn small" id="linksToggleBtn" onclick="toggleLinksPanel()" aria-pressed="false" aria-controls="linksPanel" title="Show or hide the links panel"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-link"></use></svg> <span class="tbLabel">Links</span></button>
+      <button type="button" class="btn small" id="addPageTopBtn" onclick="addPage()" title="Add a page to this notebook" aria-label="Add page"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-plus"></use></svg> <span class="tbLabel">Add page</span></button>
         <button type="button" class="btn small" id="exportBtn" commandfor="exportSheet" command="show-modal"><span class="tbLabel">Export</span> <svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg></button>
         <dialog class="sheet" id="exportSheet" closedby="any"> <div class="sheetHead"><h2>Export</h2><form method="dialog"><button class="btn" type="submit">Close</button></form></div> <div class="sheetBody"> <section class="sheetSection"> <div class="sheetRow">
           <button class="btn small" onclick="closeExportPop();exportPagePNG()">Page as PNG</button>
@@ -300,12 +302,10 @@
         <div role="group" aria-label="Draw">
           <button class="tool active" data-tool="pen" aria-pressed="true" onclick="setTool('pen',this)" title="Pen, pressure sensitive" aria-label="Pen"><svg class="ic" aria-hidden="true"><use href="#ticon-pencil"></use></svg></button>
           <button class="tool" data-tool="highlighter" aria-pressed="false" onclick="setTool('highlighter',this)" title="Highlighter, separate layer" aria-label="Highlighter"><svg class="ic" aria-hidden="true"><use href="#ticon-highlighter"></use></svg></button>
-          <button class="tool" data-tool="eraser" aria-pressed="false" onclick="setTool('eraser',this)" title="Eraser, touch a stroke to delete it" aria-label="Eraser"><svg class="ic" aria-hidden="true"><use href="#ticon-eraser"></use></svg></button>
           <button class="tool" data-tool="calligraphy" aria-pressed="false" onclick="setTool('calligraphy',this)" title="Calligraphy pen, nib angle changes width" aria-label="Calligraphy pen"><svg class="ic" aria-hidden="true"><use href="#ticon-feather"></use></svg></button>
+          <button class="tool" data-tool="eraser" aria-pressed="false" onclick="setTool('eraser',this)" title="Eraser, touch a stroke to delete it" aria-label="Eraser"><svg class="ic" aria-hidden="true"><use href="#ticon-eraser"></use></svg></button>
           <button class="tool" data-tool="text" aria-pressed="false" onclick="setTool('text',this)" title="Text, tap the page to place typed text" aria-label="Text tool"><svg class="ic" aria-hidden="true"><use href="#ticon-typography"></use></svg></button>
           <button class="tool" data-tool="vspace" aria-pressed="false" onclick="setTool('vspace',this)" title="Vertical space, drag down to make room" aria-label="Vertical space tool"><svg class="ic" aria-hidden="true"><use href="#ticon-arrows-vertical"></use></svg></button>
-          <button type="button" class="tool pillColorBtn" id="pillColorBtn" aria-label="Ink colour" title="Ink colour" aria-haspopup="true" aria-expanded="false" aria-controls="colorPop" onclick="toggleColorPop()"><span class="pillColorDot" id="pillColorDot" style="background:#18202B" aria-hidden="true"></span></button>
-          <button type="button" class="tool pillSizeBtn" id="pillSizeBtn" aria-label="Brush size" title="Brush size" aria-haspopup="true" aria-expanded="false" aria-controls="sizePop" onclick="toggleSizePop()"><span class="pillSizeLine" id="pillSizeLine" aria-hidden="true"></span></button>
         </div>
         <button type="button" class="tool" id="penOnlyBtn" data-pen-only-btn aria-pressed="false" onclick="togglePenOnly()" title="Pen only: the pen draws, your finger scrolls" aria-label="Pen only mode"><svg class="ic" aria-hidden="true"><use href="#ticon-pencil"/></svg></button>
         <span class="tbDivider" role="separator" aria-orientation="vertical"></span>
@@ -313,6 +313,9 @@
           <button class="tool" data-tool="lasso" aria-pressed="false" onclick="setTool('lasso',this)" title="Lasso select, draw a free loop around strokes" aria-label="Lasso select"><svg class="ic" aria-hidden="true"><use href="#ticon-lasso"></use></svg></button>
           <button type="button" class="tool" id="shapesBtn" aria-label="Shapes" title="Shapes: line, rectangle, ellipse, arrow, spline, compass" aria-haspopup="true" aria-expanded="false" aria-controls="shapePop" onclick="toggleShapePop()"><svg class="ic" aria-hidden="true"><use href="#ticon-square"></use></svg></button>
         </div>
+        <span class="tbDivider" role="separator" aria-orientation="vertical"></span>
+        <button type="button" class="tool pillColorBtn" id="pillColorBtn" aria-label="Ink colour" title="Ink colour" aria-haspopup="true" aria-expanded="false" aria-controls="colorPop" onclick="toggleColorPop()"><span class="pillColorDot" id="pillColorDot" style="background:#18202B" aria-hidden="true"></span></button>
+        <button type="button" class="tool pillSizeBtn" id="pillSizeBtn" aria-label="Brush size" title="Brush size" aria-haspopup="true" aria-expanded="false" aria-controls="sizePop" onclick="toggleSizePop()"><span class="pillSizeLine" id="pillSizeLine" aria-hidden="true"></span></button>
         <span class="tbDivider" role="separator" aria-orientation="vertical"></span>
         <div role="group" aria-label="History">
           <button class="iconBtn" onclick="undoStroke()" aria-label="Undo" title="Undo"><svg class="ic" aria-hidden="true"><use href="#ticon-undo"></use></svg></button>
@@ -358,8 +361,8 @@
         <button type="button" data-size="9" onclick="setBrushSize(9);closeSizePop()" aria-label="Thick"><span class="sizeOptLine" style="height:7px"></span>Thick</button>
         <button type="button" data-size="14" onclick="setBrushSize(14);closeSizePop()" aria-label="Extra thick"><span class="sizeOptLine" style="height:10px"></span>Extra thick</button>
       </div>
-      <div class="layerChip" id="layerChip">Layer: Ink</div>
     </div>
+    <div class="layerChip" id="layerChip">Layer: Ink</div>
         <div>
           <div class="zoomScroll"><div class="canvasShell" id="canvasShell">
             <div class="canvasStack">

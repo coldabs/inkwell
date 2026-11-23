@@ -2933,6 +2933,17 @@ function closeRailPanel(){
   let bd=$('railBackdrop'); if(bd) bd.classList.add('hidden');
 }
 function toggleRailPanel(which){ if(railOpen===which) closeRailPanel(); else openRailPanel(which); }
+/* Screen 09: top-bar rail toggle. Desktop (>=1025px) collapses the 210px
+   rail in place; tablet (769-1024px) opens it as a slide-over drawer;
+   on phones (<=768px) the Pages list lives in the inspector's Page tab
+   (layoutEditorSheet moves it there), so the toggle opens that sheet. */
+function toggleEditorRail(){
+  var b=$('editorRailToggle');
+  if(window.matchMedia('(max-width:768px)').matches){ openInspector('page'); return; }
+  if(window.matchMedia('(max-width:1024px)').matches){ toggleRailPanel('pages'); if(b) b.setAttribute('aria-pressed', String(railOpen==='pages')); return; }
+  var v=$('view-editor'); var hidden=v.classList.toggle('railHidden');
+  if(b) b.setAttribute('aria-pressed', String(!hidden));
+}
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&railOpen) closeRailPanel(); });
 /* Split View book picker: the pane shows the notebook's picked book
    (persisted per notebook as splitBookId, like parallelWith on books),

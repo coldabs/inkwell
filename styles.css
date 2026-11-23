@@ -2080,3 +2080,96 @@ body.prOn #readerMobileBar{display:none}
   #view-reader.nightScroll #readerSide.open .sideTab{flex:1 0 auto;min-width:60px;flex-direction:column;justify-content:center;min-height:44px;padding:8px 4px;border:0;border-radius:0;background:transparent}
 }
 
+
+/* ============ SCREEN 09: Notebook Editor Canvas & Toolbar ============
+   Restyle of the editor workspace to the mockups. Scoped under
+   #view-editor / .editorTop / #mainToolbar; earlier screens untouched.
+   Design system: 100% opaque surfaces (no glassmorphism), terracotta
+   accent for the active tool, Newsreader serif title. */
+
+/* Slim 56px top bar, single row, opaque. */
+#view-editor .editorTop{position:sticky;top:0;min-height:56px;padding:0 12px;flex-wrap:nowrap;background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none;border-bottom:1px solid var(--border)}
+#view-editor .editorTop #noteTitle{font-family:var(--font-display);font-weight:600;font-size:20px}
+#view-editor .titleField{display:flex;align-items:center;gap:6px}
+#view-editor .titleField #noteTitle{flex:1;min-width:0}
+#view-editor .titleField .titleEditIc{flex:0 0 auto;color:var(--muted);pointer-events:none}
+/* Tablet quick path (user call 2026-11-23): the top-bar "+ Add page"
+   is the one-tap way in at 769–1024px, where the rail is a slide-over.
+   Desktop keeps the rail in place (base rule hides it ≥1025px);
+   phones keep the slim bar (hidden ≤768px). */
+@media (max-width:768px){ #view-editor .editorTop #addPageTopBtn{display:none} }
+/* Counters removed (user call 2026-11-23): the "This notebook" stats
+   block is not in the mockups. CSS-only hide, scoped to the editor's
+   Links panel — the elements and their JS updates stay intact, and the
+   "Links & backlinks" section above it is untouched. */
+#view-editor #linksPanel .panelSub,
+#view-editor #linksPanel .statRow3{display:none}
+/* Links removed entirely (user call 2026-11-23: "Remove that link
+   button", "It's another unnecessary thing" — linking already happens
+   in the notebook text itself via [[Title]]). CSS-only hide, scoped to
+   the editor view: the HTML elements and their app.js handlers stay
+   intact (reversible; toggleLinksPanel / applyLinksPanel /
+   openRailPanel simply become unreachable in the editor). The top-bar
+   button, the whole panel (with the already-hidden counters inside it),
+   and the split-rail Links button all go, at all widths. The [[...]]
+   text behaviour itself is untouched. */
+#view-editor .editorTop #linksToggleBtn{display:none}
+#view-editor #linksPanel{display:none}
+#view-editor #railBtnLinks{display:none}
+/* Focus stays visible at tablet widths (mockup); icon-only on phones. */
+@media (max-width:1024px){ #view-editor .editorTop .edFocus{display:inline-flex} }
+@media (max-width:768px){ #view-editor .editorTop .edFocus .timerLabel{display:none} }
+
+/* Left rail: 210px on desktop, collapsible via the top-bar toggle.
+   Desktop-only: at <=1024px the base stylesheet stacks the editor
+   into one column (stage first, rail below), and this rule must not
+   override that collapse. */
+/* The Links panel is gone (user call 2026-11-23) — see below — so the
+   252px track is dropped: the paper fills the freed width. These grid
+   rules are guarded to the normal editor state: split mode and Focus
+   mode have their own grids, and the unguarded rule was overriding
+   them (probe on this branch: split rail stretched to a 210px track,
+   focus paper squeezed to 2px wide). */
+@media (min-width:1025px){
+  body:not(.splitOn):not(.focusMode) #view-editor .editorWrap{grid-template-columns:210px minmax(0,1fr)}
+}
+@media (min-width:1025px){
+  body:not(.splitOn):not(.focusMode) #view-editor.railHidden #pagesPanel{display:none}
+  body:not(.splitOn):not(.focusMode) #view-editor.railHidden .editorWrap{grid-template-columns:minmax(0,1fr)}
+}
+/* Pages | Layers as a segmented pill control. */
+#view-editor .railTabs{display:flex;gap:0;background:var(--surface-muted);border:0;border-radius:999px;padding:3px;margin-bottom:12px}
+#view-editor .railTab{flex:1;border-bottom:0;border-radius:999px;color:var(--muted)}
+#view-editor .railTab[aria-selected="true"]{background:var(--surface);color:var(--text);border-bottom-color:transparent;box-shadow:0 1px 3px rgba(0,0,0,.14)}
+/* Tablet slide-over drawer for the rail (toggleRailPanel adds
+   .railDrawer; the positioning CSS previously existed only in split
+   mode at >=1025px). The drawer and its backdrop start below the 56px
+   top bar so the bar — including the toggle that opened the drawer —
+   stays clickable while it is open. */
+@media (max-width:1024px){
+  #view-editor #pagesPanel.railDrawer{display:block;position:fixed;left:0;top:56px;bottom:0;z-index:70;width:300px;max-width:calc(100vw - 48px);overflow:auto;background:var(--surface);border-right:1px solid var(--border);padding:14px;overscroll-behavior:contain}
+  #view-editor #railBackdrop{display:block;position:fixed;left:0;right:0;top:56px;bottom:0;z-index:65;background:rgba(0,0,0,.18)}
+  #view-editor #railBackdrop.hidden{display:none}
+}
+
+/* Tool dock: opaque pill (no glass), active tool terracotta. */
+#view-editor .toolbar{background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none}
+#view-editor .toolbar .tool[aria-pressed="true"],#view-editor .toolbar .tool.active{background:var(--accent);border-color:var(--accent);color:var(--accent-text)}
+#view-editor .toolbar .tool[aria-pressed="true"]:hover,#view-editor .toolbar .tool.active:hover{background:var(--accent)}
+#view-editor #mainToolbar .shapePop .tool[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-text)}
+/* Pen-only toggle is not in the mockup dock; element + handler kept. */
+#view-editor .toolbar #penOnlyBtn{display:none}
+#view-editor .layerChip{background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none}
+#view-editor .zoomFab,#view-editor .pageNavFab{background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none}
+
+/* Mobile <=720px: the dock becomes a fixed, horizontally scrollable
+   bottom dock; the paper goes full-bleed and the zoom/page pills sit
+   above the dock. */
+@media (max-width:720px){
+  #view-editor .toolbar{position:fixed;left:0;right:0;bottom:0;top:auto;transform:none;z-index:40;width:auto;max-width:none;margin-top:0;border:0;border-top:1px solid var(--border);border-radius:0;padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));overflow-x:auto;scrollbar-width:none}
+  #view-editor .toolbar::-webkit-scrollbar{display:none}
+  #view-editor .toolbar .pillTools{display:inline-flex}
+  #view-editor .canvasShell{margin-top:0;border:0;border-radius:0;box-shadow:none}
+  #view-editor .zoomFab{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+  #view-editor .pageNavFab{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+}
