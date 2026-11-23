@@ -848,18 +848,19 @@ function openShelfOptions(){
 }
 function fmtBytes(n){ if(n<1024) return n+' B'; if(n<1048576) return (n/1024).toFixed(1)+' KB'; if(n<1073741824) return (n/1048576).toFixed(1)+' MB'; return (n/1073741824).toFixed(2)+' GB'; }
 async function updateStorageBar(){
-  let fill=$('storageFill'), txt=$('storageText'); if(!fill||!txt) return;
+  let fill=$('storageFill'), txt=$('storageText'), val=$('storageValue'); if(!fill||!txt) return;
   try{
     if(!navigator.storage||!navigator.storage.estimate) throw new Error('no estimate');
     let e=await navigator.storage.estimate();
     let used=e.usage||0, quota=e.quota||0;
     let pct=quota? Math.min(100,Math.round(used/quota*100)) : 0;
     fill.style.width=pct+'%';
-    /* Mockup 5 (Pass 1 audit): the storage line reads "X used ·
-       N annotations" — real data, not the quota percentage. */
-    let anCount=S.items.reduce((a,n)=>a+((n.annotations||[]).length),0);
-    txt.textContent=fmtBytes(used)+' used · '+anCount+(anCount===1?' annotation':' annotations');
-  }catch(err){ fill.style.width='0%'; txt.textContent='Storage use is not available in this browser.'; }
+    /* Screen 03 (mockups desktop/tablet/mobile): the storage line reads
+       "X.X MB used · Local-first IndexedDB" — the "Local Storage" row
+       carries the measured value, the caption names the store. */
+    if(val) val.textContent=fmtBytes(used)+' used';
+    txt.textContent='Local-first IndexedDB';
+  }catch(err){ fill.style.width='0%'; if(val) val.textContent='—'; txt.textContent='Storage use is not available in this browser.'; }
 }
 function newMenuAct(kind){
   let m=$('newMenu'); if(m&&m.matches(':popover-open')) m.hidePopover();
