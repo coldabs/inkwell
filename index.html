@@ -516,8 +516,8 @@
       <button type="button" onpointerdown="event.preventDefault()" onpointerup="barAct(event,'strike','reader')" onclick="barAct(event,'strike','reader')"><span class="prSelStrike">Strikethrough</span></button>
       <button type="button" class="selColorBtn" onpointerdown="event.preventDefault()" onpointerup="barAct(event,'color','reader')" onclick="barAct(event,'color','reader')" aria-label="Mark colour"><span class="selColorDot" aria-hidden="true"></span></button>
       <button type="button" class="selUndoBtn" id="readerSelUndo" onpointerdown="event.preventDefault()" onpointerup="barAct(event,'undo','reader')" onclick="barAct(event,'undo','reader')" aria-label="Undo last mark" title="Undo last mark"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-undo"></use></svg> Undo</button>
-      <button type="button" onpointerdown="event.preventDefault()" onclick="readerHideSelBar();openOcrPanel()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-scan"></use></svg> OCR</button>
-      <button type="button" onpointerdown="event.preventDefault()" onclick="readerHideSelBar();toggleTtsBar()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-volume"></use></svg> Listen</button>
+      <button type="button" class="selOcrBtn" onpointerdown="event.preventDefault()" onclick="readerHideSelBar();openOcrPanel()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-scan"></use></svg> OCR</button>
+      <button type="button" class="selListenBtn" onpointerdown="event.preventDefault()" onclick="readerHideSelBar();toggleTtsBar()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-volume"></use></svg> Listen</button>
     </div>
     <div id="selColorPop" class="selColorPop hidden" role="group" aria-label="Mark colour and intensity" data-selcolor-for="pop">
       <div class="selDots"></div>

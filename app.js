@@ -3660,6 +3660,7 @@ function setReaderMode(m){
   let b=curBook(); if(b){ b.mode=m; if(b.kind==='pdf') renderPdfBook(); else renderEpubBook(); }
   toast(m==='scroll'?'Scroll view':'Page view, one at a time. Use Prev and Next.');
   syncSepiaPageMode();
+  syncNightScrollMode();
 }
 function setReaderTheme(v){
   /* Theme fix (2026-11-23): the old line overwrote readerArticle.className
@@ -3686,6 +3687,7 @@ function setReaderTheme(v){
      even if storage throws. */
   try{ localStorage.setItem(READER_THEME_KEY,v); }catch(e){}
   syncSepiaPageMode();
+  syncNightScrollMode();
 }
 /* SCREEN 07: Sepia Page Mode is one state — EPUB + Sepia theme + Page
    mode. The .sepiaPage class on #view-reader scopes every Screen 07
@@ -3706,6 +3708,47 @@ function syncSepiaPageMode(){
   let mp=$('mobilePageLabel');
   if(mp) mp.textContent= on ? 'Page Mode' : 'Chapter '+(b.ch+1)+' / '+b.chapters.length;
 }
+/* SCREEN 08: Night Scroll Mode is one state — EPUB + Obsidian/Night
+   theme + Scroll mode. The .nightScroll class on #view-reader scopes
+   every Screen 08 style, so the PDF reader, Library, palette and EPUB
+   Paper/Sepia/Page are untouched. The header readout, progress bar and
+   sidebar active highlight stay in step with the visible chapter via an
+   IntersectionObserver over the [data-ch] chapter blocks (same
+   center-band pattern as the PDF page observer): the observer sets
+   b.ch, and the existing updateResume() refreshes the title, progress
+   and active highlight from it. Called from setReaderTheme,
+   setReaderMode and updateResume, which together cover every
+   theme/mode/chapter transition. */
+let epubChIO=null;
+function syncNightScrollMode(){
+  let b=curBook(), vr=$('view-reader'); if(!vr) return;
+  let on=!!(b&&b.kind==='epub'&&b.mode==='scroll'&&$('readerArticle').classList.contains('dark'));
+  vr.classList.toggle('nightScroll',on);
+  if(on) startEpubChObserver(); else stopEpubChObserver();
+  let rt=$('readerTopTitle');
+  if(rt&&on&&b&&b.kind==='epub') rt.textContent='Ch. '+(b.ch+1)+' of '+b.chapters.length+' · '+b.chapters[b.ch].title;
+}
+function startEpubChObserver(){
+  let b=curBook(); if(!b||b.kind!=='epub'||b.mode!=='scroll') return;
+  let nodes=[...document.querySelectorAll('#readerBody [data-ch]')];
+  if(!nodes.length) return;
+  /* Re-observe only when the chapter blocks were re-rendered (fresh
+     nodes): re-creating the observer on every updateResume would
+     re-fire the initial callbacks and churn the readout. */
+  if(epubChIO&&epubChIO._nodes&&epubChIO._nodes.length===nodes.length&&epubChIO._nodes.every(n=>n.isConnected)) return;
+  stopEpubChObserver();
+  epubChIO=new IntersectionObserver(es=>{
+    let vis=es.filter(e=>e.isIntersecting);
+    if(!vis.length) return;
+    vis.sort((x,y)=>x.boundingClientRect.top-y.boundingClientRect.top);
+    let idx=+vis[0].target.dataset.ch;
+    let b2=curBook();
+    if(b2&&b2.kind==='epub'&&b2.mode==='scroll'&&idx!==b2.ch){ b2.ch=idx; updateResume(); }
+  },{root:null, rootMargin:'-35% 0px -55% 0px'});
+  epubChIO._nodes=nodes;
+  nodes.forEach(n=>epubChIO.observe(n));
+}
+function stopEpubChObserver(){ if(epubChIO){ epubChIO.disconnect(); epubChIO=null; } }
 function readerFont(d){ let cur=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--reader-fs'))||19; let next=Math.max(15,Math.min(26,cur+d*1.5)); document.documentElement.style.setProperty('--reader-fs',next+'px'); let s=$('readerFontSlider'); if(s) s.value=next; }
 function readerFontSlider(v){ let next=Math.max(15,Math.min(26,+v||19)); document.documentElement.style.setProperty('--reader-fs',next+'px'); }
 function toggleReaderSide(){ prLeave(); $('readerSide').classList.toggle('open'); let st=$('readerSideToggle'); if(st) st.setAttribute('aria-expanded', String($('readerSide').classList.contains('open'))); }
@@ -3746,6 +3789,7 @@ function updateResume(){ updateReadProgress();
   /* Screen 07: keep the active chapter marked in the Contents list. */
   if(b.kind==='epub'){ let tc=$('tocList'); if(tc&&tc.dataset.bookId===b.id) tc.querySelectorAll('.tocItem').forEach((el,i)=>el.classList.toggle('active',i===b.ch)); }
   syncSepiaPageMode();
+  syncNightScrollMode();
 }
 
 /* --- EPUB rendering --- */
@@ -4116,7 +4160,7 @@ window.addEventListener('resize',()=>{
   let b=curBook(); let toc=$('tocList'), bm=$('bookmarkList'), an=$('annoList'), th=$('thumbList');
   if(!b){ toc.innerHTML='<p class="kbd">Open a book to see its contents.</p>'; return; }
   bm.innerHTML= b.bookmarks.length? b.bookmarks.map(x=>'<div class="listRow"><span>'+esc(x.label)+'</span><button class="btn small" onclick="jumpBookmark('+x.at+')">Go</button></div>').join('') : '<p class="kbd">No bookmarks yet</p>';
-  an.innerHTML= b.annotations.length? b.annotations.map(a=>'<div class="listRow"><span class="annoSwatch" style="background:'+annoSwatch(a)+'"></span><span style="font-size:13px;line-height:1.45">“'+esc(a.text.slice(0,90))+'”<br/><span class="kbd">'+esc(a.where)+(a.kind&&a.kind!=='highlight'?' · '+esc(a.kind):'')+'</span></span></div>').join('')+'<button class="btn small" style="margin-top:8px" onclick="exportAnnotations()">Export annotations</button>' : '<p class="kbd">Select text → Highlight, Underline or Strikethrough</p>';
+  an.innerHTML= b.annotations.length? b.annotations.map(a=>'<div class="listRow annoCard"><span class="annoSwatch" style="background:'+annoSwatch(a)+'"></span><span class="annoBody"><span class="annoQuote">“'+esc(a.text.slice(0,90))+'”</span><span class="kbd annoWhere">'+esc(a.where.replace(/^Chapter /,'Ch. '))+(a.kind&&a.kind!=='highlight'?' · '+esc(a.kind):'')+'</span></span>'+(a.id?'<button class="btn small annoDel" onclick="deleteAnnotation(\''+a.id+'\')" aria-label="Delete annotation" title="Delete annotation">×</button>':'')+'</div>').join('')+'<button class="btn small" style="margin-top:8px" onclick="exportAnnotations()">Export annotations</button>' : '<p class="kbd">Select text → Highlight, Underline or Strikethrough</p>';
   if(b.kind==='epub'){
     th.dataset.bookId=b.id; toc.dataset.bookId=b.id;
     toc.innerHTML=b.chapters.map((c,i)=>'<div class="tocItem'+(i===b.ch?' active':'')+'" onclick="jumpToChapter('+i+')">'+(i+1)+'. '+esc(c.title)+'</div>').join('');
@@ -4568,6 +4612,23 @@ function undoLastAnnotation(){
   }
   renderReaderSide(); renderLibrary(); syncReaderToolUI(); scheduleSave();
   toast(gone?'Undid last annotation':'Undo didn’t clear that mark — reopen the book to clear it');
+}
+/* SCREEN 08: delete one annotation from its card (the mobile mockup
+   shows a trash icon per card). Same unwrap as undoLastAnnotation, then
+   a repaint fallback for a mark whose spans were never drawn. */
+function deleteAnnotation(id){
+  let b=curBook(); if(!b||!id||id==='undefined') return;
+  let a=b.annotations.find(x=>x.id===id);
+  b.annotations=b.annotations.filter(x=>x.id!==id);
+  let unwrapped=0;
+  document.querySelectorAll('[data-hl][data-anno-id="'+id+'"]').forEach(el=>{ unwrapped++; let p=el.parentNode; while(el.firstChild) p.insertBefore(el.firstChild,el); p.removeChild(el); p.normalize(); });
+  if(!unwrapped&&a){
+    try{
+      if(b.kind==='epub'){ let m=/Chapter\s+(\d+)/.exec(a.where||''); repaintEpubMarksForUndo(b, m? (+m[1]-1) : b.ch); }
+      else { let m=/PDF page\s+(\d+)/.exec(a.where||''); repaintPdfMarksForUndo(b, m? +m[1] : (b.page||1)); }
+    }catch(e){}
+  }
+  renderReaderSide(); scheduleSave(); toast('Annotation deleted');
 }
 let readerActiveTool='', readerPointerDown=false, readerAutoMarkT=null, readerShiftHeld=false, _lastReaderTool='highlight', _armedHintShown={};
 /* Xiaomi Focus Pen in the reader: dragging the pen across text selects
