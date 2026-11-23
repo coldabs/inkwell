@@ -3629,6 +3629,9 @@ function openBook(id){
   $('ocrBox').classList.add('hidden'); $('parallelBox').classList.add('hidden');
   if(b.kind==='pdf'){ showPdfChrome(); renderPdfBook(); }
   else { showEpubChrome(); renderEpubBook(); }
+  /* Screen 05: on desktop the sidebar starts open (mockup) so the
+     top-bar toggle can collapse it; .open is what the toggle flips. */
+  if(window.matchMedia('(min-width:1025px)').matches){ let s=$('readerSide'); if(s) s.classList.add('open'); let st=$('readerSideToggle'); if(st) st.setAttribute('aria-expanded','true'); }
   showView('reader'); renderReaderSide();
 }
 function showEpubChrome(){ $('pdfView').classList.add('hidden'); $('readerArticle').classList.remove('hidden'); $('ttsBar').classList.add('hidden'); var f=$('annotateFab'); if(f) f.classList.add('hidden'); var rz=$('readerZoomGroup'); if(rz) rz.classList.add('hidden'); }
@@ -3644,7 +3647,7 @@ function setReaderMode(m){
 function setReaderTheme(v){ $('readerArticle').className='reader '+v; $('parallelRead').dataset.theme=v; let pv=$('pdfView'); pv.style.filter= v==='dark'? 'invert(0.92) hue-rotate(180deg)':''; }
 function readerFont(d){ let cur=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--reader-fs'))||19; let next=Math.max(15,Math.min(26,cur+d*1.5)); document.documentElement.style.setProperty('--reader-fs',next+'px'); let s=$('readerFontSlider'); if(s) s.value=next; }
 function readerFontSlider(v){ let next=Math.max(15,Math.min(26,+v||19)); document.documentElement.style.setProperty('--reader-fs',next+'px'); }
-function toggleReaderSide(){ prLeave(); $('readerSide').classList.toggle('open'); }
+function toggleReaderSide(){ prLeave(); $('readerSide').classList.toggle('open'); let st=$('readerSideToggle'); if(st) st.setAttribute('aria-expanded', String($('readerSide').classList.contains('open'))); }
 /* P4: the reader side panel is a 4-tab rail now (Contents / Bookmarks /
    Annotations / Thumbnails, mockup 18) — tabs guide: aria-selected drives
    the style, initial state is in the HTML. */
@@ -3663,8 +3666,14 @@ function sheetDragEnd(){ if(!_sheetDrag) return; let s=_sheetDrag; _sheetDrag=nu
 function updateResume(){ updateReadProgress();
   let b=curBook(); if(!b) return;
   scheduleSave();
-  if(b.kind==='pdf'){ $('pageLabel').textContent='Page '+b.page+' / '+b.numPages; $('resumeLabel').textContent='Reading · '+b.title+' · Page '+b.page+' of '+b.numPages+' · '+Math.round(b.page/b.numPages*100)+'%. Resumes here.'; S.stats.pagesRead['pdf:'+b.id+':'+b.page]=1; }
-  else { $('pageLabel').textContent='Chapter '+(b.ch+1)+' / '+b.chapters.length; $('resumeLabel').textContent='Reading · '+b.title+' · Chapter '+(b.ch+1)+' of '+b.chapters.length+'. Resumes here.'; S.stats.pagesRead['epub:'+b.id+':'+b.ch]=1; }
+  if(b.kind==='pdf'){ $('pageLabel').textContent='Page '+b.page+' / '+b.numPages; $('resumeLabel').textContent='Reading · '+b.title+' · Page '+b.page+' of '+b.numPages+' · '+Math.round(b.page/b.numPages*100)+'%. Resumes here.'; S.stats.pagesRead['pdf:'+b.id+':'+b.page]=1; let rt=$('readerTopTitle'); if(rt) rt.textContent='Reading · '+b.title+' · Page '+b.page+' of '+b.numPages+' · '+Math.round(b.page/b.numPages*100)+'%'; let rp=$('readerTopPage'); if(rp) rp.textContent='Page '+b.page+' / '+b.numPages+' · '+Math.round(b.page/b.numPages*100)+'%'; let mp=$('mobilePageLabel'); if(mp) mp.textContent='Page '+b.page+' / '+b.numPages; }
+  else { $('pageLabel').textContent='Chapter '+(b.ch+1)+' / '+b.chapters.length; $('resumeLabel').textContent='Reading · '+b.title+' · Chapter '+(b.ch+1)+' of '+b.chapters.length+'. Resumes here.'; S.stats.pagesRead['epub:'+b.id+':'+b.ch]=1; let mp=$('mobilePageLabel'); if(mp) mp.textContent='Chapter '+(b.ch+1)+' / '+b.chapters.length; let rp=$('readerTopPage'); if(rp) rp.textContent='Chapter '+(b.ch+1)+' / '+b.chapters.length; }
+  /* Screen 05: keep the active thumbnail in step with the current page /
+     chapter on every page change (jump, scroll, mode switch). The
+     sidebar is only rebuilt on open; without this the terracotta border
+     stayed on the page the reader opened at. Cheap class toggles only —
+     no sidebar re-render, so no flicker while scrolling. */
+  let th=$('thumbList'); if(th&&th.dataset.bookId===b.id){ if(b.kind==='pdf') th.querySelectorAll('.thumbItem').forEach((el,i)=>el.classList.toggle('active',i+1===b.page)); else th.querySelectorAll('.thumbItem').forEach((el,i)=>el.classList.toggle('active',i===b.ch)); }
   let tw=$('ttsWhere'); if(tw) tw.textContent=$('pageLabel').textContent;
   syncBookmarkBtn();
 }
@@ -4541,7 +4550,7 @@ document.addEventListener('pointerdown',e=>{
 document.addEventListener('pointermove',e=>{ if(penSel) penSelMove(e); },true);
 document.addEventListener('pointerup',e=>{ if(e.pointerType==='pen') penSelEnd(); },true);
 document.addEventListener('pointercancel',e=>{ if(e.pointerType==='pen') penSelEnd(); },true);
-function toggleReaderToolPanel(forceOpen){ let p=$('readerToolPanel'); if(!p) return; let show=typeof forceOpen==='boolean'? forceOpen : p.classList.contains('hidden'); p.classList.toggle('hidden',!show); let fab=$('readerToolFab'); if(fab) fab.setAttribute('aria-expanded',show?'true':'false'); syncReaderToolUI(); }
+function toggleReaderToolPanel(forceOpen){ let p=$('readerToolPanel'); if(!p) return; let show=typeof forceOpen==='boolean'? forceOpen : p.classList.contains('hidden'); p.classList.toggle('hidden',!show); let fab=$('readerToolFab'); if(fab) fab.setAttribute('aria-expanded',show?'true':'false'); let d=$('readerToolDock'); if(d) d.classList.toggle('panelOpen', show); let mm=$('mobileMarkupBtn'); if(mm) mm.setAttribute('aria-expanded',show?'true':'false'); syncReaderToolUI(); }
 function toggleReaderTool(tool){
   readerActiveTool=(readerActiveTool===tool)?'':tool;
   if(!readerActiveTool) clearTimeout(readerAutoMarkT);
@@ -4565,12 +4574,12 @@ function syncReaderToolUI(){
   }
   let hasMarks=!!(b&&b.annotations&&b.annotations.length);
   let ub=$('readerUndoBtn'); if(ub) ub.disabled=!hasMarks;
-  let tu=$('readerTopUndo'); if(tu) tu.disabled=!hasMarks;
+  let tu=$('readerTopUndo'); if(tu) tu.disabled=!hasMarks; let mu=$('mobileUndoBtn'); if(mu) mu.disabled=!hasMarks;
   let su=$('readerSelUndo'); if(su) su.disabled=!hasMarks;
   let qu=$('readerQuickUndo'); if(qu) qu.classList.toggle('hidden',!hasMarks);
 }
 function scheduleAutoReaderMark(){ clearTimeout(readerAutoMarkT); if(!readerActiveTool||readerPointerDown||PR.on||S.view!=='reader') return; readerAutoMarkT=setTimeout(()=>{ if(!readerActiveTool||readerPointerDown||PR.on||S.view!=='reader') return; let sel=readerSelection(); if(sel&&sel.toString().trim()) annotateSelection(readerActiveTool); },500); }
-document.addEventListener('pointerdown',e=>{ if(penSel && e.pointerType==='touch') return; /* palm during a pen selection */ readerPointerDown=true; clearTimeout(readerAutoMarkT); let p=$('readerToolPanel'); if(p&&!p.classList.contains('hidden')&&!e.target.closest('#readerToolPanel')&&!e.target.closest('#readerToolFab')&&!e.target.closest('#readerFab')) toggleReaderToolPanel(false); },true);
+document.addEventListener('pointerdown',e=>{ if(penSel && e.pointerType==='touch') return; /* palm during a pen selection */ readerPointerDown=true; clearTimeout(readerAutoMarkT); let p=$('readerToolPanel'); if(p&&!p.classList.contains('hidden')&&!e.target.closest('#readerToolPanel')&&!e.target.closest('#readerToolFab')&&!e.target.closest('#readerFab')&&!e.target.closest('#mobileMarkupBtn')) toggleReaderToolPanel(false); },true);
 document.addEventListener('pointerup',e=>{ if(penSel && e.pointerType==='touch') return; /* palm lifting must not end the pen's selection early */ readerPointerDown=false; if(readerActiveTool&&!PR.on&&S.view==='reader') scheduleAutoReaderMark(); },true);
 document.addEventListener('pointercancel',e=>{ if(penSel && e.pointerType==='touch') return; readerPointerDown=false; },true);
 /* --- "<Tool> color" bottom sheet (reference video r06: colour grid + Opacity slider) --- */
