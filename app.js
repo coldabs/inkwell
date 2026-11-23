@@ -39,6 +39,7 @@ function setBtnContent(id,iconName,label){ let b=$(id); if(b) b.innerHTML=icon(i
 
 /* ============ theme ============ */
 const THEME_KEY='inkwell-theme';
+const READER_THEME_KEY='inkwell-reader-theme'; /* Paper/Sepia/Obsidian reading theme: stored, restored on open (see restoreReaderTheme) */
 function effectiveTheme(){ return document.documentElement.dataset.theme || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); }
 function syncThemeToggle(){
   let b=$('themeToggle'); if(!b) return;
@@ -3629,6 +3630,9 @@ function openBook(id){
   $('ocrBox').classList.add('hidden'); $('parallelBox').classList.add('hidden');
   if(b.kind==='pdf'){ showPdfChrome(); renderPdfBook(); }
   else { showEpubChrome(); renderEpubBook(); }
+  /* Re-apply the stored reading theme on every open so Paper/Sepia/
+     Obsidian survives reopening the book, switching books and reloads. */
+  restoreReaderTheme();
   /* Screen 05: on desktop the sidebar starts open (mockup) so the
      top-bar toggle can collapse it; .open is what the toggle flips. */
   if(window.matchMedia('(min-width:1025px)').matches){ let s=$('readerSide'); if(s) s.classList.add('open'); let st=$('readerSideToggle'); if(st) st.setAttribute('aria-expanded','true'); }
@@ -3644,7 +3648,31 @@ function setReaderMode(m){
   let b=curBook(); if(b){ b.mode=m; if(b.kind==='pdf') renderPdfBook(); else renderEpubBook(); }
   toast(m==='scroll'?'Scroll view':'Page view, one at a time. Use Prev and Next.');
 }
-function setReaderTheme(v){ $('readerArticle').className='reader '+v; $('parallelRead').dataset.theme=v; let pv=$('pdfView'); pv.style.filter= v==='dark'? 'invert(0.92) hue-rotate(180deg)':''; }
+function setReaderTheme(v){
+  /* Theme fix (2026-11-23): the old line overwrote readerArticle.className
+     wholesale ('reader '+v), which wiped the 'hidden' class showPdfChrome()
+     adds — so picking any theme while a PDF was open un-hid the EPUB
+     article above the PDF and the reader "reverted back to a epub".
+     Toggle only the theme classes now; 'hidden' (and anything else) is
+     left alone. */
+  let ra=$('readerArticle');
+  ra.classList.remove('sepia','dark');
+  if(v==='sepia'||v==='dark') ra.classList.add(v);
+  $('parallelRead').dataset.theme=v;
+  let pv=$('pdfView');
+  /* Obsidian keeps the existing container invert. Sepia warms the page
+     sheets only (see the [data-reader-theme="sepia"] rule in styles.css):
+     a sepia filter on the whole #pdfView also filters its #F6F3EC
+     padding, which saturates into a yellow frame — measured (255,255,177)
+     even at sepia(0.45) saturate(2.5) — while the sheet itself only
+     reaches a pale cream. Sheet-level tint keeps the surround calm. */
+  pv.style.filter= v==='dark'? 'invert(0.92) hue-rotate(180deg)':'';
+  pv.dataset.readerTheme=v||'paper';
+  /* Persist the choice (same try/catch pattern as THEME_KEY): the theme
+     used to reset to Paper on every reload. The page still gets themed
+     even if storage throws. */
+  try{ localStorage.setItem(READER_THEME_KEY,v); }catch(e){}
+}
 function readerFont(d){ let cur=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--reader-fs'))||19; let next=Math.max(15,Math.min(26,cur+d*1.5)); document.documentElement.style.setProperty('--reader-fs',next+'px'); let s=$('readerFontSlider'); if(s) s.value=next; }
 function readerFontSlider(v){ let next=Math.max(15,Math.min(26,+v||19)); document.documentElement.style.setProperty('--reader-fs',next+'px'); }
 function toggleReaderSide(){ prLeave(); $('readerSide').classList.toggle('open'); let st=$('readerSideToggle'); if(st) st.setAttribute('aria-expanded', String($('readerSide').classList.contains('open'))); }
@@ -3657,6 +3685,12 @@ function readerSideTab(name,open){
   if(open){ let s=$('readerSide'); if(s) s.classList.add('open'); }
 }
 function setReaderThemeSwatch(v){ let s=$('themeSel'); if(s) s.value=v; setReaderTheme(v); syncReaderThemeUI(); }
+function restoreReaderTheme(){
+  let v=''; try{ v=localStorage.getItem(READER_THEME_KEY)||''; }catch(e){}
+  if(v!=='sepia'&&v!=='dark') v='';
+  let s=$('themeSel'); if(s) s.value=v;
+  setReaderTheme(v); syncReaderThemeUI();
+}
 function syncReaderThemeUI(){ let v=($('themeSel')||{}).value||''; document.querySelectorAll('#readerThemeSwatches .themeSwatch').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.theme===v))); }
 function syncTtsRateLabel(){ let r=$('ttsRate'), v=$('ttsRateVal'); if(r&&v) v.textContent=(+r.value).toString()+'×'; }
 let _sheetDrag=null;
@@ -4132,9 +4166,9 @@ function toggleBookmark(){
   else { b.bookmarks.push({at:at,label:label}); toast('Bookmarked: '+label); }
   syncBookmarkBtn();
   renderReaderSide();
-  /* P7: open the Bookmarks panel so the new bookmark is actually
-     visible — the old <details> is now the 4-tab rail. */
-  readerSideTab('bookmarks',true);
+  /* No auto-open of the Bookmarks panel (same hijack as highlights: on
+     mobile it is a bottom drawer). The toast is the confirmation; the
+     drawer opens only on a user tap. */
 }
 function changePage(d){
   let b=curBook(); if(!b){ toast('Open a book first'); return; }
@@ -4401,8 +4435,10 @@ function annotateSelection(kind){
   b.annotations.push({id:annoId, text:text, where:where, kind:kind, color:markColorFor(b,kind), opacity:markOpacityFor(b,kind)});
   sel.removeAllRanges();
   renderReaderSide(); renderLibrary(); scheduleSave(); syncReaderToolUI();;
-  /* P7: open the Annotations panel so the new entry is visible. */
-  readerSideTab('annotations',true);
+  /* No auto-open of the Annotations panel: on mobile it is a bottom
+     drawer, so opening it after every highlight hijacked the screen and
+     the user had to dismiss it to keep reading. The toast is the
+     confirmation; the drawer opens only on a user tap. */
   toast((kind==='highlight'?'Highlighted': kind==='underline'?'Underlined':'Struck through')+' & saved to annotations');
 }
 function highlightSelection(){ annotateSelection('highlight'); }
@@ -5925,6 +5961,7 @@ async function initApp(){
   let restorePromise=(async()=>{ try{ return await restoreLibrary(myToken); }catch(e){ restoreState='failed'; return false; } })();
   if(!S.items.length){ S.items.push(sampleBook()); S.items.push(samplePdfBook()); }
   renderLibrary(); showView('library');
+  restoreReaderTheme(); /* sheet swatches match the stored theme from the first paint */
   ensureSamplePdf();
   let initDone=false;
   restorePromise.then(v=>{ if(!initDone){ initDone=true; finishInit(v); } });

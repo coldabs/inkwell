@@ -1471,6 +1471,16 @@ body.inEditor .pageNavFab{display:flex}
 @media (pointer:coarse){
   #readerArticle, #pdfView .textLayer, #parallelRead .textLayer, #parallelRead .prPane{-webkit-touch-callout:none}
 }
+/* --- Reader chrome is never selectable: only book text can be selected
+   and highlighted. A drag starting on a chrome label (e.g. the "Quick
+   Markup" button) used to select the word "Quick" and highlight it into
+   the Annotations list. Book text is untouched: #readerArticle prose and
+   the PDF text layers keep their default selection, and the selection
+   bar still appears for book text. --- */
+.readerTop, #readerMobileBar, #readerSide, #readerToolDock,
+#readerSelBar, #readerSheet, .readerPager, #ttsBar, .pdfPageNum{
+  -webkit-user-select:none; user-select:none;
+}
 .reader.dark .textLayer mark{mix-blend-mode:lighten}
 .prSelBar{max-width:calc(100vw - 16px)}
 .readerToolDock{position:fixed;right:16px;bottom:max(18px,env(safe-area-inset-bottom,18px));z-index:76;display:flex;flex-direction:column;align-items:flex-end;gap:10px;}
@@ -1819,6 +1829,13 @@ dialog.sheet.drawerRight#librarySheet::backdrop{background:rgba(20,16,12,.45);ba
 #pdfView{background:var(--bg);border:0;border-radius:0;box-shadow:none;padding:18px}
 .pdfHead{display:none}
 .pdfPage{box-shadow:var(--shadow-sheet)}
+/* Reader theme — Sepia: warm the PDF sheets only. A sepia filter on the
+   whole #pdfView would also filter its #F6F3EC padding into a saturated
+   yellow frame (measured (255,255,177) even at sepia(0.45) saturate(2.5)),
+   so the tint lives here, on the white sheets. Measured on the Demo PDF:
+   sheet renders (250,248,220) warm cream, black text stays pure black,
+   so contrast is unchanged. Obsidian keeps the container invert in JS. */
+#pdfView[data-reader-theme="sepia"] .pdfPage{filter:sepia(0.7) saturate(3) hue-rotate(-12deg) brightness(0.98)}
 .readerColumn{padding-bottom:96px}
 
 /* --- Bottom floating center pill: Prev / Page X of Y / Next. --- */
@@ -1882,7 +1899,11 @@ body.prOn #readerMobileBar{display:none}
   #readerTopUndo{display:none}
   .readerPager{display:none}
   .readerColumn{padding-bottom:84px}
-  #readerMobileBar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:70;align-items:center;gap:8px;padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--border)}
+  #readerMobileBar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:90;align-items:center;gap:8px;padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--border)}
+  /* z-index 90, above the open drawer (80): the drawer must not cover
+     the bottom bar, or its TOC toggle is untappable while the drawer is
+     open and the drawer can only be closed with the ×. The bar stays
+     visible over the drawer's bottom edge; drawer geometry is unchanged. */
   .readerMobilePager{flex:1 1 auto;display:flex;align-items:center;justify-content:center;gap:2px;min-width:0}
   .readerMobilePager .btn{border:0;background:transparent;box-shadow:none;padding:0 4px}
   #mobilePageLabel{font-family:var(--font-mono);font-size:12px;white-space:nowrap}
