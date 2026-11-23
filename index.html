@@ -29,7 +29,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="styles.css?v=2026-11-22-r32">
+<link rel="stylesheet" href="styles.css?v=2026-11-23-r33">
 </head>
 <body>
 <!-- Icons: Tabler Icons 3.52.0, MIT, https://tabler.io/icons -->
@@ -459,20 +459,52 @@
     <div class="readerTop">
       <button class="iconBtn" onclick="showView('library')" aria-label="Back to library" title="Back to library"><svg class="ic" aria-hidden="true"><use href="#ticon-arrow-left"></use></svg></button>
       <div class="seg" role="tablist" aria-label="Reading mode"><button class="active" id="modeScrollBtn" onclick="setReaderMode('scroll')">Scroll</button><button id="modePageBtn" onclick="setReaderMode('page')">Page</button></div>
-      <button type="button" class="btn primary hidden" id="annotateFab" onclick="annotateCurrentPdf()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-pencil"></use></svg> Annotate</button> <button type="button" class="iconBtn" id="readerTopUndo" onclick="undoLastAnnotation()" aria-label="Undo last mark" title="Undo last mark" disabled><svg class="ic" aria-hidden="true"><use href="#ticon-undo"></use></svg></button> <button class="btn" id="readerMoreBtn" commandfor="readerSheet" command="show-modal">More <svg class="ic ic-sm moreChevron" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg></button>
+      <span class="readerTopTitle" id="readerTopTitle">Nothing open</span>
+      <button type="button" class="btn primary hidden" id="annotateFab" onclick="annotateCurrentPdf()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-pencil"></use></svg> Annotate</button> <button type="button" class="iconBtn" id="readerTopUndo" onclick="undoLastAnnotation()" aria-label="Undo last mark" title="Undo last mark" disabled><svg class="ic" aria-hidden="true"><use href="#ticon-undo"></use></svg></button> <button type="button" class="btn" commandfor="readerSheet" command="show-modal"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-typography"></use></svg> Aa Options</button> <button type="button" class="btn" onclick="openOcrPanel()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-scan"></use></svg> OCR</button> <button type="button" class="btn" id="readerTopBookmarkBtn" onclick="toggleBookmark()" aria-pressed="false"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-bookmark"></use></svg> Bookmark</button> <button type="button" class="btn readerFocusBtn" onclick="openTimer()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-clock"></use></svg> <span class="timerLabel">Focus 25:00</span></button> <button class="btn" id="readerMoreBtn" commandfor="readerSheet" command="show-modal">More <svg class="ic ic-sm moreChevron" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg></button>
       <span class="readerResume" id="resumeLabel"></span>
     </div>
-    <progress id="readProgress" class="readProgress" max="100" value="0"></progress> <dialog class="sheet" id="readerSheet" closedby="any">   <div class="sheetHead"><h2>Reading options</h2><form method="dialog"><button class="btn" type="submit">Close</button></form></div>   <div class="sheetBody">     <section class="sheetSection">       <h3>Reading</h3>       <div class="sheetRow">
-      <span class="tool-label">Theme</span>
-      <select id="themeSel" onchange="setReaderTheme(this.value)" aria-label="Reading theme"><option value="">Default</option><option value="sepia">Sepia</option><option value="dark">Night</option></select>
-      <button class="btn small" onclick="readerFont(-1)" aria-label="Decrease reading font size">A−</button>
-      <button class="btn small" onclick="readerFont(1)" aria-label="Increase reading font size">A+</button>
-      </div> <div class="sheetRow"><span class="prZoom hidden" id="readerZoomGroup"><button type="button" class="btn" onclick="readerZoomBy(0.8)" title="Zoom out" aria-label="Zoom out">−</button><button type="button" class="btn prZoomLabel" id="readerZoomLabel" onclick="readerZoomBy(0)" title="Reset zoom">100%</button><button type="button" class="btn" onclick="readerZoomBy(1.25)" title="Zoom in" aria-label="Zoom in">+</button></span> <button class="btn" id="sideToggle" onclick="toggleReaderSide()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-list"></use></svg> Contents</button> <button class="btn" id="bookmarkBtn" onclick="toggleBookmark()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-bookmark"></use></svg> Bookmark</button></div> </section> <section class="sheetSection"> <h3>Selected text</h3> <div class="sheetRow">
-      <button class="btn" onclick="readerSheetAction(highlightSelection)">Highlight</button>
-      <button class="btn" onclick="readerSheetAction(underlineSelection)">Underline</button>
-      <button class="btn" onclick="readerSheetAction(strikeSelection)">Strikethrough</button>
-      <button class="btn" onclick="openOcrPanel()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-scan"></use></svg> OCR</button>
-      <button class="btn" onclick="readerSheetAction(toggleTtsBar)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-volume"></use></svg> Listen</button> </div> <div class="sheetRow selColorRow" data-selcolor-for="sheet"><span class="tool-label">Colour</span><span class="selDots"></span><label class="selSliderWrap">Intensity <input type="range" class="selSlider" min="0.25" max="1" step="0.05" value="0.6" aria-label="Highlight intensity"><span class="selSliderVal">60%</span></label></div> <p class="sheetNote">Select words in the book first, then choose what to do with them.</p> </section> </div> </dialog>
+    <progress id="readProgress" class="readProgress" max="100" value="0"></progress> <dialog class="sheet" id="readerSheet" closedby="any">
+  <div class="sheetGrip" onpointerdown="sheetDragStart(event)" aria-hidden="true"><span></span></div>
+  <div class="sheetHead"><h2>Reading options</h2><form method="dialog"><button class="btn" type="submit">Close</button></form></div>
+  <div class="sheetBody">
+    <section class="sheetSection">
+      <h3>Theme</h3>
+      <div class="sheetRow themeSwatches" id="readerThemeSwatches" role="group" aria-label="Reading theme">
+        <button type="button" class="themeSwatch" data-theme="" onclick="setReaderThemeSwatch('')" aria-pressed="true"><span class="themeSwatchDot themePaper"></span>Paper</button>
+        <button type="button" class="themeSwatch" data-theme="sepia" onclick="setReaderThemeSwatch('sepia')" aria-pressed="false"><span class="themeSwatchDot themeSepia"></span>Sepia</button>
+        <button type="button" class="themeSwatch" data-theme="dark" onclick="setReaderThemeSwatch('dark')" aria-pressed="false"><span class="themeSwatchDot themeObsidian"></span>Obsidian</button>
+      </div>
+      <select id="themeSel" class="srOnly" tabindex="-1" aria-hidden="true" onchange="setReaderTheme(this.value);syncReaderThemeUI()"><option value="">Default</option><option value="sepia">Sepia</option><option value="dark">Night</option></select>
+    </section>
+    <section class="sheetSection">
+      <h3>Size</h3>
+      <div class="sheetRow sizeRow">
+        <button class="btn small" onclick="readerFont(-1)" aria-label="Decrease reading font size">A&minus;</button>
+        <input type="range" id="readerFontSlider" min="15" max="26" step="1.5" value="19" aria-label="Reading font size" oninput="readerFontSlider(+this.value)"/>
+        <button class="btn small" onclick="readerFont(1)" aria-label="Increase reading font size">A+</button>
+      </div>
+      <div class="sheetRow"><span class="prZoom hidden" id="readerZoomGroup"><button type="button" class="btn" onclick="readerZoomBy(0.8)" title="Zoom out" aria-label="Zoom out">&minus;</button><button type="button" class="btn prZoomLabel" id="readerZoomLabel" onclick="readerZoomBy(0)" title="Reset zoom">100%</button><button type="button" class="btn" onclick="readerZoomBy(1.25)" title="Zoom in" aria-label="Zoom in">+</button></span> <button class="btn" id="sideToggle" onclick="toggleReaderSide()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-list"></use></svg> Contents</button></div>
+    </section>
+    <section class="sheetSection">
+      <h3>Actions</h3>
+      <div class="actionGrid">
+        <button type="button" class="btn actionTile" onclick="readerSheetAction(highlightSelection)"><svg class="ic" aria-hidden="true"><use href="#ticon-highlighter"></use></svg>Highlight</button>
+        <button type="button" class="btn actionTile" onclick="openOcrPanel()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-scan"></use></svg>OCR</button>
+        <button type="button" class="btn actionTile" onclick="readerSheetAction(toggleTtsBar)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-volume"></use></svg>Listen</button>
+        <button type="button" class="btn actionTile" id="bookmarkBtn" onclick="toggleBookmark()" aria-pressed="false"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-bookmark"></use></svg>Bookmark</button>
+      </div>
+    </section>
+    <section class="sheetSection">
+      <h3>Selected text</h3>
+      <div class="sheetRow">
+        <button class="btn" onclick="readerSheetAction(underlineSelection)">Underline</button>
+        <button class="btn" onclick="readerSheetAction(strikeSelection)">Strikethrough</button>
+      </div>
+      <div class="sheetRow selColorRow" data-selcolor-for="sheet"><span class="tool-label">Colour</span><span class="selDots"></span><label class="selSliderWrap">Intensity <input type="range" class="selSlider" min="0.25" max="1" step="0.05" value="0.6" aria-label="Highlight intensity"><span class="selSliderVal">60%</span></label></div>
+      <p class="sheetNote">Select words in the book first, then choose what to do with them.</p>
+    </section>
+  </div>
+</dialog>
 
     <div id="readerSelBar" class="prSelBar hidden" role="toolbar" aria-label="Text tools" focusgroup="toolbar wrap">
       <button type="button" onpointerdown="event.preventDefault()" onpointerup="barAct(event,'highlight','reader')" onclick="barAct(event,'highlight','reader')"><mark class="prSelSample">Highlight</mark></button>
@@ -480,6 +512,8 @@
       <button type="button" onpointerdown="event.preventDefault()" onpointerup="barAct(event,'strike','reader')" onclick="barAct(event,'strike','reader')"><span class="prSelStrike">Strikethrough</span></button>
       <button type="button" class="selColorBtn" onpointerdown="event.preventDefault()" onpointerup="barAct(event,'color','reader')" onclick="barAct(event,'color','reader')" aria-label="Mark colour"><span class="selColorDot" aria-hidden="true"></span></button>
       <button type="button" class="selUndoBtn" id="readerSelUndo" onpointerdown="event.preventDefault()" onpointerup="barAct(event,'undo','reader')" onclick="barAct(event,'undo','reader')" aria-label="Undo last mark" title="Undo last mark"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-undo"></use></svg> Undo</button>
+      <button type="button" onpointerdown="event.preventDefault()" onclick="readerHideSelBar();openOcrPanel()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-scan"></use></svg> OCR</button>
+      <button type="button" onpointerdown="event.preventDefault()" onclick="readerHideSelBar();toggleTtsBar()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-volume"></use></svg> Listen</button>
     </div>
     <div id="selColorPop" class="selColorPop hidden" role="group" aria-label="Mark colour and intensity" data-selcolor-for="pop">
       <div class="selDots"></div>
@@ -489,19 +523,28 @@
     <dialog class="sheet toolColorSheet" id="toolColorSheet" closedby="any" aria-labelledby="toolColorSheetTitle"><div class="sheetHead"><h2 id="toolColorSheetTitle">Highlight color</h2><form method="dialog"><button class="btn" type="submit">Close</button></form></div><div class="sheetBody"><div class="toolColorGrid" id="toolColorGrid" role="group" aria-label="Colour"></div><div class="toolOpacityWrap"><span class="tool-label">Opacity</span><div class="toolOpacityRow"><div class="toolOpacityTrack"><div class="toolOpacityFill" id="toolOpacityFill"></div><input type="range" id="toolOpacitySlider" min="0.25" max="1" step="0.05" value="0.6" aria-label="Opacity" oninput="setToolColorOpacity(this.value)"></div><span class="toolOpacityVal" id="toolOpacityVal">60%</span></div></div><p class="sheetNote">Applies to the next mark you make with this tool — and stays for the ones after that.</p></div></dialog>
     <div id="readerGrid">
       <aside class="panel" id="readerSide">
-        <h4>Contents <button type="button" class="btn small sideClose" onclick="toggleReaderSide()" aria-label="Close contents">×</button></h4>
-        <div id="tocList"><p class="kbd">Open a book to see its contents.</p></div>
-        <details class="helpBox" id="bookmarkDetails"><summary><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-bookmark"></use></svg> Bookmarks</summary><div id="bookmarkList"><p class="kbd">No bookmarks yet</p></div></details>
-        <details class="helpBox" id="annoDetails"><summary><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-highlighter"></use></svg> Annotations</summary><div id="annoList"><p class="kbd">Select text, then choose Highlight</p></div></details>
-        <details class="helpBox"><summary><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-layout-grid"></use></svg> Thumbnails</summary><div id="thumbList"><p class="kbd">No pages yet</p></div></details>
+        <div class="sideTabs" focusgroup="tablist nomemory" role="tablist" aria-label="Reader panels">
+          <button type="button" class="sideTab" id="sideTab-contents" aria-selected="true" focusgroupstart onclick="readerSideTab('contents')"><svg class="ic" aria-hidden="true"><use href="#ticon-list"></use></svg><span>Contents</span></button>
+          <button type="button" class="sideTab" id="sideTab-bookmarks" aria-selected="false" onclick="readerSideTab('bookmarks')"><svg class="ic" aria-hidden="true"><use href="#ticon-bookmark"></use></svg><span>Bookmarks</span></button>
+          <button type="button" class="sideTab" id="sideTab-annotations" aria-selected="false" onclick="readerSideTab('annotations')"><svg class="ic" aria-hidden="true"><use href="#ticon-pencil"></use></svg><span>Annotations</span></button>
+          <button type="button" class="sideTab" id="sideTab-thumbnails" aria-selected="false" onclick="readerSideTab('thumbnails')"><svg class="ic" aria-hidden="true"><use href="#ticon-layout-grid"></use></svg><span>Thumbnails</span></button>
+          <button type="button" class="btn small sideClose" onclick="toggleReaderSide()" aria-label="Close contents">&times;</button>
+        </div>
+        <div class="sidePanels">
+          <div class="sidePanel" id="sidePanel-contents" role="tabpanel" aria-labelledby="sideTab-contents"><h4>Contents</h4><div id="tocList"><p class="kbd">Open a book to see its contents.</p></div></div>
+          <div class="sidePanel" id="sidePanel-bookmarks" role="tabpanel" aria-labelledby="sideTab-bookmarks" hidden><h4>Bookmarks</h4><div id="bookmarkList"><p class="kbd">No bookmarks yet</p></div></div>
+          <div class="sidePanel" id="sidePanel-annotations" role="tabpanel" aria-labelledby="sideTab-annotations" hidden><h4>Annotations</h4><div id="annoList"><p class="kbd">Select text, then choose Highlight</p></div></div>
+          <div class="sidePanel" id="sidePanel-thumbnails" role="tabpanel" aria-labelledby="sideTab-thumbnails" hidden><h4>Thumbnails</h4><div id="thumbList"><p class="kbd">No pages yet</p></div></div>
+        </div>
       </aside>
       <div class="readerColumn">
+        <div id="ocrRegion" class="ocrRegion hidden" aria-hidden="true"><span>OCR Region Selection</span></div>
         <article class="reader" id="readerArticle">
           <span class="readerBadge" id="readerBadge">Reader</span>
           <h2 id="readerTitle">Nothing open</h2>
           <div id="readerBody"><p>Open a book from the library, or import a PDF or EPUB, and it will open here in reading mode first.</p></div>
           <div id="ocrBox" class="resultBox hidden">
-            <div class="cardHead"><b>OCR, read print on this page</b><button class="btn small cardClose" type="button" onclick="closeReaderCards()" aria-label="Close OCR panel"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-x"></use></svg> Close</button></div>
+            <div class="cardHead"><b>OCR Extracted Text</b><button class="btn small cardClose" type="button" onclick="closeReaderCards()" aria-label="Close OCR panel"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-x"></use></svg> Close</button></div>
             <p class="kbd">Runs on this device with Tesseract.js. Language data downloads on first use for the language you pick. Best on clear print; handwriting is not what this is for.</p>
             <div class="ocrControls">
               <select id="ocrLang" aria-label="OCR language">
@@ -514,7 +557,7 @@
             <progress id="ocrProgress" class="hidden" value="0" max="1"></progress>
             <p class="kbd" id="ocrStatus"></p>
             <p id="ocrText"></p>
-            <div class="cardBtnRow"><button class="btn small hidden" id="ocrCopyBtn" onclick="copyOcrText()">Copy text</button><button class="btn small hidden" id="ocrNoteBtn" onclick="ocrToNote()">Add to a notebook note</button></div>
+            <div class="cardBtnRow"><button class="btn small hidden" id="ocrCopyBtn" onclick="copyOcrText()">Copy Text</button><button class="btn small hidden" id="ocrNoteBtn" onclick="ocrToNote()">Send to Written Notes</button></div>
           </div>
         </article>
 
@@ -534,9 +577,10 @@
           <button class="btn primary" id="ttsBtn" onclick="toggleTTS()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-player-play"></use></svg> Play</button>
           <span class="ttsField"><label class="kbd" for="accentSel">Accent</label><select id="accentSel"></select></span>
           <span class="ttsField"><label class="kbd" for="genderSel">Voice</label><select id="genderSel"><option value="">Any</option><option value="female">Female</option><option value="male">Male</option></select></span>
-          <span class="ttsField ttsSpeed"><label class="kbd" for="ttsRate">Speed</label><input type="range" id="ttsRate" min="0.7" max="1.4" step="0.1" value="1" aria-label="Speech speed"/></span>
+          <span class="ttsField ttsSpeed"><label class="kbd" for="ttsRate">Speed</label><input type="range" id="ttsRate" min="0.7" max="1.4" step="0.1" value="1" aria-label="Speech speed" oninput="syncTtsRateLabel()"/><span class="kbd" id="ttsRateVal">1&times;</span></span>
           <button class="btn" onclick="toggleParallel()" title="Translate this page, with the original beside it"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-language"></use></svg> Translate</button>
           <span class="kbd ttsHint" id="voiceHint">Loading voices that work on this device…</span>
+          <span class="kbd ttsWhere" id="ttsWhere"></span>
           <button class="btn small ttsClose" type="button" onclick="toggleTtsBar()" aria-label="Hide listen controls" title="Hide listen controls"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-x"></use></svg></button>
         </div>
         <div id="parallelBox" class="parallelBox hidden">
@@ -561,21 +605,19 @@
     <!-- PARALLEL READ: two books side by side (stacked on a phone), scrolling together -->
     <div id="parallelRead" class="hidden" aria-label="Parallel Read">
       <div class="prBar">
+        <button class="btn small" type="button" onclick="closeParallelRead(true);showView('library')" aria-label="Back to library"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-arrow-left"></use></svg> Shelf</button>
         <b class="prBarTitle">Parallel Read</b>
         <label class="kbd prBarLabel">Beside it</label>
         <button class="btn small" type="button" id="prRightBtn" onclick="prOpenPicker('second')" aria-label="Choose the second book"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-columns"></use></svg> <span id="prRightLabel">Choose a book</span></button>
-        <label class="kbd prBarLabel" for="prSync">Sync</label>
-        <select id="prSync" onchange="prSetSync(this.value)" aria-label="How the two books scroll together">
-          <option value="unit">By chapter / page</option>
-          <option value="percent">By overall position</option>
-          <option value="off">Off, scroll each on its own</option>
-        </select>
-        <span class="prOffsetWrap" id="prOffsetWrap"><label class="kbd" for="prOffset" title="Use this when the two books do not start on the same chapter or page. For example, 2 means the right book's chapter or page 3 lines up with the left book's 1."><span class="prLong">Right is ahead by</span><span class="prShort">Offset</span></label><input id="prOffset" type="number" step="1" value="0" inputmode="numeric" onchange="prSetOffset(this.value)" aria-label="Right book is ahead by this many chapters or pages"/></span>
+        <span class="kbd prBarLabel prSyncLabel">Sync</span>
+        <span class="seg prSyncSeg" id="prSyncSeg" role="tablist" aria-label="How the two books scroll together"><button type="button" data-sync="unit" class="active" onclick="prSetSync('unit')" title="Synced by chapter / page">Chapter</button><button type="button" data-sync="percent" onclick="prSetSync('percent')" title="Synced by overall position">Page</button><button type="button" data-sync="off" onclick="prSetSync('off')" title="Each book scrolls on its own">Off</button></span>
+        <span class="prOffsetWrap" id="prOffsetWrap"><label class="kbd" for="prOffset" title="Use this when the two books do not start on the same chapter or page. For example, 2 means the right book's chapter or page 3 lines up with the left book's 1."><span class="prLong">Right is ahead by</span><span class="prShort">Offset</span></label><button class="btn small" type="button" onclick="prOffsetStep(-1)" aria-label="Decrease offset">&minus;</button><input id="prOffset" type="number" step="1" value="0" inputmode="numeric" onchange="prSetOffset(this.value)" aria-label="Right book is ahead by this many chapters or pages"/><button class="btn small" type="button" onclick="prOffsetStep(1)" aria-label="Increase offset">+</button></span>
                 <button class="btn small" type="button" id="prMarksBtn" aria-expanded="false" aria-label="Marks in the book in use" onclick="prToggleMarks(this)" title="Highlights, underlines and strikethroughs in the book in use"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-highlighter"></use></svg> <span class="prMarksText">Marks</span> <span class="prCount" id="prMarksCount"></span></button> <span class="prZoom" role="group" aria-label="Zoom"><button class="btn small" type="button" onclick="prZoomBy(1/1.2)" aria-label="Zoom out" title="Zoom out (Ctrl + scroll, or pinch)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-out"></use></svg></button><button class="btn small prZoomLabel" type="button" id="prZoomLabel" onclick="prZoomBy(0)" title="Reset zoom to 100%">100%</button><button class="btn small" type="button" onclick="prZoomBy(1.2)" aria-label="Zoom in" title="Zoom in (Ctrl + scroll, or pinch)"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-zoom-in"></use></svg></button></span>
         <span class="prSpacer"></span>
+        <button class="btn small prAnnotateTop" type="button" onclick="prAnnotateThisPdf()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-pencil"></use></svg> Annotate</button>
         <button class="btn small" type="button" onclick="closeParallelRead()">Close</button>
       </div>
-    <dialog class="sheet" id="prMarksSheet" closedby="any" aria-labelledby="prMarksTitle"> <div class="sheetHead"><h2 id="prMarksTitle">Marks</h2><form method="dialog"><button class="btn" type="submit">Close</button></form></div> <div class="sheetBody"> <div id="prMarksBody"></div> </div> </dialog>
+    <dialog class="sheet drawerRight" id="prMarksSheet" closedby="any" aria-labelledby="prMarksTitle"> <div class="sheetHead"><h2 id="prMarksTitle">Marks</h2><form method="dialog"><button class="btn" type="submit">Close</button></form></div> <div class="sheetBody"> <div id="prMarksBody"></div> </div> </dialog>
       <div class="prInkBar hidden" id="prInkBar" role="toolbar" aria-label="Annotate both books, drawing tools">
         <span class="prInkWhoWrap"><span class="tool-label">Annotating</span><b class="prInkWho" id="prInkWho"></b></span>
         <div class="prInkTools" role="group" aria-label="Tool">
@@ -613,8 +655,14 @@
         <div class="prRailBox"><div class="prRailLabel" id="prRailLabel">Page</div><div class="prRailTrack"><div class="prRail" id="prRail" role="navigation"></div></div></div>
         <div class="prGrid">
           <div class="prCol"><div class="prHead"><b id="prTitleL"></b><span class="kbd" id="prPosL"></span></div><div class="prBody"><div class="prPane" id="prPaneL" tabindex="0" aria-label="First book"></div></div></div>
+          <div class="prDivider" id="prDivider" role="separator" aria-label="Drag to resize the two books" onpointerdown="prDividerStart(event)"><span></span></div>
           <div class="prCol"><div class="prHead"><b id="prTitleR"></b><span class="kbd" id="prPosR"></span></div><div class="prBody"><div class="prPane" id="prPaneR" tabindex="0" aria-label="Second book"></div></div></div>
         </div>
+      </div>
+      <div class="prBottomBar" id="prBottomBar" role="toolbar" aria-label="Parallel Read actions">
+        <button type="button" class="prBottomBtn" id="prBottomSync" onclick="prToggleSync()" aria-pressed="true"><svg class="ic" aria-hidden="true"><use href="#ticon-rotate-clockwise"></use></svg><span>Sync</span></button>
+        <button type="button" class="prBottomBtn" onclick="prToggleMarks(this)"><svg class="ic" aria-hidden="true"><use href="#ticon-highlighter"></use></svg><span>Marks</span></button>
+        <button type="button" class="prBottomBtn" onclick="prAnnotateThisPdf()"><svg class="ic" aria-hidden="true"><use href="#ticon-pencil"></use></svg><span>Annotate</span></button>
       </div>
       <p class="kbd prHelp">Scroll either book and the other follows. The page numbers on the left belong to the book you are using, the one with the coloured edge. Scroll them, or tap one, to move through it. Zoom the book under the pointer with Ctrl + scroll or a pinch, or the book in use with the zoom buttons. Highlighting, Listen and OCR work in the normal reader. Tap Close to get back to it.</p>
     </div>
@@ -686,7 +734,7 @@
   </div>
 </dialog>
 
-<script src="app.js?v=2026-11-22-r32" defer></script>
+<script src="app.js?v=2026-11-23-r33" defer></script>
 <script>
 /* PWA: install prompt and offline app shell. */
 (function(){
