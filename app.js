@@ -710,16 +710,19 @@ function updateStatsPanel(){
    annotations), and actions that call the existing flows. No fake
    entries. The old dropdown (#searchResults) and its show/hide
    helpers are gone with it. */
+/* Screen 04: labels are the brief's exact words; icon names the Tabler
+   symbol used for the tablet list / mobile tile layouts. "Open sample
+   book" is an eighth pre-existing action kept after the brief's seven. */
 function paletteActions(){
   return [
-    {label:'New notebook', sub:'Create a blank notebook', act:()=>openNewNotebook()},
-    {label:'Import a PDF', sub:'Open a PDF from your files', act:()=>$('pdfImport').click()},
-    {label:'Import an EPUB', sub:'Open an EPUB from your files', act:()=>$('epubImport').click()},
-    {label:'Parallel Read', sub:'Read two books side by side', act:()=>prOpenPicker('first')},
-    {label:'Start Focus 25:00', sub:'Start a 25 minute focus session', act:()=>openTimer()},
-    {label:'Export backup', sub:'Download all notebooks and books as JSON', act:()=>exportBackup()},
-    {label:'Toggle theme', sub:'Switch between light and dark', act:()=>toggleTheme()},
-    {label:'Open sample book', sub:'The Art of Slow Reading', act:()=>openBook(SAMPLE_ID)}
+    {label:'New notebook', sub:'Create a blank notebook', icon:'plus', act:()=>openNewNotebook()},
+    {label:'Import PDF', sub:'Open a PDF from your files', icon:'upload', act:()=>$('pdfImport').click()},
+    {label:'Import EPUB', sub:'Open an EPUB from your files', icon:'upload', act:()=>$('epubImport').click()},
+    {label:'Parallel Read', sub:'Read two books side by side', icon:'columns', act:()=>prOpenPicker('first')},
+    {label:'Start Focus 25:00', sub:'Start a 25 minute focus session', icon:'clock', act:()=>openTimer()},
+    {label:'Export backup', sub:'Download all notebooks and books as JSON', icon:'download', act:()=>exportBackup()},
+    {label:'Toggle theme', sub:'Switch between light and dark', icon:'sun', act:()=>toggleTheme()},
+    {label:'Open sample book', sub:'The Art of Slow Reading', icon:'book', act:()=>openBook(SAMPLE_ID)}
   ];
 }
 /* Backlinks for a notebook: other notebooks whose pages link to it
@@ -729,30 +732,33 @@ function backlinkCount(nb){
   S.items.forEach(i=>{ if(i.kind==='notebook' && !i.pdfBookId && i.id!==nb.id && i.pages.some(p=>p.text.includes('[['+nb.title+']]'))) n++; });
   return n;
 }
+/* Screen 04: the right-side meta text for a notebook row — backlink
+   count when it has any, page count otherwise. */
+function nbMeta(it){ let bl=backlinkCount(it); if(bl) return bl+(bl===1?' backlink':' backlinks'); let n=itemPages(it); return n===1?'1 page':n+' pages'; }
 /* The old onSearchInput matching, refactored to return flat results
    tagged with their palette group instead of rendering a dropdown. */
 function searchItemsFlat(q){
   let res=[];
   S.items.forEach(it=>{
     if(isLinkedNb(it)) return; /* annotation stores never surface in search */
-    if(it.title.toLowerCase().includes(q)) res.push({label:it.title, sub:(it.kind==='notebook'?'Notebook':it.kind==='pdf'?'PDF':'EPUB')+' · title match', act:()=> it.kind==='notebook'? openNotebook(it.id): openBook(it.id), group:it.kind==='notebook'?'notebooks':'books', kind:it.kind, prog:itemProgress(it)});
+    if(it.title.toLowerCase().includes(q)) res.push({label:it.title, sub:(it.kind==='notebook'?'Notebook':it.kind==='pdf'?'PDF':'EPUB')+' · title match', meta:it.kind==='notebook'?nbMeta(it):'Progress: '+itemProgress(it)+'%', act:()=> it.kind==='notebook'? openNotebook(it.id): openBook(it.id), group:it.kind==='notebook'?'notebooks':'books', kind:it.kind, prog:itemProgress(it)});
     if(it.kind==='notebook') it.pages.forEach((p,pi)=>{
       let idx=p.text.toLowerCase().indexOf(q);
-      if(idx>=0) res.push({label:it.title+', page '+(pi+1), sub:'“…'+esc(p.text.slice(Math.max(0,idx-30),idx+60))+'…”', act:()=>{openNotebook(it.id); switchPage(pi);}, group:'notebooks'});
-      (p.stickies||[]).forEach(st=>{ if(st.text.toLowerCase().includes(q)) res.push({label:it.title+', sticky, page '+(pi+1), sub:esc(st.text.slice(0,80)), act:()=>{openNotebook(it.id); switchPage(pi);}, group:'notebooks'}); });
-      (p.texts||[]).forEach(t=>{ if(String(t.text).toLowerCase().includes(q)) res.push({label:it.title+', on-page text, page '+(pi+1), sub:esc(String(t.text).slice(0,80)), act:()=>{openNotebook(it.id); switchPage(pi);}, group:'notebooks'}); });
-      (p.texs||[]).forEach(t=>{ if(String(t.tex).toLowerCase().includes(q)) res.push({label:it.title+', equation, page '+(pi+1), sub:esc(String(t.tex).slice(0,80)), act:()=>{openNotebook(it.id); switchPage(pi);}, group:'notebooks'}); });
-      if(p.board && p.board.strokes.length && 'board'.includes(q)) res.push({label:it.title+', floating board, page '+(pi+1), sub:'This page has board work', act:()=>{openNotebook(it.id); switchPage(pi); toggleBoard(true);}, group:'notebooks'});
+      if(idx>=0) res.push({label:it.title+', page '+(pi+1), sub:'“…'+esc(p.text.slice(Math.max(0,idx-30),idx+60))+'…”', meta:nbMeta(it), act:()=>{openNotebook(it.id); switchPage(pi);}, group:'notebooks', kind:'notebook'});
+      (p.stickies||[]).forEach(st=>{ if(st.text.toLowerCase().includes(q)) res.push({label:it.title+', sticky, page '+(pi+1), sub:esc(st.text.slice(0,80)), meta:nbMeta(it), act:()=>{openNotebook(it.id); switchPage(pi);}, group:'notebooks', kind:'notebook'}); });
+      (p.texts||[]).forEach(t=>{ if(String(t.text).toLowerCase().includes(q)) res.push({label:it.title+', on-page text, page '+(pi+1), sub:esc(String(t.text).slice(0,80)), meta:nbMeta(it), act:()=>{openNotebook(it.id); switchPage(pi);}, group:'notebooks', kind:'notebook'}); });
+      (p.texs||[]).forEach(t=>{ if(String(t.tex).toLowerCase().includes(q)) res.push({label:it.title+', equation, page '+(pi+1), sub:esc(String(t.tex).slice(0,80)), meta:nbMeta(it), act:()=>{openNotebook(it.id); switchPage(pi);}, group:'notebooks', kind:'notebook'}); });
+      if(p.board && p.board.strokes.length && 'board'.includes(q)) res.push({label:it.title+', floating board, page '+(pi+1), sub:'This page has board work', meta:nbMeta(it), act:()=>{openNotebook(it.id); switchPage(pi); toggleBoard(true);}, group:'notebooks', kind:'notebook'});
     });
     if(it.kind==='epub' && it.chapters) it.chapters.forEach((c,ci)=>{
       let idx=c.text.toLowerCase().indexOf(q);
-      if(idx>=0) res.push({label:it.title+' · '+c.title, sub:'“…'+esc(c.text.slice(Math.max(0,idx-30),idx+60))+'…”', act:()=>{openBook(it.id); jumpToChapter(ci);}, group:'books'});
+      if(idx>=0) res.push({label:it.title+' · '+c.title, sub:'“…'+esc(c.text.slice(Math.max(0,idx-30),idx+60))+'…”', meta:'Progress: '+itemProgress(it)+'%', act:()=>{openBook(it.id); jumpToChapter(ci);}, group:'books', kind:'epub', prog:itemProgress(it)});
     });
     if(it.kind==='pdf' && it.textCache) Object.keys(it.textCache).forEach(pg=>{
       let idx=it.textCache[pg].toLowerCase().indexOf(q);
-      if(idx>=0) res.push({label:it.title+', PDF page '+pg, sub:'“…'+esc(it.textCache[pg].slice(Math.max(0,idx-30),idx+60))+'…”', act:()=>{openBook(it.id); jumpToPdfPage(+pg);}, group:'books'});
+      if(idx>=0) res.push({label:it.title+', PDF page '+pg, sub:'“…'+esc(it.textCache[pg].slice(Math.max(0,idx-30),idx+60))+'…”', meta:'Progress: '+itemProgress(it)+'%', act:()=>{openBook(it.id); jumpToPdfPage(+pg);}, group:'books', kind:'pdf', prog:itemProgress(it)});
     });
-    (it.annotations||[]).forEach(a=>{ if(a.text.toLowerCase().includes(q)) res.push({label:it.title+', annotation', sub:'“'+esc(a.text.slice(0,80))+'”'+(a.where?' · '+esc(a.where):''), act:()=> it.kind==='notebook'? openNotebook(it.id): openBook(it.id), group:'annotations'}); });
+    (it.annotations||[]).forEach(a=>{ if(a.text.toLowerCase().includes(q)) res.push({label:'“'+a.text.slice(0,80)+'”', sub:'', meta:esc(it.title)+(a.where?' · '+esc(a.where):''), act:()=> it.kind==='notebook'? openNotebook(it.id): openBook(it.id), group:'annotations', kind:'annotation'}); });
   });
   return res;
 }
@@ -760,9 +766,9 @@ function collectPalette(q){
   let groups={books:[], notebooks:[], annotations:[], actions:[]};
   if(!q){
     /* No query: the shelf itself, recent first, plus every action. */
-    S.items.filter(i=>!isLinkedNb(i) && i.kind!=='notebook').slice(0,5).forEach(it=>groups.books.push({label:it.title, sub:(it.kind==='pdf'?'PDF':'EPUB')+' · '+(it.kind==='pdf'?(it.numPages||'?')+' pages':(it.chapters?it.chapters.length:0)+' chapters'), act:()=>openBook(it.id), kind:it.kind, prog:itemProgress(it)}));
-    S.items.filter(i=>i.kind==='notebook' && !i.pdfBookId).slice().sort((a,b)=>(b.openedAt||0)-(a.openedAt||0)).slice(0,5).forEach(it=>{ let bl=backlinkCount(it); groups.notebooks.push({label:it.title, sub:'Notebook · '+itemPages(it)+' pages'+(bl?' · '+bl+(bl===1?' backlink':' backlinks'):''), act:()=>openNotebook(it.id), kind:'notebook', prog:itemProgress(it)}); });
-    S.items.forEach(it=>{ if(isLinkedNb(it)) return; (it.annotations||[]).forEach(a=>{ if(groups.annotations.length<5) groups.annotations.push({label:it.title+', annotation', sub:'“'+esc(a.text.slice(0,80))+'”'+(a.where?' · '+esc(a.where):''), act:()=> it.kind==='notebook'? openNotebook(it.id): openBook(it.id)}); }); });
+    S.items.filter(i=>!isLinkedNb(i) && i.kind!=='notebook').slice(0,5).forEach(it=>groups.books.push({label:it.title, sub:'', meta:'Progress: '+itemProgress(it)+'%', act:()=>openBook(it.id), kind:it.kind, prog:itemProgress(it)}));
+    S.items.filter(i=>i.kind==='notebook' && !i.pdfBookId).slice().sort((a,b)=>(b.openedAt||0)-(a.openedAt||0)).slice(0,5).forEach(it=>{ groups.notebooks.push({label:it.title, sub:'', meta:nbMeta(it), act:()=>openNotebook(it.id), kind:'notebook', prog:itemProgress(it)}); });
+    S.items.forEach(it=>{ if(isLinkedNb(it)) return; (it.annotations||[]).forEach(a=>{ if(groups.annotations.length<5) groups.annotations.push({label:'“'+a.text.slice(0,80)+'”', sub:'', meta:esc(it.title)+(a.where?' · '+esc(a.where):''), act:()=> it.kind==='notebook'? openNotebook(it.id): openBook(it.id), kind:'annotation'}); }); });
     groups.actions=paletteActions();
     return groups;
   }
@@ -772,23 +778,57 @@ function collectPalette(q){
   groups.actions=paletteActions();
   return groups;
 }
+/* Screen 04: keycaps are assigned per item, not per position. Result
+   rows take ⌘1..⌘9 in flat order, and the first three Quick Actions keep
+   the brief's fixed ⌘7/⌘8/⌘9 — skipping any key a result row already
+   took, so the chips on screen always match the ⌘+digit jump. */
+function assignPaletteKeys(flat){
+  flat.forEach(r=>{ r.key=null; });
+  let used=new Set();
+  flat.forEach(r=>{ if(r.group!=='actions' && used.size<9){ r.key=used.size+1; used.add(r.key); } });
+  let fixed={'New notebook':7,'Import PDF':8,'Import EPUB':9};
+  flat.forEach(r=>{ if(r.group==='actions' && fixed[r.label] && !used.has(fixed[r.label])){ r.key=fixed[r.label]; used.add(r.key); } });
+}
 function renderPalette(q){
   let box=$('paletteResults'); if(!box) return;
   let groups=collectPalette(q);
-  let flat=[]; let html='';
+  let flat=[];
+  [['books','Books & PDFs'],['notebooks','Notebooks & Backlinks'],['annotations','Annotations'],['actions','Quick Actions']].forEach(([key,title])=>{
+    groups[key].forEach(r=>{ r.group=key; flat.push(r); });
+  });
+  assignPaletteKeys(flat);
+  S.paletteItems=flat;
+  let html='';
+  if(!flat.length) html='<div class="palEmpty">No matches for “'+esc(q)+'”.</div>';
   [['books','Books & PDFs'],['notebooks','Notebooks & Backlinks'],['annotations','Annotations'],['actions','Quick Actions']].forEach(([key,title])=>{
     let list=groups[key]; if(!list.length) return;
-    html+='<div class="palGroup" role="presentation">'+title+'</div>';
-    list.forEach(r=>{ let i=flat.length; flat.push(r);
-      /* Mockup 1 (Pass 1 audit): book rows carry a format pill +
-         progress pill on the right, and every row a ⌘1..⌘9 chip. */
+    html+='<div class="palSection" role="presentation"><div class="palGroup" role="presentation">'+title+'</div>';
+    if(key==='actions'){
+      /* Screen 04: actions are their own container so the layout can
+         differ per device — inline flow on desktop, icon list on
+         tablet, 3-column tile grid on mobile. */
+      html+='<div class="palActions">';
+      list.forEach(r=>{ let i=flat.indexOf(r);
+        html+='<button type="button" class="palItem palAction" role="option" aria-selected="false" data-pi="'+i+'" title="'+esc(r.sub||'')+'" onclick="runPaletteResult('+i+')"><svg class="ic palActIcon" aria-hidden="true"><use href="#ticon-'+(r.icon||'note')+'"/></svg><span class="palActionLabel">'+esc(r.label)+'</span>'+(r.key?'<kbd class="palKbd">⌘'+r.key+'</kbd>':'')+'</button>'; });
+      html+='</div></div>';
+      return;
+    }
+    html+='<div class="palRows">';
+    list.forEach(r=>{ let i=flat.indexOf(r);
+      /* Screen 04: book rows are one line — title, format pill,
+         "Progress: NN%" ("NN% read" on mobile), keycap. Notebook rows
+         show the backlink count; annotation rows show the excerpt with
+         the source book as the meta. Leading kind icons show on
+         tablet/mobile only, matching those mockups. */
+      let lead=r.kind?'<span class="palLeadIcon"><svg class="ic" aria-hidden="true"><use href="#ticon-'+(r.kind==='notebook'?'notebook':r.kind==='annotation'?'highlighter':'book')+'"/></svg></span>':'';
       let chips='';
-      if(r.kind) chips+='<span class="palPill">'+(r.kind==='notebook'?'Notebook':r.kind==='pdf'?'PDF':'EPUB')+'</span><span class="palPill">'+r.prog+'%</span>';
-      if(i<9) chips+='<kbd class="palKbd">⌘'+(i+1)+'</kbd>';
-      html+='<div class="palItem" role="option" aria-selected="false" data-pi="'+i+'" onclick="runPaletteResult('+i+')"><span class="palItemMain"><b>'+esc(r.label)+'</b><span>'+r.sub+'</span></span>'+(chips?'<span class="palChips">'+chips+'</span>':'')+'</div>'; });
+      if(r.kind==='pdf'||r.kind==='epub') chips+='<span class="palPill">'+(r.kind==='pdf'?'PDF':'EPUB')+'</span>';
+      if(r.kind==='pdf'||r.kind==='epub') chips+='<span class="palMeta palMetaLong">'+esc(r.meta||'')+'</span><span class="palMeta palMetaShort">'+(r.prog||0)+'% read</span>';
+      else if(r.meta) chips+='<span class="palMeta">'+r.meta+'</span>';
+      if(r.key) chips+='<kbd class="palKbd">⌘'+r.key+'</kbd>';
+      html+='<div class="palItem'+(r.kind==='annotation'?' palAnn':'')+'" role="option" aria-selected="false" data-pi="'+i+'" onclick="runPaletteResult('+i+')">'+lead+'<span class="palItemMain"><b>'+esc(r.label)+'</b>'+(r.sub?'<span>'+r.sub+'</span>':'')+'</span>'+(chips?'<span class="palChips">'+chips+'</span>':'')+'</div>'; });
+    html+='</div></div>';
   });
-  S.paletteItems=flat;
-  if(!flat.length) html='<div class="palEmpty">No matches for “'+esc(q)+'”.</div>';
   box.innerHTML=html;
   if(S.paletteSel>=flat.length) S.paletteSel=flat.length?0:-1;
   syncPaletteSel();
@@ -824,11 +864,14 @@ $('paletteDialog').addEventListener('close',()=>{
 });
 $('globalSearch').addEventListener('keydown',e=>{
   /* Mockup 1 (Pass 1 audit): ⌘1..⌘9 / Ctrl+1..9 jumps straight to a
-     result, matching the shortcut chips on the rows. */
+     result, matching the shortcut chips on the rows. Screen 04: chips
+     are assigned per item (assignPaletteKeys), so jump by the item's
+     key, not its position. */
   if((e.metaKey||e.ctrlKey) && /^[1-9]$/.test(e.key)){
     if(!S.paletteItems.length) return;
     e.preventDefault();
-    runPaletteResult(+e.key-1);
+    let i=S.paletteItems.findIndex(r=>r.key===+e.key);
+    if(i>=0) runPaletteResult(i);
   }else if(e.key==='ArrowDown'||e.key==='ArrowUp'){
     if(!S.paletteItems.length) return;
     e.preventDefault();

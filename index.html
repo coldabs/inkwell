@@ -676,11 +676,11 @@
       <h2 id="paletteTitle" class="srOnly">Search the shelf</h2>
       <div class="paletteSearch">
         <svg class="ic searchIcon" aria-hidden="true"><use href="#ticon-search"></use></svg>
-        <input id="globalSearch" placeholder="Search notes, notebooks and books" aria-label="Search notebooks and notes" oninput="onSearchInput()" autocomplete="off"/>
-        <kbd class="searchKbd" title="Press Esc to close">ESC</kbd>
+        <input id="globalSearch" placeholder="Search notes, notebooks, books, and [[WikiLinks]]..." aria-label="Search notes, notebooks, books, and WikiLinks" oninput="onSearchInput()" autocomplete="off"/>
+        <button type="button" class="paletteEsc" onclick="closePalette()" aria-label="Close search"><span class="escDesktop">ESC</span><span class="escMobile">Close</span></button>
       </div>
       <div id="paletteResults" class="paletteResults" role="listbox" aria-label="Search results"></div>
-      <p class="paletteHint"><kbd class="searchKbd">/</kbd> or <kbd class="searchKbd">⌘K</kbd> to search · <kbd class="searchKbd">↑</kbd><kbd class="searchKbd">↓</kbd> to move · <kbd class="searchKbd">↵</kbd> to open · <kbd class="searchKbd">ESC</kbd> to close</p>
+      <p class="paletteHint">↑ ↓ navigate · ↵ open · ESC close</p>
     </dialog>
 </main>
 

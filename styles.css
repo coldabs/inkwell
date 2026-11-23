@@ -1102,10 +1102,17 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px);over
 .btn.primary.newBtn{background:var(--accent);border-color:var(--accent);color:var(--accent-text)}
 .btn.primary.newBtn:hover{background:var(--accent);border-color:var(--accent);color:var(--accent-text);filter:brightness(1.07)}
 
-/* Command palette: native <dialog>, centred modal (dialog guide Rule 1).
-   No role/aria-modal — the native modal provides them. */
+/* ============ Screen 04 — Command Palette (mockups desktop/tablet/mobile) ============
+   Native <dialog>, centred 560px modal on desktop/tablet, full-screen
+   opaque view on mobile (dialog guide Rule 1: no role/aria-modal — the
+   native modal provides them; closedby="any" gives light dismiss + Esc).
+   The ESC pill is a real <button>, not a <kbd>. Group headers are small
+   caps; result rows carry a format pill + right-side meta + a ⌘ keycap
+   (keycaps show on desktop only, matching those mockups). Quick Actions
+   are an inline flow on desktop, an icon list on tablet, a 3-column
+   tile grid on mobile. */
 dialog.palette{
-  width:min(600px,calc(100vw - 32px));
+  width:min(560px,calc(100vw - 32px));
   max-height:min(72vh,72dvh);
   margin:max(24px,10vh) auto auto;
   padding:0;border:1px solid var(--border);border-radius:var(--radius-md);
@@ -1116,22 +1123,71 @@ dialog.palette::backdrop{background:rgba(20,16,12,.45);overflow:hidden}
 .paletteSearch{display:flex;align-items:center;gap:10px;padding:4px 14px;border-bottom:1px solid var(--border)}
 .paletteSearch input{flex:1;min-width:0;height:48px;border:0;background:transparent;color:var(--text);font-size:16px;outline:none}
 .paletteSearch input::placeholder{color:var(--muted)}
+/* Screen 04: the ESC pill is a real button — it must close the palette
+   on tap. "Close" on mobile, where the search row becomes a pill. */
+.paletteEsc{flex:0 0 auto;min-height:28px;display:grid;place-items:center;border:1px solid var(--border);border-radius:var(--radius-xs);background:transparent;color:var(--muted);font-family:var(--font-mono);font-size:11px;line-height:1;padding:0 8px;cursor:pointer}
+.paletteEsc:hover{background:var(--paper2);color:var(--text)}
+.paletteEsc .escMobile{display:none}
 .paletteResults{flex:1;min-height:0;overflow-y:auto;padding:6px 0 10px}
-/* Mockup 1 (Pass 1 audit): group headers are normal case, not small
-   caps; rows are a row — label + sub on the left, format/progress
-   pills and a ⌘1..⌘9 shortcut chip on the right. */
-.palGroup{padding:12px 16px 6px;font:600 13px/1.3 var(--font-ui);letter-spacing:0;text-transform:none;color:var(--text)}
+.palGroup{padding:14px 16px 6px;font:600 11px/1.3 var(--font-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .palItem{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;min-height:44px}
 .palItem:hover,.palItem.sel{background:var(--paper2)}
+.palLeadIcon{display:none;flex:0 0 auto;color:var(--muted)}
+.palLeadIcon .ic{width:18px;height:18px}
 .palItemMain{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .palItem b{display:block;font-size:14px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
+.palAnn b{font-weight:400;overflow-wrap:break-word}
 .palItemMain span{display:block;font-size:12px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}
 .palChips{display:flex;align-items:center;gap:6px;flex:0 0 auto}
 .palPill{font-size:11px;font-weight:600;line-height:1;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:4px 8px;white-space:nowrap}
-.palKbd{min-width:24px;min-height:24px;display:grid;place-items:center;border:1px solid var(--border);border-radius:var(--radius-xs);font-size:11px;line-height:1;color:var(--muted);padding:0 5px}
+.palMeta{font-size:12px;line-height:1;color:var(--muted);white-space:nowrap}
+.palMetaShort{display:none}
+.palKbd{min-width:24px;min-height:24px;display:grid;place-items:center;border:1px solid var(--border);border-radius:var(--radius-xs);font-family:var(--font-mono);font-size:11px;line-height:1;color:var(--muted);padding:0 5px}
 .palEmpty{padding:18px 16px;font-size:13px;color:var(--muted)}
 .paletteHint{margin:0;padding:10px 16px;border-top:1px solid var(--border);font-size:11px;line-height:1.6;color:var(--muted)}
-.paletteHint .searchKbd{display:inline-grid}
+/* Quick Actions: inline flow on desktop. */
+.palActions{display:flex;flex-wrap:wrap;gap:2px 4px;padding:0 12px 8px}
+.palAction{width:auto;min-height:40px;padding:8px 10px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text);font-family:var(--font-ui);font-size:14px;font-weight:600;line-height:1.35;text-align:left}
+.palAction .palActIcon{display:none}
+.palActionLabel{flex:1;min-width:0}
+@media (max-width:1024px){
+  /* Tablet: leading kind icons on result rows; actions are a vertical
+     icon list; keycaps are hidden (the tablet mockup shows none). */
+  .palLeadIcon{display:grid;place-items:center}
+  .palKbd{display:none}
+  .palActions{flex-direction:column;flex-wrap:nowrap;gap:0;padding:0 0 8px}
+  .palAction{width:100%;padding:10px 16px}
+  .palAction .palActIcon{display:grid;place-items:center;flex:0 0 auto;color:var(--muted)}
+  .palAction .palActIcon .ic{width:18px;height:18px}
+}
+@media (max-width:768px){
+  dialog.palette{width:100vw;max-width:none;height:100dvh;max-height:none;margin:0;border:0;border-radius:0}
+  /* Mobile: the search row is a pill field with the Close button at its
+     right end; no footer hint; book progress reads "NN% read". */
+  .paletteSearch{margin:10px 12px 4px;padding:2px 6px 2px 14px;border:1px solid var(--border);border-bottom:1px solid var(--border);border-radius:999px}
+  .paletteSearch input{height:42px}
+  .paletteEsc{border:0}
+  .paletteEsc .escDesktop{display:none}
+  .paletteEsc .escMobile{display:block}
+  .paletteHint{display:none}
+  .palMetaLong{display:none}
+  .palMetaShort{display:inline}
+  /* Mobile: annotation rows stack — the excerpt gets the full row width
+     and the source sits below it, instead of squeezing the excerpt into
+     a narrow column beside a long nowrap source (which broke words). */
+  .palAnn{flex-wrap:wrap}
+  .palAnn .palChips{flex:1 1 100%;padding:2px 0 0 28px}
+  .palSection{margin-bottom:4px}
+  .palRows{margin:0 12px 12px;border:1px solid var(--border);border-radius:14px;overflow:hidden}
+  .palRows .palItem{padding:11px 14px}
+  .palRows .palItem + .palItem{border-top:1px solid var(--border)}
+  /* Mobile: actions are a 3-column tile grid. */
+  .palActions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:2px 12px 12px}
+  .palAction{flex-direction:column;justify-content:center;align-items:center;gap:8px;min-height:64px;padding:12px 4px;border:1px solid var(--border);border-radius:12px;text-align:center}
+  .palAction .palActIcon{display:grid;place-items:center;color:var(--muted)}
+  .palAction .palActIcon .ic{width:20px;height:20px}
+  .palActionLabel{flex:none;font-size:12px;font-weight:600;line-height:1.3}
+}
 
 /* + New menu popover (menu guide): anchored under its trigger, flips
    at viewport edges. The JS anchor fallback covers browsers without
