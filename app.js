@@ -39,6 +39,7 @@ function setBtnContent(id,iconName,label){ let b=$(id); if(b) b.innerHTML=icon(i
 
 /* ============ theme ============ */
 const THEME_KEY='inkwell-theme';
+const READER_THEME_KEY='inkwell-reader-theme'; /* Paper/Sepia/Obsidian reading theme: stored, restored on open (see restoreReaderTheme) */
 function effectiveTheme(){ return document.documentElement.dataset.theme || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); }
 function syncThemeToggle(){
   let b=$('themeToggle'); if(!b) return;
@@ -3629,6 +3630,12 @@ function openBook(id){
   $('ocrBox').classList.add('hidden'); $('parallelBox').classList.add('hidden');
   if(b.kind==='pdf'){ showPdfChrome(); renderPdfBook(); }
   else { showEpubChrome(); renderEpubBook(); }
+  /* Re-apply the stored reading theme on every open so Paper/Sepia/
+     Obsidian survives reopening the book, switching books and reloads. */
+  restoreReaderTheme();
+  /* Screen 05: on desktop the sidebar starts open (mockup) so the
+     top-bar toggle can collapse it; .open is what the toggle flips. */
+  if(window.matchMedia('(min-width:1025px)').matches){ let s=$('readerSide'); if(s) s.classList.add('open'); let st=$('readerSideToggle'); if(st) st.setAttribute('aria-expanded','true'); }
   showView('reader'); renderReaderSide();
 }
 function showEpubChrome(){ $('pdfView').classList.add('hidden'); $('readerArticle').classList.remove('hidden'); $('ttsBar').classList.add('hidden'); var f=$('annotateFab'); if(f) f.classList.add('hidden'); var rz=$('readerZoomGroup'); if(rz) rz.classList.add('hidden'); }
@@ -3641,10 +3648,34 @@ function setReaderMode(m){
   let b=curBook(); if(b){ b.mode=m; if(b.kind==='pdf') renderPdfBook(); else renderEpubBook(); }
   toast(m==='scroll'?'Scroll view':'Page view, one at a time. Use Prev and Next.');
 }
-function setReaderTheme(v){ $('readerArticle').className='reader '+v; $('parallelRead').dataset.theme=v; let pv=$('pdfView'); pv.style.filter= v==='dark'? 'invert(0.92) hue-rotate(180deg)':''; }
+function setReaderTheme(v){
+  /* Theme fix (2026-11-23): the old line overwrote readerArticle.className
+     wholesale ('reader '+v), which wiped the 'hidden' class showPdfChrome()
+     adds — so picking any theme while a PDF was open un-hid the EPUB
+     article above the PDF and the reader "reverted back to a epub".
+     Toggle only the theme classes now; 'hidden' (and anything else) is
+     left alone. */
+  let ra=$('readerArticle');
+  ra.classList.remove('sepia','dark');
+  if(v==='sepia'||v==='dark') ra.classList.add(v);
+  $('parallelRead').dataset.theme=v;
+  let pv=$('pdfView');
+  /* Obsidian keeps the existing container invert. Sepia warms the page
+     sheets only (see the [data-reader-theme="sepia"] rule in styles.css):
+     a sepia filter on the whole #pdfView also filters its #F6F3EC
+     padding, which saturates into a yellow frame — measured (255,255,177)
+     even at sepia(0.45) saturate(2.5) — while the sheet itself only
+     reaches a pale cream. Sheet-level tint keeps the surround calm. */
+  pv.style.filter= v==='dark'? 'invert(0.92) hue-rotate(180deg)':'';
+  pv.dataset.readerTheme=v||'paper';
+  /* Persist the choice (same try/catch pattern as THEME_KEY): the theme
+     used to reset to Paper on every reload. The page still gets themed
+     even if storage throws. */
+  try{ localStorage.setItem(READER_THEME_KEY,v); }catch(e){}
+}
 function readerFont(d){ let cur=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--reader-fs'))||19; let next=Math.max(15,Math.min(26,cur+d*1.5)); document.documentElement.style.setProperty('--reader-fs',next+'px'); let s=$('readerFontSlider'); if(s) s.value=next; }
 function readerFontSlider(v){ let next=Math.max(15,Math.min(26,+v||19)); document.documentElement.style.setProperty('--reader-fs',next+'px'); }
-function toggleReaderSide(){ prLeave(); $('readerSide').classList.toggle('open'); }
+function toggleReaderSide(){ prLeave(); $('readerSide').classList.toggle('open'); let st=$('readerSideToggle'); if(st) st.setAttribute('aria-expanded', String($('readerSide').classList.contains('open'))); }
 /* P4: the reader side panel is a 4-tab rail now (Contents / Bookmarks /
    Annotations / Thumbnails, mockup 18) — tabs guide: aria-selected drives
    the style, initial state is in the HTML. */
@@ -3654,6 +3685,12 @@ function readerSideTab(name,open){
   if(open){ let s=$('readerSide'); if(s) s.classList.add('open'); }
 }
 function setReaderThemeSwatch(v){ let s=$('themeSel'); if(s) s.value=v; setReaderTheme(v); syncReaderThemeUI(); }
+function restoreReaderTheme(){
+  let v=''; try{ v=localStorage.getItem(READER_THEME_KEY)||''; }catch(e){}
+  if(v!=='sepia'&&v!=='dark') v='';
+  let s=$('themeSel'); if(s) s.value=v;
+  setReaderTheme(v); syncReaderThemeUI();
+}
 function syncReaderThemeUI(){ let v=($('themeSel')||{}).value||''; document.querySelectorAll('#readerThemeSwatches .themeSwatch').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.theme===v))); }
 function syncTtsRateLabel(){ let r=$('ttsRate'), v=$('ttsRateVal'); if(r&&v) v.textContent=(+r.value).toString()+'×'; }
 let _sheetDrag=null;
@@ -3663,8 +3700,14 @@ function sheetDragEnd(){ if(!_sheetDrag) return; let s=_sheetDrag; _sheetDrag=nu
 function updateResume(){ updateReadProgress();
   let b=curBook(); if(!b) return;
   scheduleSave();
-  if(b.kind==='pdf'){ $('pageLabel').textContent='Page '+b.page+' / '+b.numPages; $('resumeLabel').textContent='Reading · '+b.title+' · Page '+b.page+' of '+b.numPages+' · '+Math.round(b.page/b.numPages*100)+'%. Resumes here.'; S.stats.pagesRead['pdf:'+b.id+':'+b.page]=1; }
-  else { $('pageLabel').textContent='Chapter '+(b.ch+1)+' / '+b.chapters.length; $('resumeLabel').textContent='Reading · '+b.title+' · Chapter '+(b.ch+1)+' of '+b.chapters.length+'. Resumes here.'; S.stats.pagesRead['epub:'+b.id+':'+b.ch]=1; }
+  if(b.kind==='pdf'){ $('pageLabel').textContent='Page '+b.page+' / '+b.numPages; $('resumeLabel').textContent='Reading · '+b.title+' · Page '+b.page+' of '+b.numPages+' · '+Math.round(b.page/b.numPages*100)+'%. Resumes here.'; S.stats.pagesRead['pdf:'+b.id+':'+b.page]=1; let rt=$('readerTopTitle'); if(rt) rt.textContent='Reading · '+b.title+' · Page '+b.page+' of '+b.numPages+' · '+Math.round(b.page/b.numPages*100)+'%'; let rp=$('readerTopPage'); if(rp) rp.textContent='Page '+b.page+' / '+b.numPages+' · '+Math.round(b.page/b.numPages*100)+'%'; let mp=$('mobilePageLabel'); if(mp) mp.textContent='Page '+b.page+' / '+b.numPages; }
+  else { $('pageLabel').textContent='Chapter '+(b.ch+1)+' / '+b.chapters.length; $('resumeLabel').textContent='Reading · '+b.title+' · Chapter '+(b.ch+1)+' of '+b.chapters.length+'. Resumes here.'; S.stats.pagesRead['epub:'+b.id+':'+b.ch]=1; let mp=$('mobilePageLabel'); if(mp) mp.textContent='Chapter '+(b.ch+1)+' / '+b.chapters.length; let rp=$('readerTopPage'); if(rp) rp.textContent='Chapter '+(b.ch+1)+' / '+b.chapters.length; }
+  /* Screen 05: keep the active thumbnail in step with the current page /
+     chapter on every page change (jump, scroll, mode switch). The
+     sidebar is only rebuilt on open; without this the terracotta border
+     stayed on the page the reader opened at. Cheap class toggles only —
+     no sidebar re-render, so no flicker while scrolling. */
+  let th=$('thumbList'); if(th&&th.dataset.bookId===b.id){ if(b.kind==='pdf') th.querySelectorAll('.thumbItem').forEach((el,i)=>el.classList.toggle('active',i+1===b.page)); else th.querySelectorAll('.thumbItem').forEach((el,i)=>el.classList.toggle('active',i===b.ch)); }
   let tw=$('ttsWhere'); if(tw) tw.textContent=$('pageLabel').textContent;
   syncBookmarkBtn();
 }
@@ -4123,9 +4166,9 @@ function toggleBookmark(){
   else { b.bookmarks.push({at:at,label:label}); toast('Bookmarked: '+label); }
   syncBookmarkBtn();
   renderReaderSide();
-  /* P7: open the Bookmarks panel so the new bookmark is actually
-     visible — the old <details> is now the 4-tab rail. */
-  readerSideTab('bookmarks',true);
+  /* No auto-open of the Bookmarks panel (same hijack as highlights: on
+     mobile it is a bottom drawer). The toast is the confirmation; the
+     drawer opens only on a user tap. */
 }
 function changePage(d){
   let b=curBook(); if(!b){ toast('Open a book first'); return; }
@@ -4391,9 +4434,14 @@ function annotateSelection(kind){
   }catch(e){ toast('Select a clean stretch inside one paragraph'); return; }
   b.annotations.push({id:annoId, text:text, where:where, kind:kind, color:markColorFor(b,kind), opacity:markOpacityFor(b,kind)});
   sel.removeAllRanges();
+  /* The mark consumed this selection: drop the saved range so no later
+     handler can resurrect it and re-apply the same mark on a loop. */
+  lastReaderSel=null;
   renderReaderSide(); renderLibrary(); scheduleSave(); syncReaderToolUI();;
-  /* P7: open the Annotations panel so the new entry is visible. */
-  readerSideTab('annotations',true);
+  /* No auto-open of the Annotations panel: on mobile it is a bottom
+     drawer, so opening it after every highlight hijacked the screen and
+     the user had to dismiss it to keep reading. The toast is the
+     confirmation; the drawer opens only on a user tap. */
   toast((kind==='highlight'?'Highlighted': kind==='underline'?'Underlined':'Struck through')+' & saved to annotations');
 }
 function highlightSelection(){ annotateSelection('highlight'); }
@@ -4485,7 +4533,7 @@ function undoLastAnnotation(){
   renderReaderSide(); renderLibrary(); syncReaderToolUI(); scheduleSave();
   toast(gone?'Undid last annotation':'Undo didn’t clear that mark — reopen the book to clear it');
 }
-let readerActiveTool='', readerPointerDown=false, readerAutoMarkT=null, _lastReaderTool='highlight', _armedHintShown={};
+let readerActiveTool='', readerPointerDown=false, readerAutoMarkT=null, readerShiftHeld=false, _lastReaderTool='highlight', _armedHintShown={};
 /* Xiaomi Focus Pen in the reader: dragging the pen across text selects
    it instead of scrolling the page, and a palm landing mid-selection
    neither scrolls nor collapses the selection. The browser's native
@@ -4541,11 +4589,11 @@ document.addEventListener('pointerdown',e=>{
 document.addEventListener('pointermove',e=>{ if(penSel) penSelMove(e); },true);
 document.addEventListener('pointerup',e=>{ if(e.pointerType==='pen') penSelEnd(); },true);
 document.addEventListener('pointercancel',e=>{ if(e.pointerType==='pen') penSelEnd(); },true);
-function toggleReaderToolPanel(forceOpen){ let p=$('readerToolPanel'); if(!p) return; let show=typeof forceOpen==='boolean'? forceOpen : p.classList.contains('hidden'); p.classList.toggle('hidden',!show); let fab=$('readerToolFab'); if(fab) fab.setAttribute('aria-expanded',show?'true':'false'); syncReaderToolUI(); }
+function toggleReaderToolPanel(forceOpen){ let p=$('readerToolPanel'); if(!p) return; let show=typeof forceOpen==='boolean'? forceOpen : p.classList.contains('hidden'); p.classList.toggle('hidden',!show); let fab=$('readerToolFab'); if(fab) fab.setAttribute('aria-expanded',show?'true':'false'); let d=$('readerToolDock'); if(d) d.classList.toggle('panelOpen', show); let mm=$('mobileMarkupBtn'); if(mm) mm.setAttribute('aria-expanded',show?'true':'false'); syncReaderToolUI(); }
 function toggleReaderTool(tool){
   readerActiveTool=(readerActiveTool===tool)?'':tool;
   if(!readerActiveTool) clearTimeout(readerAutoMarkT);
-  else{
+  if(readerActiveTool){
     _lastReaderTool=tool;
     toggleReaderToolPanel(false); /* armed: get the panel out of the way so the page is clear to drag over */
     if(!_armedHintShown[tool]){ _armedHintShown[tool]=true; toast('Drag over text to '+(tool==='highlight'?'highlight':tool==='underline'?'underline':'strikethrough')); }
@@ -4565,14 +4613,42 @@ function syncReaderToolUI(){
   }
   let hasMarks=!!(b&&b.annotations&&b.annotations.length);
   let ub=$('readerUndoBtn'); if(ub) ub.disabled=!hasMarks;
-  let tu=$('readerTopUndo'); if(tu) tu.disabled=!hasMarks;
+  let tu=$('readerTopUndo'); if(tu) tu.disabled=!hasMarks; let mu=$('mobileUndoBtn'); if(mu) mu.disabled=!hasMarks;
   let su=$('readerSelUndo'); if(su) su.disabled=!hasMarks;
   let qu=$('readerQuickUndo'); if(qu) qu.classList.toggle('hidden',!hasMarks);
 }
-function scheduleAutoReaderMark(){ clearTimeout(readerAutoMarkT); if(!readerActiveTool||readerPointerDown||PR.on||S.view!=='reader') return; readerAutoMarkT=setTimeout(()=>{ if(!readerActiveTool||readerPointerDown||PR.on||S.view!=='reader') return; let sel=readerSelection(); if(sel&&sel.toString().trim()) annotateSelection(readerActiveTool); },500); }
-document.addEventListener('pointerdown',e=>{ if(penSel && e.pointerType==='touch') return; /* palm during a pen selection */ readerPointerDown=true; clearTimeout(readerAutoMarkT); let p=$('readerToolPanel'); if(p&&!p.classList.contains('hidden')&&!e.target.closest('#readerToolPanel')&&!e.target.closest('#readerToolFab')&&!e.target.closest('#readerFab')) toggleReaderToolPanel(false); },true);
+/* Armed Quick Markup: apply shortly after the selection gesture ends, so
+   the mark lands on the FINAL selection — a handle adjustment starting
+   inside the 500ms window cancels the pending apply and the next gesture
+   end re-arms it, so adjusting never produces a second overlapping mark.
+   The old code had the same delay but only pointerup re-armed the timer:
+   a drag that starts inside the selection fires dragstart + pointercancel
+   with no pointerup at all, so the pending apply was killed and never
+   re-scheduled — the mark never applied and the user had to pick again in
+   the selection bar (probe4). Now pointercancel and dragend re-arm it too,
+   so every pointerdown is always followed by a re-arm. Live selection
+   only — never resurrect lastReaderSel here, or the just-marked range would
+   re-apply on a 500ms loop (probe2-D: five annotate calls for one mark).
+   The bar stays hidden while a tool is armed; it still appears for
+   unarmed selections. */
+function scheduleAutoReaderMark(){
+  clearTimeout(readerAutoMarkT);
+  if(!readerActiveTool||readerPointerDown||readerShiftHeld||PR.on||S.view!=='reader') return;
+  readerAutoMarkT=setTimeout(()=>{
+    if(!readerActiveTool||readerPointerDown||readerShiftHeld||PR.on||S.view!=='reader') return;
+    let sel=window.getSelection();
+    if(sel&&sel.rangeCount&&!sel.isCollapsed&&sel.toString().trim()) annotateSelection(readerActiveTool);
+  },500);
+}
+/* Keyboard selection with a tool armed: Shift+arrows extend the range, so
+   hold the apply until Shift is released — that release is the selection
+   end for the keyboard, the same role pointerup plays for mouse/touch. */
+document.addEventListener('keydown',e=>{ if(e.key==='Shift') readerShiftHeld=true; },true);
+document.addEventListener('keyup',e=>{ if(e.key==='Shift'){ readerShiftHeld=false; scheduleAutoReaderMark(); } },true);
+document.addEventListener('pointerdown',e=>{ if(penSel && e.pointerType==='touch') return; /* palm during a pen selection */ readerPointerDown=true; clearTimeout(readerAutoMarkT); let p=$('readerToolPanel'); if(p&&!p.classList.contains('hidden')&&!e.target.closest('#readerToolPanel')&&!e.target.closest('#readerToolFab')&&!e.target.closest('#readerFab')&&!e.target.closest('#mobileMarkupBtn')) toggleReaderToolPanel(false); },true);
 document.addEventListener('pointerup',e=>{ if(penSel && e.pointerType==='touch') return; /* palm lifting must not end the pen's selection early */ readerPointerDown=false; if(readerActiveTool&&!PR.on&&S.view==='reader') scheduleAutoReaderMark(); },true);
-document.addEventListener('pointercancel',e=>{ if(penSel && e.pointerType==='touch') return; readerPointerDown=false; },true);
+document.addEventListener('pointercancel',e=>{ if(penSel && e.pointerType==='touch') return; readerPointerDown=false; /* a drag that starts inside the selection ends here (dragstart + pointercancel, no pointerup): re-arm, or the pending apply is lost */ if(readerActiveTool&&!PR.on&&S.view==='reader') scheduleAutoReaderMark(); },true);
+document.addEventListener('dragend',()=>{ /* backup for the same gesture: the drag truly ends here */ if(readerActiveTool&&!PR.on&&S.view==='reader') scheduleAutoReaderMark(); },true);
 /* --- "<Tool> color" bottom sheet (reference video r06: colour grid + Opacity slider) --- */
 const TOOL_COLORS=['#0A84FF','#30D158','#FFE600','#FF9F0A','#FF3B30','#BF5AF2','#64D2FF','#7EE787','#FFF3A3','#FFD9B3','#FF6482','#E84393','#FFFFFF','#E8E4DA','#AEAEB2','#6E6E73','#3A3A3C','#000000'];
 let _colorSheetTool='highlight', _toolColorGridBuilt=false;
@@ -5916,6 +5992,7 @@ async function initApp(){
   let restorePromise=(async()=>{ try{ return await restoreLibrary(myToken); }catch(e){ restoreState='failed'; return false; } })();
   if(!S.items.length){ S.items.push(sampleBook()); S.items.push(samplePdfBook()); }
   renderLibrary(); showView('library');
+  restoreReaderTheme(); /* sheet swatches match the stored theme from the first paint */
   ensureSamplePdf();
   let initDone=false;
   restorePromise.then(v=>{ if(!initDone){ initDone=true; finishInit(v); } });

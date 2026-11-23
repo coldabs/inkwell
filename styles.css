@@ -1471,6 +1471,16 @@ body.inEditor .pageNavFab{display:flex}
 @media (pointer:coarse){
   #readerArticle, #pdfView .textLayer, #parallelRead .textLayer, #parallelRead .prPane{-webkit-touch-callout:none}
 }
+/* --- Reader chrome is never selectable: only book text can be selected
+   and highlighted. A drag starting on a chrome label (e.g. the "Quick
+   Markup" button) used to select the word "Quick" and highlight it into
+   the Annotations list. Book text is untouched: #readerArticle prose and
+   the PDF text layers keep their default selection, and the selection
+   bar still appears for book text. --- */
+.readerTop, #readerMobileBar, #readerSide, #readerToolDock,
+#readerSelBar, #readerSheet, .readerPager, #ttsBar, .pdfPageNum{
+  -webkit-user-select:none; user-select:none;
+}
 .reader.dark .textLayer mark{mix-blend-mode:lighten}
 .prSelBar{max-width:calc(100vw - 16px)}
 .readerToolDock{position:fixed;right:16px;bottom:max(18px,env(safe-area-inset-bottom,18px));z-index:76;display:flex;flex-direction:column;align-items:flex-end;gap:10px;}
@@ -1763,4 +1773,143 @@ dialog.sheet.drawerRight#librarySheet::backdrop{background:rgba(20,16,12,.45);ba
 @keyframes sheetUp{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:no-preference) and (max-width:768px){
   dialog.sheet.drawerRight#librarySheet:modal{animation:sheetUp .18s ease}
+}
+
+/* ============ Screen 05: PDF Reader view (mockups desktop/tablet/mobile)
+   Redesign of the Pass 4 Reader Studio to match the mockups 1:1. Restyle
+   only: no element id or data-* attribute is renamed, every restyled
+   control already exists. Guides used: "tabs" (selected tab = accent
+   border + bottom bar, not colour alone; the mockup's 2x2 tab grid is
+   kept even though the guide prefers a single row — four labelled tabs
+   cannot fit one row in 268px without scrolling), "navigation-drawer"
+   (268px persistent sidebar on desktop, slide-over on tablet, bottom
+   drawer on mobile; the existing class-toggle open/close is kept, not
+   rebuilt as a popover, so the verified toggle/jump-to-close behaviour
+   is unchanged), "toolbar" (single-row 56px top bar, one primary action
+   per group). Deviations from the mockups are listed in
+   files/screen05-pdf-reader/CHECKS.md. */
+
+/* --- Single-row 56px top bar: Back, sidebar toggle, Scroll|Page,
+   status readout (one line, ellipsis), Undo, Annotate, More. The
+   terracotta progress line and the resume label are retired — the
+   status readout now carries the page + %. Opaque surface, no blur
+   (ban: no glassmorphism). --- */
+.readerTop{position:sticky;top:0;z-index:30;height:56px;flex-wrap:nowrap;gap:8px;padding:0 10px;margin-bottom:12px;background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none;border:0;border-bottom:1px solid var(--border);border-radius:0}
+#readProgress{display:none}
+.readerResume{display:none}
+.readerTopPage{display:none;font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0}
+/* Focus moved from the top bar into the More sheet (it is the 5th
+   action tile there); the old <=1024px hide must not hide the tile. */
+#readerSheet .readerFocusBtn{display:flex}
+/* The brief's Annotate button is terracotta; .btn.primary is dark
+   (var(--text)) everywhere else, so scope the terracotta to the
+   reader's Annotate button only. */
+#annotateFab{background:var(--accent);border-color:var(--accent);color:var(--accent-text)}
+
+/* --- Left sidebar: 268px persistent column on desktop. The Pass 4
+   icon rail becomes a 2x2 tab grid; the panel headings are redundant
+   with the tab labels and are hidden. Flat cream background (no card)
+   so the tabs and thumbnails read as cards on the page surround. --- */
+#readerGrid{grid-template-columns:268px minmax(0,1fr);gap:24px}
+#readerSide{flex-direction:column;top:68px;max-height:calc(100dvh - 84px);background:transparent;border:0;box-shadow:none;border-radius:0}
+.sideTabs{flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px;border-right:0;border-bottom:1px solid var(--border);background:transparent}
+.sideTab{flex-direction:row;justify-content:flex-start;align-items:center;min-height:44px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);font-size:12px;line-height:1.2}
+.sideTab .ic{width:18px;height:18px;flex:0 0 auto}
+.sideTab[aria-selected="true"]{color:var(--text);border-color:var(--accent);background:var(--surface)}
+.sideTab[aria-selected="true"]::after{left:8px;right:8px;top:auto;bottom:0;width:auto;height:3px}
+.sidePanels{padding:12px 14px 0}
+.sidePanel h4{display:none}
+#readerSide.open h4{display:none}
+#thumbList{grid-template-columns:1fr 1fr;gap:10px}
+.thumbItem.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+
+/* --- Center viewport: #F6F3EC surround, crisp white page sheet. The
+   per-page header strip is retired; the page itself carries the shadow.
+   Highlights already use mix-blend-mode:multiply (see .textLayer mark). --- */
+#pdfView{background:var(--bg);border:0;border-radius:0;box-shadow:none;padding:18px}
+.pdfHead{display:none}
+.pdfPage{box-shadow:var(--shadow-sheet)}
+/* Reader theme — Sepia: warm the PDF sheets only. A sepia filter on the
+   whole #pdfView would also filter its #F6F3EC padding into a saturated
+   yellow frame (measured (255,255,177) even at sepia(0.45) saturate(2.5)),
+   so the tint lives here, on the white sheets. Measured on the Demo PDF:
+   sheet renders (250,248,220) warm cream, black text stays pure black,
+   so contrast is unchanged. Obsidian keeps the container invert in JS. */
+#pdfView[data-reader-theme="sepia"] .pdfPage{filter:sepia(0.7) saturate(3) hue-rotate(-12deg) brightness(0.98)}
+.readerColumn{padding-bottom:96px}
+
+/* --- Bottom floating center pill: Prev / Page X of Y / Next. --- */
+.readerPager{position:fixed;left:50%;transform:translateX(-50%);bottom:max(16px,env(safe-area-inset-bottom,16px));z-index:70;display:flex;align-items:center;gap:4px;flex-wrap:nowrap;max-width:calc(100vw - 32px);margin:0;padding:4px 6px;background:var(--surface);border:1px solid var(--border);border-radius:999px;box-shadow:var(--shadow-modal)}
+.readerPager .btn{border:0;background:transparent;box-shadow:none}
+.readerPager #pageLabel{font-family:var(--font-mono);font-size:13px;padding:0 6px}
+
+/* --- Quick Markup pill: the annotation panel becomes a horizontal
+   4-icon pill (Highlighter, Underliner, Strikethrough, Undo). The
+   per-tool colour swatch shrinks to a 16px corner dot — colour picking
+   is still available from the selection bar and the More sheet. The
+   FAB toggle hides while the panel is open, so the open state matches
+   the mockup (pill only, no FAB). --- */
+.readerToolPanel{flex-direction:row;align-items:center;gap:4px;padding:6px;border-radius:999px;min-width:0}
+.readerToolList{flex-direction:row;align-items:center;gap:4px}
+.readerToolItem{position:relative;gap:0}
+.readerToolPanel .readerToolBtn{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;justify-content:center;border:1px solid transparent;border-radius:999px;background:transparent;font-size:13px}
+.readerToolPanel .readerToolBtn .ic{width:20px;height:20px}
+.readerToolItem .readerToolBtn{flex:none;font-size:13px}
+.readerToolPanel .readerToolBtn.active,.readerToolPanel .readerToolBtn[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.readerToolPanel .readerToolSwatch{position:absolute;right:1px;bottom:1px;width:16px;height:16px;min-width:16px;min-height:16px;border:2px solid var(--surface);box-shadow:none}
+.readerToolPanel .readerUndoBtn{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;justify-content:center;border:1px solid transparent;border-radius:999px;background:transparent}
+.readerToolDock.panelOpen .readerFabRow{display:none}
+
+/* --- Desktop: the sidebar toggle collapses the 268px column. The
+   sidebar starts .open on desktop (openBook sets it), so the toggle
+   genuinely collapses / reopens it; the grid collapses with it. --- */
+@media (min-width:1025px){
+  #readerSide:not(.open){display:none}
+  #readerGrid:has(#readerSide:not(.open)){grid-template-columns:1fr}
+}
+
+/* --- Mobile bottom bar: hidden above 720px, and hidden in Parallel
+   Read (which has its own bar). --- */
+.readerMobileBar{display:none}
+body.prOn #readerMobileBar{display:none}
+
+/* --- Tablet (721-1024px): short status readout, sidebar becomes a
+   slide-over below the top bar (top:56px, not covering it). --- */
+@media (max-width:1024px){
+  #readerTopTitle{display:none}
+  #readerTopPage{display:block}
+  #readerGrid{grid-template-columns:1fr;gap:16px}
+  #readerSide{display:none}
+  #readerSide.open{display:flex;flex-direction:column;position:fixed;top:56px;left:0;bottom:0;width:min(268px,86vw);z-index:80;background:var(--surface);border-right:1px solid var(--border);border-radius:0;box-shadow:0 0 32px rgba(0,0,0,.28)}
+  #readerSide.open .sideClose{display:inline-flex}
+  #readerSide.open .sideTabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;flex:0 0 auto;padding:10px;border-right:0;border-bottom:1px solid var(--border);background:transparent;overflow:visible}
+  #readerSide.open .sideTab{flex:none;min-width:0}
+}
+
+/* --- Mobile (<=720px): slim static top bar (Back, Page X / Y,
+   Annotate, More), bottom bar with TOC, pagination, Undo, Quick
+   Markup; sidebar becomes a bottom drawer. The center pagination pill
+   is replaced by the bottom-bar pagination. --- */
+@media (max-width:720px){
+  .readerTop{position:static;height:56px;min-height:48px;padding:6px 8px;gap:6px;overflow-x:auto;scrollbar-width:none}
+  .readerTop::-webkit-scrollbar{display:none}
+  #readerTopPage{display:block}
+  #readerSideToggle{display:none}
+  .readerTop .seg{display:none}
+  #readerTopUndo{display:none}
+  .readerPager{display:none}
+  .readerColumn{padding-bottom:84px}
+  #readerMobileBar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:90;align-items:center;gap:8px;padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--border)}
+  /* z-index 90, above the open drawer (80): the drawer must not cover
+     the bottom bar, or its TOC toggle is untappable while the drawer is
+     open and the drawer can only be closed with the ×. The bar stays
+     visible over the drawer's bottom edge; drawer geometry is unchanged. */
+  .readerMobilePager{flex:1 1 auto;display:flex;align-items:center;justify-content:center;gap:2px;min-width:0}
+  .readerMobilePager .btn{border:0;background:transparent;box-shadow:none;padding:0 4px}
+  #mobilePageLabel{font-family:var(--font-mono);font-size:12px;white-space:nowrap}
+  .readerMobileMarkup{flex-direction:column;gap:2px;font-size:10px;padding:4px 8px;min-height:44px}
+  .readerToolDock{bottom:calc(72px + env(safe-area-inset-bottom,0px))}
+  .readerToolDock .readerFabRow{display:none}
+  #readerSide.open{top:auto;left:0;right:0;bottom:0;width:auto;height:min(72dvh,560px);border-right:0;border-top:1px solid var(--border);border-radius:16px 16px 0 0;box-shadow:0 -12px 32px rgba(0,0,0,.28);overflow:hidden}
+  #readerSide.open::before{content:"";display:block;width:40px;height:5px;margin:10px auto 0;border-radius:999px;background:var(--border-strong);flex:0 0 auto}
 }
