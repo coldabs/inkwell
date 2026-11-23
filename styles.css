@@ -1,30 +1,33 @@
-/* Inkwell design system — Gemini Step 1 (2026-11-19): calm, editorial
-   2026 tokens (Craft / Readwise Reader / Linear direction).
-   Light: --bg #F7F5F0, --surface #FFFFFF, --border #E5E2DA,
-   --text #18181B, --muted #71717A, --accent #C85A32 (terracotta).
-   Dark: --bg #121214, --surface #1A1A1E, --paper-dark #17171A,
-   --border #2A2A30, --text #ECEBE6, --muted #9A9AA2, --accent #E06D44.
+/* Inkwell design system — Gemini Step 1 (2026-11-19), retokened for the
+   Screen 01 rebuild (Gemini share 2026-11-22, screens 01/16/31) to the
+   brief's locked tokens.
+   Light: --bg #F6F3EC, --surface #FDFBF7, --paper2 #EFEAE0,
+   --border #E5DFD3, --text #1A1917, --muted #6B655D, --accent #C85A32.
+   Dark: --bg #141311, --surface #1E1C19, --border #2D2A26,
+   --text #F2EEE6, --muted #A69F95, --accent #D96B43.
    Serif (Newsreader) for the wordmark and reading body; Inter for UI
-   chrome. Hairline borders, 10–14px card radii, 999px pills.
-   No paper texture, no heavy boxes, no gradients, no glassmorphism.
-   One responsive section at the end of the file (1024px tablet,
-   768px mobile); 44px touch targets on coarse pointers. */
+   chrome; JetBrains Mono for ⌘K / ESC / zoom % / timers. Hairline
+   borders, 10–14px card radii, 999px pills. No paper texture, no heavy
+   boxes, no gradients, no glassmorphism. One responsive section at the
+   end of the file (1024px tablet, 768px mobile); 44px touch targets on
+   coarse pointers. */
 
 :root{
   --font-ui:"Inter","Instrument Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
   --font-display:"Newsreader",Georgia,"Times New Roman",serif;
   --font-reading:"Newsreader",Georgia,"Times New Roman",serif;
   --font-hand:"Newsreader",Georgia,serif;
-  --bg:#F7F5F0;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --bg:#F6F3EC;
   --bg-deep:#EDEBE4;
-  --surface:#FFFFFF;
+  --surface:#FDFBF7;
   --paper:#FFFFFF;
-  --paper2:#F4F2EC;
+  --paper2:#EFEAE0;
   --paper-dark:#17171A;
-  --text:#18181B;
+  --text:#1A1917;
   --text-soft:#3F3F46;
-  --muted:#71717A;
-  --border:#E5E2DA;
+  --muted:#6B655D;
+  --border:#E5DFD3;
   --border-strong:#D4D0C8;
   --accent:#C85A32;
   --accent-text:#FFFFFF;
@@ -47,18 +50,18 @@
 }
 @media (prefers-color-scheme: dark){
   :root{
-    --bg:#121214;
+    --bg:#141311;
     --bg-deep:#0C0C0E;
-    --surface:#1A1A1E;
+    --surface:#1E1C19;
     --paper:var(--paper-dark);
     --paper-dark:#17171A;
     --paper2:#222228;
-    --text:#ECEBE6;
+    --text:#F2EEE6;
     --text-soft:#C6C6CC;
-    --muted:#9A9AA2;
-    --border:#2A2A30;
+    --muted:#A69F95;
+    --border:#2D2A26;
     --border-strong:#3A3A42;
-    --accent:#E06D44;
+    --accent:#D96B43;
     --accent-text:#15100E;
     --accent-soft:#3B2722;
     --danger:#E08072;
@@ -71,8 +74,8 @@
   }
 }
 :root[data-theme="light"]{
-  --bg:#F7F5F0; --bg-deep:#EDEBE4; --surface:#FFFFFF; --paper:#FFFFFF; --paper2:#F4F2EC;
-  --text:#18181B; --text-soft:#3F3F46; --muted:#71717A; --border:#E5E2DA; --border-strong:#D4D0C8;
+  --bg:#F6F3EC; --bg-deep:#EDEBE4; --surface:#FDFBF7; --paper:#FFFFFF; --paper2:#EFEAE0;
+  --text:#1A1917; --text-soft:#3F3F46; --muted:#6B655D; --border:#E5DFD3; --border-strong:#D4D0C8;
   --accent:#C85A32; --accent-text:#FFFFFF; --accent-soft:#F2DED8; --danger:#A02E24; --success:#3F5C46;
   --shadow-sheet:0 2px 0 rgba(24,24,27,.04),0 24px 48px -28px rgba(24,24,27,.45);
   --shadow-cover:0 12px 24px -16px rgba(24,24,27,.55);
@@ -81,9 +84,9 @@
   color-scheme:light;
 }
 :root[data-theme="dark"]{
-  --bg:#121214; --bg-deep:#0C0C0E; --surface:#1A1A1E; --paper:var(--paper-dark); --paper-dark:#17171A; --paper2:#222228;
-  --text:#ECEBE6; --text-soft:#C6C6CC; --muted:#9A9AA2; --border:#2A2A30; --border-strong:#3A3A42;
-  --accent:#E06D44; --accent-text:#15100E; --accent-soft:#3B2722; --danger:#E08072; --success:#8FB59A;
+  --bg:#141311; --bg-deep:#0C0C0E; --surface:#1E1C19; --paper:var(--paper-dark); --paper-dark:#17171A; --paper2:#222228;
+  --text:#F2EEE6; --text-soft:#C6C6CC; --muted:#A69F95; --border:#2D2A26; --border-strong:#3A3A42;
+  --accent:#D96B43; --accent-text:#15100E; --accent-soft:#3B2722; --danger:#E08072; --success:#8FB59A;
   --shadow-sheet:0 2px 0 rgba(0,0,0,.3),0 24px 48px -24px rgba(0,0,0,.8);
   --shadow-cover:0 14px 28px -14px rgba(0,0,0,.8);
   --shadow-modal:0 30px 80px -30px rgba(0,0,0,.9);
@@ -854,11 +857,11 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px);over
    rules above. Input-based rules (pointer:coarse) are separate,
    below. */
 
-/* Shelf grid: 2 columns by default, 3 from tablet, 4 from desktop. */
-@media (min-width:768px){
+/* Shelf grid: 2 columns by default, 3 from tablet (721px), 4 from desktop (1025px). */
+@media (min-width:721px){
   .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
-@media (min-width:1024px){
+@media (min-width:1025px){
   .grid{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
 
@@ -1620,4 +1623,67 @@ body.inEditor .pageNavFab{display:flex}
   .prBottomBtn{display:flex;flex-direction:column;align-items:center;gap:2px;min-height:52px;padding:6px 4px;border:0;border-radius:var(--radius-xs);background:transparent;color:var(--text);font-size:11px;font-weight:600;cursor:pointer}
   .prBottomBtn[aria-pressed="true"]{color:var(--accent)}
   .prBottomBtn .ic{width:20px;height:20px}
+}
+
+/* ============ Screen 01 — Library Shelf (Gemini share 2026-11-22, screens 01/16/31) ============
+   User brief, followed literally. Light-mode mockups; dark tokens come
+   from the brief's locked design system in :root.
+   Guides used (modern-web-guidance, retrieved this turn):
+   css-layout (explicit grid tracks; flexbox for the meta row and header),
+   card (<article> root, regions in source order, subgrid not needed —
+   cards here do not share row tracks), responsive-design (dvh units for
+   the mobile FAB's safe-area offset), form-factor-adaptation (44px
+   touch targets on coarse pointers; icon-only buttons labelled).
+   No ids or data-* attributes were renamed. The mobile tab bar
+   (#libraryBar) has no place in the new layout and is hidden — see
+   the report for where its entries went. */
+
+/* Header: 56px, opaque, 1px bottom border — no translucency, no blur
+   (the brief bans glassmorphism). */
+#view-library .masthead{position:sticky;top:0;min-height:56px;padding:0 14px;background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none;border-bottom:1px solid var(--border)}
+#view-library .wordmarkName{font-size:28px}
+/* Search pill: 40px on tablet/desktop; the ⌘K keycap is JetBrains Mono. */
+@media (min-width:769px){#view-library .search{min-height:40px}}
+#view-library .searchKbd{font-family:var(--font-mono)}
+/* "Saved" stays visible on tablet (mockup 16); phones hide it (old rule). */
+@media (min-width:769px) and (max-width:1024px){#view-library .saveFlag{display:block}}
+#view-library .shelfBar{margin-bottom:24px}
+/* Active filter: dark ink on desktop/tablet (mockups 01/16), terracotta
+   on phones (mockup 31). Overrides the Pass 1 desktop inversion. */
+@media (min-width:1025px){#chipRow .chip.active{background:var(--text);color:var(--surface);border-color:var(--text)}}
+@media (max-width:768px){#chipRow .chip.active{background:var(--accent);border-color:var(--accent);color:var(--accent-text)}}
+
+/* Cards: white frame with the cover inset, portrait 4:5 covers, serif
+   cover titles. Below the cover, in order: status + % read row, thin
+   terracotta progress bar, serif title, type label. */
+#view-library .bookCard{padding:12px 12px 0}
+#view-library .book{aspect-ratio:4/5;border-radius:8px;box-shadow:var(--shadow-cover),inset 0 0 0 1px rgba(255,255,255,.09)}
+#view-library .book .bookTitle{font-family:var(--font-display);font-weight:600}
+#view-library .bookBelow{display:flex;flex-direction:column;gap:8px;padding:12px 2px 14px}
+#view-library .bookMeta{display:flex;justify-content:space-between;gap:8px;margin:0;padding:0;font-size:11px;line-height:1.55;color:var(--muted)}
+#view-library .bookMeta span{display:inline}
+#view-library .bookProgress{height:4px;border:0}
+#view-library .bookTitleBelow{display:-webkit-box}
+#view-library .bookKindBelow{display:block;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+/* Cover title stays on the cover on desktop/tablet (mockup 16); on
+   phones the title lives below the cover only (mockup 31). */
+@media (min-width:769px){#view-library .bookTitleCover{display:-webkit-box}}
+@media (max-width:768px){#view-library .bookTitleCover{display:none}}
+/* "···" is plain ink text on the card frame, not a dark chip. */
+#view-library .bookMenu{background:transparent;border:0;color:var(--text)}
+#view-library .bookMenu:hover{background:var(--paper2)}
+
+/* No bottom tab bar on the library in the new design. */
+#libraryBar{display:none}
+@media (max-width:768px){
+  .layout.shelf{padding-bottom:120px}
+  /* Floating "+ New" pill, bottom-right (mockup 31). */
+  #view-library .libFab{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    width:auto;min-width:56px;height:56px;padding:0 20px;border-radius:999px;
+    font-family:var(--font-ui);font-size:15px;font-weight:600;
+    position:fixed;right:16px;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:46;
+    border:0;background:var(--accent);color:var(--accent-text);box-shadow:var(--shadow-modal);cursor:pointer;
+  }
+  #view-library .libFab .ic{width:20px;height:20px}
 }

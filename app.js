@@ -620,17 +620,18 @@ function renderLibrary(){
     let menu='<button type="button" onclick="event.stopPropagation();'+openAct+'">'+icon(n.kind==='notebook'?'notebook':'book-2')+(n.kind==='notebook'?'Open notebook':'Read book')+'</button>'
       + (n.kind==='pdf'? '<button type="button" onclick="event.stopPropagation();annotatePdf(\''+n.id+'\')">'+icon('pencil')+'Annotate</button>':'')
       + '<button type="button" class="danger" data-delete-id="'+esc(n.id)+'">'+icon('trash')+'Delete</button>';
-    /* Pass 1 audit (mockups 11/15): the card is a white frame — the
-       coloured cover inside it, progress + meta BELOW the cover.
-       Desktop shows the title on the cover; at ≤1024px the title
-       moves below the cover in serif with the type label above the
-       bar. The button's accessible name comes from the srOnly span
-       so it survives the cover title being display:none on small
-       screens; the visible titles are aria-hidden duplicates. */
+    /* Screen 01 (Gemini screens 01/16/31): the card is a white frame —
+       the coloured cover inside it, then status + % read, the progress
+       bar, the serif title and the type label BELOW the cover. The
+       title also sits on the cover on desktop/tablet; on phones it
+       lives below the cover only. The button's accessible name comes
+       from the srOnly span so it survives the cover title being
+       display:none on small screens; the visible titles are aria-hidden
+       duplicates. */
     let titleHtml=esc(n.title).split('_').join('_&#8203;');
     let edited=n.sample?'Sample':'Edited '+esc(n.updated||'just now');
     return '<article class="bookCard"><button type="button" class="book" style="background:'+cov.bg+';color:'+cov.ink+'" onclick="'+openAct+'"><span class="srOnly">Open '+titleHtml+'</span><span class="bookSpine" style="background:'+cov.spine+'"></span><span class="bookFace"><span class="bookTitle bookTitleCover" aria-hidden="true">'+titleHtml+'</span></span></button>'
-      +'<div class="bookBelow"><span class="bookTitle bookTitleBelow">'+titleHtml+'</span><span class="bookKindBelow">'+kindLabel+'</span><span class="bookProgress" aria-hidden="true"><span style="width:'+prog+'%"></span></span><span class="srOnly">'+prog+'% read</span><span class="bookMeta"><span>'+prog+'% read</span><span>'+edited+'</span></span></div>'
+      +'<div class="bookBelow"><span class="bookMeta"><span>'+edited+'</span><span>'+prog+'% read</span></span><span class="bookProgress" aria-hidden="true"><span style="width:'+prog+'%"></span></span><span class="srOnly">'+prog+'% read</span><span class="bookTitle bookTitleBelow">'+titleHtml+'</span><span class="bookKindBelow">'+kindLabel+'</span></div>'
       +'<button type="button" class="bookMenu" aria-label="Options for '+esc(n.title)+'" aria-haspopup="true" onclick="toggleCardMenu(this)">'+icon('dots','ic-sm')+'</button>'
       +'<div class="bookActions">'+menu+'</div></article>';
   }).join('') || '<p class="kbd">Nothing matches this filter.</p>';
