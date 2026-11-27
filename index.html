@@ -331,6 +331,10 @@
       <button type="button" class="btn small pillTools" id="pillToolsBtn" onclick="openInspector('draw')" aria-haspopup="dialog" aria-controls="editorSheet" title="Open the tools panel">Tools</button>
       <button type="button" class="btn pillInsert" id="pillInsertBtn" onclick="onPillInsertClick()" aria-haspopup="menu" aria-controls="insertMenu" aria-expanded="false" title="Insert: image, table, sticky note, set square, LaTeX, handwriting to text"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-plus"></use></svg> <span class="tbLabel">Insert</span> <svg class="ic ic-sm pillInsertChev" aria-hidden="true"><use href="#ticon-chevron-down"></use></svg></button>
       <div id="insertMenu" popover="auto" class="menuPop">
+        <div class="insertSheetHead">
+          <span class="insertSheetGrip" aria-hidden="true"></span>
+          <div class="insertSheetHeadRow"><span class="insertSheetTitle">+ Insert</span><button type="button" class="insertSheetClose" onclick="closeInsertMenu()" aria-label="Close insert menu"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-x"></use></svg></button></div>
+        </div>
         <div focusgroup="menu nomemory" aria-labelledby="pillInsertBtn">
           <button type="button" onclick="closeInsertMenu();$('pageImgInput').click()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-photo"></use></svg> Image</button>
           <button type="button" onclick="closeInsertMenu();closeAllToolPops();insertTable()"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-table"></use></svg> Table</button>
@@ -379,7 +383,7 @@
               <div id="texLayer"></div>
             </div>
             <div id="setSquare" class="setSquare hidden">
-              <div class="sqBody" id="sqBody"></div>
+              <div class="sqBody" id="sqBody"><svg class="sqTicks" viewBox="0 0 300 212" preserveAspectRatio="none" aria-hidden="true"><path d="M0,212 V199 M30,212 V199 M60,212 V199 M90,212 V199 M120,212 V199 M150,212 V199 M180,212 V199 M210,212 V199 M240,212 V199 M270,212 V199 M300,212 V199 M0,212 H13 M0,182 H13 M0,152 H13 M0,122 H13 M0,92 H13 M0,62 H13 M0,32 H13 M0,2 H13" fill="none" stroke="#7A6A45" stroke-width="1"/><path d="M15,212 V205 M45,212 V205 M75,212 V205 M105,212 V205 M135,212 V205 M165,212 V205 M195,212 V205 M225,212 V205 M255,212 V205 M285,212 V205 M0,197 H7 M0,167 H7 M0,137 H7 M0,107 H7 M0,77 H7 M0,47 H7 M0,17 H7" fill="none" stroke="#7A6A45" stroke-width="0.75"/><g fill="#6B5A2E" font-size="10" font-family="Inter, system-ui, sans-serif"><text x="5" y="192">0</text><text x="30" y="192" text-anchor="middle">1</text><text x="60" y="192" text-anchor="middle">2</text><text x="90" y="192" text-anchor="middle">3</text><text x="120" y="192" text-anchor="middle">4</text><text x="150" y="192" text-anchor="middle">5</text><text x="180" y="192" text-anchor="middle">6</text><text x="210" y="192" text-anchor="middle">7</text><text x="240" y="192" text-anchor="middle">8</text><text x="270" y="192" text-anchor="middle">9</text><text x="295" y="192" text-anchor="end">10</text><text x="17" y="185.5">1</text><text x="17" y="155.5">2</text><text x="17" y="125.5">3</text><text x="17" y="95.5">4</text><text x="17" y="65.5">5</text><text x="17" y="35.5">6</text><text x="17" y="5.5">7</text></g></svg></div>
               <div class="sqHole"></div>
               <div class="sqBtns"><button type="button" onclick="rotateSetSquare(-15)" title="Rotate minus 15 degrees"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-rotate-clockwise"></use></svg></button><button type="button" onclick="rotateSetSquare(15)" title="Rotate plus 15 degrees"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-rotate-clockwise"></use></svg></button><button type="button" onclick="toggleSetSquare(false)" title="Hide set square"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-x"></use></svg></button></div>
             </div>
@@ -403,7 +407,7 @@
                 <div class="boardGrip" id="boardGrip" data-bdir="se" title="Drag to resize"></div>
               </div>
             </div>
-            <div id="boardMini" class="boardMini hidden" aria-label="Board overview"><div class="boardMiniHead"><span>Board</span><span class="boardMiniActions"><button type="button" class="btn small" onclick="toggleBoardFullscreen()">Expand</button><button type="button" class="btn small" onclick="toggleBoard(false)">Close</button></span></div><canvas id="boardMiniCanvas" width="400" height="240" aria-hidden="true"></canvas></div><div id="stickyLayer"></div>
+            <div id="boardMini" class="boardMini hidden" aria-label="Board overview"><div class="boardMiniHead"><span>Board</span><span class="boardMiniActions"><button type="button" class="btn small" onclick="toggleBoardFullscreen()">Expand</button><button type="button" class="btn small" onclick="toggleBoard(false)">Close</button></span></div><canvas id="boardMiniCanvas" width="400" height="240" aria-hidden="true"></canvas></div><div id="stickyLayer"></div><div id="tableHost"></div>
           </div></div>
           <div id="selBar"><span class="kbd" id="selInfo">Selection</span><button class="btn small" onclick="duplicateSelection()">Duplicate</button><button class="btn small" onclick="copySelection()">Copy</button><button class="btn small" onclick="pasteSelection()">Paste</button><button class="btn small" onclick="rotateSelection(-15)">Rotate left</button><button class="btn small" onclick="rotateSelection(15)">Rotate right</button><button class="btn small" onclick="scaleSelection(0.85)">Smaller</button><button class="btn small" onclick="scaleSelection(1.18)">Bigger</button><button class="btn small" onclick="flipSelection('x')"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-flip-horizontal"></use></svg> Flip</button><button class="btn small" onclick="flipSelection('y')"><svg class="ic ic-sm" aria-hidden="true"><use href="#ticon-flip-vertical"></use></svg> Flip</button><button class="btn small" onclick="bringSelectionFront()">Bring to front</button><button class="btn small danger" onclick="deleteSelection()">Delete</button><button class="btn small" onclick="clearSelection()" title="Deselect the strokes (they stay on the page)">Deselect</button><span class="kbd">Drag inside the blue box to move the selected strokes. Copy and paste work across pages.</span></div>
           <div class="notesAudioRow">
@@ -419,7 +423,6 @@
           </div>
           </div>
           <div class="statusBar" id="editorStatus" aria-live="polite"><span>Page <b id="statusPage">1 / 1</b></span><span>Layer <b id="statusLayer">Ink</b></span><span><button type="button" class="btn small" onclick="editorZoomBy(0.8)" aria-label="Zoom out">−</button> Zoom <b id="statusZoom">100%</b> <button type="button" class="btn small" onclick="editorZoomBy(1.25)" aria-label="Zoom in">+</button></span><span>Tool <b id="statusTool">Pen</b></span><span class="statusSpacer"></span><span id="statusHint">One finger draws. Two fingers scroll.</span></div>
-          <div id="tableHost"></div>
         </div>
         <div id="splitPane" class="splitPane hidden"></div>
       </div>
