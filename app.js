@@ -1258,7 +1258,7 @@ let sqAngle=0, sqDrag=null;
 function toggleSetSquare(force){
   let el=$('setSquare'); let show= typeof force==='boolean'? force : el.classList.contains('hidden');
   el.classList.toggle('hidden',!show);
-  $('setSquareBtn').classList.toggle('primary',show);
+  let sb=$('setSquareBtn'); if(sb) sb.classList.toggle('primary',show); /* Screen 11: the toolbar button is gone (its id no longer exists) — guard so toggling the ruler cannot throw */
   if(show) toast('Set square on the page. Drag it to position it, use its buttons to rotate it. Draw along its long edge for a guided straight line.');
 }
 function rotateSetSquare(deg){ sqAngle=(sqAngle+deg)%360; $('setSquare').style.transform='rotate('+sqAngle+'deg)'; }
@@ -2783,16 +2783,33 @@ document.querySelectorAll('#floatingBoard [data-bdir]').forEach(h=>{
 });
 
 /* ============ stickies & tables ============ */
-const STICKY_COLORS=['#fef08a','#fda4af','#93c5fd','#86efac','#f3e8c8'];
+const STICKY_COLORS=['#FBF0B8','#fda4af','#93c5fd','#86efac','#f3e8c8'];
 function renderStickies(){
   let p=curPageObj(); let host=$('stickyLayer'); host.innerHTML=''; if(!p) return;
   p.stickies.forEach(st=>{
-    let d=document.createElement('div'); d.className='sticky'; d.style.left=st.x+'%'; d.style.top=st.y+'%'; d.style.background=st.color;
-    d.innerHTML='<div class="stickyHead"><span>Sticky</span><span><button title="Change colour" aria-label="Change sticky colour">'+icon('palette')+'</button><button title="Delete sticky" aria-label="Delete sticky">'+icon('x')+'</button></span></div><textarea placeholder="Type a note...">'+esc(st.text)+'</textarea>';
-    let [colorBtn,delBtn]=d.querySelectorAll('.stickyHead button');
+    let d=document.createElement('div'); d.className='sticky'+(st.min?' stickyMin':''); d.style.left=st.x+'%'; d.style.top=st.y+'%'; d.style.background=st.color;
+    if(st.min){
+      /* Minimised: a small box in the sticky's own colour. Tap it to
+         reveal the note; drag it to move it (a tap is a press that
+         barely moves; a drag moves it instead). */
+      d.title='Tap to open this sticky note';
+      d.setAttribute('aria-label','Minimised sticky note — tap to open');
+      d.addEventListener('pointerdown',e=>{
+        e.stopPropagation();
+        let shell=$('canvasShell').getBoundingClientRect(); let sx=e.clientX, sy=e.clientY, ox=st.x, oy=st.y, moved=0;
+        function mv(ev){ moved=Math.max(moved,Math.abs(ev.clientX-sx),Math.abs(ev.clientY-sy)); st.x=Math.max(0,Math.min(82, ox+(ev.clientX-sx)/shell.width*100)); st.y=Math.max(0,Math.min(80, oy+(ev.clientY-sy)/shell.height*100)); d.style.left=st.x+'%'; d.style.top=st.y+'%'; }
+        function up(){ window.removeEventListener('pointermove',mv); window.removeEventListener('pointerup',up); if(moved<6){ st.min=false; renderStickies(); scheduleSave(); } }
+        window.addEventListener('pointermove',mv); window.addEventListener('pointerup',up);
+      });
+      host.appendChild(d);
+      return;
+    }
+    d.innerHTML='<div class="stickyHead"><span>Sticky</span><span><button title="Minimise sticky" aria-label="Minimise sticky">−</button><button title="Change colour" aria-label="Change sticky colour">'+icon('palette')+'</button><button title="Delete sticky" aria-label="Delete sticky">'+icon('x')+'</button></span></div><textarea placeholder="Type a note...">'+esc(st.text)+'</textarea>';
+    let [minBtn,colorBtn,delBtn]=d.querySelectorAll('.stickyHead button');
     let ta=d.querySelector('textarea');
     ta.addEventListener('input',()=>{ st.text=ta.value; scheduleSave(); });
     ta.addEventListener('pointerdown',e=>e.stopPropagation());
+    minBtn.onclick=()=>{ st.min=true; renderStickies(); scheduleSave(); };
     colorBtn.onclick=()=>{ let i=STICKY_COLORS.indexOf(st.color); st.color=STICKY_COLORS[(i+1)%STICKY_COLORS.length]; d.style.background=st.color; scheduleSave(); };
     delBtn.onclick=()=>{ p.stickies=p.stickies.filter(s=>s!==st); renderStickies(); scheduleSave(); };
     d.querySelector('.stickyHead').addEventListener('pointerdown',e=>{
@@ -2805,17 +2822,29 @@ function renderStickies(){
     host.appendChild(d);
   });
 }
-function addSticky(){ let p=curPageObj(); if(!p) return; p.stickies.push({x:62,y:58,text:'',color:STICKY_COLORS[0]}); renderStickies(); toast('Sticky added. Drag it by its top bar.'); }
+function addSticky(){ let p=curPageObj(); if(!p) return; p.stickies.push({x:62,y:58,text:'',color:STICKY_COLORS[0],min:false}); renderStickies(); toast('Sticky added. Drag it by its top bar.'); }
 function renderTable(){
   let p=curPageObj(); let host=$('tableHost'); if(!p||!p.table){ host.innerHTML=''; return; }
   let rows=p.table.rows;
-  let html='<div class="panel" style="margin-top:12px"><h4>Table</h4><table class="inkTable">';
+  if(p.table.x==null) p.table.x=10; if(p.table.y==null) p.table.y=60;
+  host.style.left=p.table.x+'%'; host.style.top=p.table.y+'%';
+  let html='<div class="panel tablePanel"><div class="tablePanelHead"><h4>Table</h4><button type="button" class="miniBtn" title="Delete table" aria-label="Delete table" onclick="tableDelete()">'+icon('x')+'</button></div><table class="inkTable">';
   rows.forEach((r,ri)=>{ html+='<tr>'+r.map((c,ci)=>'<td contenteditable="true" data-r="'+ri+'" data-c="'+ci+'">'+esc(c)+'</td>').join('')+'</tr>'; });
   html+='</table><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn small" onclick="tableAddRow()">'+icon('plus','ic-sm')+' Row</button><button class="btn small" onclick="tableAddCol()">'+icon('plus','ic-sm')+' Column</button><button class="btn small danger" onclick="tableDelete()">Delete table</button></div></div>';
   host.innerHTML=html;
   host.querySelectorAll('td').forEach(td=>td.addEventListener('input',()=>{ p.table.rows[+td.dataset.r][+td.dataset.c]=td.textContent; scheduleSave(); }));
+  /* Screen 11: the table is an on-canvas object — drag it by its header,
+     like a sticky drags by its top bar. Cells stay editable; the × and
+     the footer buttons are not drag handles. */
+  host.querySelector('.tablePanelHead').addEventListener('pointerdown',e=>{
+    if(e.target.closest('button')) return;
+    let shell=$('canvasShell').getBoundingClientRect(); let sx=e.clientX, sy=e.clientY, ox=p.table.x, oy=p.table.y;
+    function mv(ev){ p.table.x=Math.max(0,Math.min(70, ox+(ev.clientX-sx)/shell.width*100)); p.table.y=Math.max(0,Math.min(80, oy+(ev.clientY-sy)/shell.height*100)); host.style.left=p.table.x+'%'; host.style.top=p.table.y+'%'; }
+    function up(){ window.removeEventListener('pointermove',mv); window.removeEventListener('pointerup',up); scheduleSave(); }
+    window.addEventListener('pointermove',mv); window.addEventListener('pointerup',up);
+  });
 }
-function insertTable(){ let p=curPageObj(); if(!p) return; if(p.table){ toast('This page already has a table'); return; } p.table={rows:[['Item','Notes'],['',''],['','']]}; renderTable(); toast('Table inserted. Tap cells to edit.'); }
+function insertTable(){ let p=curPageObj(); if(!p) return; if(p.table){ toast('This page already has a table'); return; } p.table={rows:[['Item','Notes','Value'],['','',''],['','','']]}; renderTable(); toast('Table inserted. Tap cells to edit.'); }
 function tableAddRow(){ let p=curPageObj(); p.table.rows.push(p.table.rows[0].map(()=>'') ); renderTable(); }
 function tableAddCol(){ let p=curPageObj(); p.table.rows.forEach(r=>r.push('')); renderTable(); }
 function tableDelete(){ let p=curPageObj(); askConfirm('Delete this table?','',()=>{ p.table=null; renderTable(); }); }
@@ -3376,6 +3405,12 @@ function focusWrittenNotes(){ let t=$('noteText'); if(t){ t.scrollIntoView({bloc
     let open=e.newState==='open';
     btn.setAttribute('aria-expanded',open?'true':'false');
     if(!open) return;
+    if(window.matchMedia('(max-width:720px)').matches){
+      /* Screen 11: on phones the menu is a bottom sheet (see the
+         max-width:720px rules for #insertMenu) — it places itself, so
+         clear any inline position left over from a wider viewport. */
+      menu.style.position=''; menu.style.margin=''; menu.style.top=''; menu.style.left='';
+    } else {
     /* Script positioning, below the trigger, flipping above when there
        is no room, clamped to the viewport. */
     let r=btn.getBoundingClientRect();
@@ -3383,6 +3418,7 @@ function focusWrittenNotes(){ let t=$('noteText'); if(t){ t.scrollIntoView({bloc
     let top=r.bottom+6, left=Math.max(8,Math.min(r.right-menu.offsetWidth,window.innerWidth-menu.offsetWidth-8));
     if(top+menu.offsetHeight>window.innerHeight-8) top=Math.max(8,r.top-menu.offsetHeight-6);
     menu.style.top=top+'px'; menu.style.left=left+'px';
+    }
     if(lastKey){ let first=menu.querySelector('[focusgroup] button'); if(first) first.focus(); }
   });
 })();
@@ -4944,7 +4980,7 @@ async function handwritingToText(){
   let p=curPageObj(); if(!p){ toast('Open a notebook first'); return; }
   if(!p.ink.length){ toast('Write something on the page first'); return; }
   if(!window.Tesseract){ toast('Recognition engine could not load. Check the connection.'); return; }
-  let btn=$('hwBtn'); btn.disabled=true; let hwLab=btn?btn.querySelector('span'):null; if(hwLab) hwLab.textContent='Recognising…'; else if(btn) btn.textContent='Recognising…';
+  let btn=$('hwBtn'); let hwLab=btn?btn.querySelector('span'):null; if(btn){ btn.disabled=true; if(hwLab) hwLab.textContent='Recognising…'; else btn.textContent='Recognising…'; }
   try{
     let comp=composePage(p,'blank');
     let res=await Tesseract.recognize(comp,'eng');
@@ -4952,7 +4988,7 @@ async function handwritingToText(){
     if(text){ $('noteText').value=($('noteText').value? $('noteText').value+'\n':'')+text; saveEditorToModel(); updateWordCount(); toast('Handwriting recognised and added below'); }
     else toast('No text recognised. Try larger, clearer letters.');
   }catch(e){ toast('Recognition failed. Check the connection and retry.'); }
-  btn.disabled=false; if(hwLab) hwLab.textContent='Handwriting → Text'; else btn.textContent='Handwriting → Text';
+  if(btn){ btn.disabled=false; if(hwLab) hwLab.textContent='Handwriting → Text'; else btn.textContent='Handwriting → Text'; }
 }
 
 /* --- TTS --- */
