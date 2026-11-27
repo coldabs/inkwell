@@ -2787,12 +2787,29 @@ const STICKY_COLORS=['#FBF0B8','#fda4af','#93c5fd','#86efac','#f3e8c8'];
 function renderStickies(){
   let p=curPageObj(); let host=$('stickyLayer'); host.innerHTML=''; if(!p) return;
   p.stickies.forEach(st=>{
-    let d=document.createElement('div'); d.className='sticky'; d.style.left=st.x+'%'; d.style.top=st.y+'%'; d.style.background=st.color;
-    d.innerHTML='<div class="stickyHead"><span>Sticky</span><span><button title="Change colour" aria-label="Change sticky colour">'+icon('palette')+'</button><button title="Delete sticky" aria-label="Delete sticky">'+icon('x')+'</button></span></div><textarea placeholder="Type a note...">'+esc(st.text)+'</textarea>';
-    let [colorBtn,delBtn]=d.querySelectorAll('.stickyHead button');
+    let d=document.createElement('div'); d.className='sticky'+(st.min?' stickyMin':''); d.style.left=st.x+'%'; d.style.top=st.y+'%'; d.style.background=st.color;
+    if(st.min){
+      /* Minimised: a small box in the sticky's own colour. Tap it to
+         reveal the note; drag it to move it (a tap is a press that
+         barely moves; a drag moves it instead). */
+      d.title='Tap to open this sticky note';
+      d.setAttribute('aria-label','Minimised sticky note — tap to open');
+      d.addEventListener('pointerdown',e=>{
+        e.stopPropagation();
+        let shell=$('canvasShell').getBoundingClientRect(); let sx=e.clientX, sy=e.clientY, ox=st.x, oy=st.y, moved=0;
+        function mv(ev){ moved=Math.max(moved,Math.abs(ev.clientX-sx),Math.abs(ev.clientY-sy)); st.x=Math.max(0,Math.min(82, ox+(ev.clientX-sx)/shell.width*100)); st.y=Math.max(0,Math.min(80, oy+(ev.clientY-sy)/shell.height*100)); d.style.left=st.x+'%'; d.style.top=st.y+'%'; }
+        function up(){ window.removeEventListener('pointermove',mv); window.removeEventListener('pointerup',up); if(moved<6){ st.min=false; renderStickies(); scheduleSave(); } }
+        window.addEventListener('pointermove',mv); window.addEventListener('pointerup',up);
+      });
+      host.appendChild(d);
+      return;
+    }
+    d.innerHTML='<div class="stickyHead"><span>Sticky</span><span><button title="Minimise sticky" aria-label="Minimise sticky">−</button><button title="Change colour" aria-label="Change sticky colour">'+icon('palette')+'</button><button title="Delete sticky" aria-label="Delete sticky">'+icon('x')+'</button></span></div><textarea placeholder="Type a note...">'+esc(st.text)+'</textarea>';
+    let [minBtn,colorBtn,delBtn]=d.querySelectorAll('.stickyHead button');
     let ta=d.querySelector('textarea');
     ta.addEventListener('input',()=>{ st.text=ta.value; scheduleSave(); });
     ta.addEventListener('pointerdown',e=>e.stopPropagation());
+    minBtn.onclick=()=>{ st.min=true; renderStickies(); scheduleSave(); };
     colorBtn.onclick=()=>{ let i=STICKY_COLORS.indexOf(st.color); st.color=STICKY_COLORS[(i+1)%STICKY_COLORS.length]; d.style.background=st.color; scheduleSave(); };
     delBtn.onclick=()=>{ p.stickies=p.stickies.filter(s=>s!==st); renderStickies(); scheduleSave(); };
     d.querySelector('.stickyHead').addEventListener('pointerdown',e=>{
@@ -2805,7 +2822,7 @@ function renderStickies(){
     host.appendChild(d);
   });
 }
-function addSticky(){ let p=curPageObj(); if(!p) return; p.stickies.push({x:62,y:58,text:'',color:STICKY_COLORS[0]}); renderStickies(); toast('Sticky added. Drag it by its top bar.'); }
+function addSticky(){ let p=curPageObj(); if(!p) return; p.stickies.push({x:62,y:58,text:'',color:STICKY_COLORS[0],min:false}); renderStickies(); toast('Sticky added. Drag it by its top bar.'); }
 function renderTable(){
   let p=curPageObj(); let host=$('tableHost'); if(!p||!p.table){ host.innerHTML=''; return; }
   let rows=p.table.rows;

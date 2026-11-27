@@ -586,6 +586,9 @@ mark{background:#F2D887;color:#1A1A1A;padding:0 2px;border-radius:2px}
 .stickyHead button:hover{background:rgba(0,0,0,.12)}
 .stickyHead .ic{width:13px;height:13px}
 .sticky textarea{width:100%;height:96px;padding:8px;border:0;background:transparent;color:#111;font-family:var(--font-ui);font-size:13px;line-height:1.5;resize:none;outline:none}
+/* Minimised sticky: a small box in the sticky's own colour (background is
+   set inline, same as the open note). Tap it to reveal the note. */
+.sticky.stickyMin{width:48px;height:48px;border-radius:6px;cursor:pointer;touch-action:none}
 .setSquare{position:absolute;left:24px;top:24px;z-index:6;width:300px;max-width:82%;aspect-ratio:300/212;pointer-events:none;filter:drop-shadow(0 6px 14px rgba(0,0,0,.25));transform-origin:20% 85%}
 .setSquare .sqBody{position:absolute;inset:0;background:rgba(242,179,61,.34);border:1.5px solid rgba(146,104,20,.75);clip-path:polygon(0 100%,100% 100%,0 0);pointer-events:auto;touch-action:none;cursor:grab}
 .setSquare .sqHole{position:absolute;left:16%;bottom:9%;width:46%;height:52%;background:rgba(255,255,255,.30);border:1px solid rgba(146,104,20,.55);clip-path:polygon(0 100%,100% 100%,0 0);pointer-events:none}
